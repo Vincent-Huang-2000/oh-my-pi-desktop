@@ -6,6 +6,8 @@ oh-my-pi 的桌面端客户端 —— 一个**对话型 AI Agent 工作台**。
 
 当前版本 `0.1.0`，主要面向 Windows 平台。
 
+![主窗口：三栏工作台 + 对话 + 审阅](docs/images/main-window.png)
+
 ## 功能特性
 
 - **三栏工作台布局**：左侧全高项目栏 + 中间对话区 + 右侧上下文栏（审查 / 终端输出）
@@ -20,7 +22,7 @@ oh-my-pi 的桌面端客户端 —— 一个**对话型 AI Agent 工作台**。
 ## 前置依赖
 
 - **Node.js** >= 22.12.0（Electron 42 要求）
-- **omp CLI** — [oh-my-pi](https://github.com/can1357/oh-my-pi) 的命令行工具，需确保 `omp acp --help` 可正常执行。当前桌面端使用的omp非原版omp，后续会考虑开源。原版omp ACP存在一些问题。
+- **omp CLI**（已在 `v16.4.8` 上验证）— [oh-my-pi](https://github.com/can1357/oh-my-pi) 的命令行工具，需确保 `omp acp --help` 可正常执行。当前桌面端使用的omp非原版omp，后续会考虑开源。原版omp ACP存在一些问题。
 
 ## 快速开始
 
@@ -125,4 +127,4 @@ npm run preview   # 仅渲染层预览
 
 ## 许可证
 
-待定。
+本项目基于 [MIT 协议](LICENSE) 开源。
