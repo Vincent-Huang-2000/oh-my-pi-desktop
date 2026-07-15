@@ -1,0 +1,93 @@
+/* ============================================================
+ * 代码语法高亮主题：omp-light（浅色）
+ *
+ * 由 rehype-highlight（基于 highlight.js）在渲染时给 fenced code
+ * 的 token 注入 .hljs-* class，本文件仅定义这些 token 的配色。
+ *
+ * 换主题：新建同目录文件（如 omp-dark.css）并替换 main.tsx 中的引入；
+ * 或后续接入「按 class 切换主题」时把各主题规则置于不同 data-theme 作用域下。
+ *
+ * 注意：本文件只管代码块内部 token 颜色，不触碰 .code-block-wrapper /
+ * pre 容器结构样式（那些仍在 styles.css 中维护）。
+ * 配色基调与全局 --theme-accent（靛蓝 H245）保持协调。
+ * ============================================================ */
+
+.hljs {
+  color: #1e2825;          /* 兜底文字色（= --color-text），被 styles.css 的 pre code 覆盖也无妨 */
+  background: transparent;  /* 背景由 .code-block-wrapper pre 提供 */
+}
+
+/* 注释：柔和灰绿 */
+.hljs-comment,
+.hljs-quote {
+  color: #8a9491;
+  font-style: italic;
+}
+
+/* 关键字 / 控制流 / 布尔：靛蓝（与主题强调色同系，饱和度略低） */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-type {
+  color: #5b54e0;
+}
+
+/* 字符串 / 文本 / 正则：低饱和青绿 */
+.hljs-string,
+.hljs-regexp,
+.hljs-addition {
+  color: #1a8a5f;
+}
+
+/* 数字 / 常量：暖琥珀 */
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet {
+  color: #b06a00;
+}
+
+/* 函数名 / 标题：靛蓝偏蓝 */
+.hljs-title,
+.hljs-section,
+.hljs-name {
+  color: #3b5bdb;
+}
+
+/* 属性 / 变量 / 模板标签：靛紫 */
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-template-tag {
+  color: #7c4dff;
+}
+
+/* 标签 / 选择器：青蓝 */
+.hljs-tag,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-selector-pseudo,
+.hljs-meta {
+  color: #0e7490;
+}
+
+/* 内置 / 特殊符号：玫红 */
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-deletion {
+  color: #d6336c;
+}
+
+/* 强调 / 链接：保持中等灰，避免过亮 */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
+
+.hljs-link {
+  color: #3b5bdb;
+  text-decoration: underline;
+}
