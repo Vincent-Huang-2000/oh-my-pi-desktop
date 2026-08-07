@@ -248,15 +248,6 @@
 }
 
 /* ── 消息内部 ── */
-.message > span {
-  display: block;
-  margin-bottom: 2px;
-  color: var(--color-text-tertiary);
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
 
 .message p {
   margin: 0;
@@ -518,8 +509,7 @@
   padding: 0;
   overflow: hidden;
 }
-/* 工具卡片内隐藏全局 message span/p 样式 */
-.tool-card > span,
+/* 工具卡片内隐藏全局 message p 样式 */
 .tool-card > p { display: none; }
 
 .tool-card-header {
@@ -779,10 +769,8 @@
   /* 计划卡片轻微透明，透出对话区底色 */
   background: rgba(255, 255, 255, 0.55);
 }
-/* 计划卡片内不显示全局 message span/p 样式 */
-.message.plan > span,
+/* 计划卡片内隐藏全局 message p 样式 */
 .message.plan > p { display: none; }
-
 .plan-empty {
   padding: 12px 14px;
   color: var(--color-text-muted);

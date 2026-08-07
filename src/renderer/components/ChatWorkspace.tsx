@@ -400,17 +400,6 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
 
   return (
     <article className={`message ${message.role}`} key={message.id}>
-      {!isStatus && (
-        <span>
-          {message.role === 'agent'
-            ? 'agent'
-            : message.role === 'thought'
-              ? '思考'
-              : message.role === 'user'
-                ? 'user'
-                : message.role}
-        </span>
-      )}
       {useMarkdown ? <MemoizedMarkdownContent text={message.text} /> : <p>{message.text}</p>}
       {!isStatus && (
         <button type="button" className="msg-copy-btn" onClick={handleCopyMessage} title={copyMsgDone ? '已复制' : '复制全文'}>
@@ -686,16 +675,17 @@ function TurnBlock({
   collapsedToolGroups,
   onSetToolGroupCollapsed
 }: TurnBlockProps) {
-  const { finalAnswer, processOnly, tailMessages, elicitationMessages, planMessages } = useMemo(() => {
-    // 审批记录与计划是关键节点，始终放在思考折叠区外展示。
+  const { finalAnswer, processOnly, tailMessages, elicitationMessages, planMessages, statusMessages } = useMemo(() => {
+    // 审批记录、计划与状态是用户需要看见的关键节点，始终放在思考折叠区外展示。
     const elicitationMessages = processMessages.filter((message) => message.role === 'elicitation');
     const planMessages = processMessages.filter((message) => message.role === 'plan');
+    const statusMessages = processMessages.filter((message) => message.role === 'status');
     const ordinaryMessages = processMessages.filter(
-      (message) => message.role !== 'elicitation' && message.role !== 'plan'
+      (message) => message.role !== 'elicitation' && message.role !== 'plan' && message.role !== 'status'
     );
     if (isActive) {
       // 当前回合仍在流式输出时，agent 文本也归入折叠区，避免长输出持续占满中间栏。
-      return { finalAnswer: null, processOnly: ordinaryMessages, tailMessages: [], elicitationMessages, planMessages };
+      return { finalAnswer: null, processOnly: ordinaryMessages, tailMessages: [], elicitationMessages, planMessages, statusMessages };
     }
     // 最终回答通常是最后一条 agent 消息；如果 agent 没有正常输出，error 消息作为回合同等重要的结果也始终展开。
     const lastFinalIndex = ordinaryMessages
@@ -707,10 +697,11 @@ function TurnBlock({
         processOnly: ordinaryMessages.slice(0, lastFinalIndex),
         tailMessages: ordinaryMessages.slice(lastFinalIndex + 1),
         elicitationMessages,
-        planMessages
+        planMessages,
+        statusMessages
       };
     }
-    return { finalAnswer: null, processOnly: ordinaryMessages, tailMessages: [], elicitationMessages, planMessages };
+    return { finalAnswer: null, processOnly: ordinaryMessages, tailMessages: [], elicitationMessages, planMessages, statusMessages };
   }, [processMessages, isActive]);
 
   const summary = useMemo(() => {
@@ -750,6 +741,10 @@ function TurnBlock({
         </div>
       )}
       {planMessages.map((message) => (
+        <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
+      ))}
+
+      {statusMessages.map((message) => (
         <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
       ))}
       {elicitationMessages.map((message) => (

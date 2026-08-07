@@ -174,14 +174,15 @@ export const mergeAgentEventIntoMessages = (
           : unresolvedToolResult
       };
     });
-    return [
-      ...settledMessages,
-      {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        role,
-        text: event.message
-      }
-    ];
+    // 正常 end_turn 和 cancelled 都静默完成：前者状态栏已有"完成"，后者已有 "已请求取消当前回合" 即时反馈。
+    // 只有 error 才追加错误消息到对话流。
+    if (event.type === 'error') {
+      return [
+        ...settledMessages,
+        { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, role, text: event.message }
+      ];
+    }
+    return settledMessages;
   }
 
   return [
