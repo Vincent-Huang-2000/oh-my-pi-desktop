@@ -2,6 +2,20 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 新增
+
+- **布局优化**：窄窗口自适应（避免横向/纵向滚动条），侧栏折叠状态持久化
+
+### 修复
+
+- 重启后 OMP 状态始终显示"未检测"的问题
+- Fork 失败后 usageBySession 残留占位 session 条目
+- 窗口缩窄时出现横向与纵向滚动条的问题
+- ProjectPane 会话菜单被 `overflow: hidden` 裁剪导致不可见
+- ProjectPane 折叠/展开会话时滚动条位置不稳定，优化滚动条稳定性、交互细节与视觉间距
+
 ## [0.1.0] - 2026-07-15
 
 ### 新增
