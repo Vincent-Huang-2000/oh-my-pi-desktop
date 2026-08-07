@@ -18,6 +18,8 @@
  * ## 维护
  * - 新增事件类型在本文件末尾追加 else-if 分支。
  * - 事件 payload 解析走 utils 中的 getPayload* 系列，不在此处内联。
+ * - 不再在每个事件上更新 desktopState.logs——主进程 agentService 已通过 addLog 写盘，
+ *   渲染端不需重复构建 120 条日志数组来触发整棵 App 重渲染。
  */
 import { useEffect } from 'react';
 import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption, PermissionRequest, QuestionnaireRequest } from '../types';

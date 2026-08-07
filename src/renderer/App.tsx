@@ -1,3 +1,19 @@
+/**
+ * App — 渲染进程根组件。
+ *
+ * 薄编排层：实例化 10 个业务 hook，按 props 下传给子组件组装三栏布局。
+ * 本身不持有任何 useState——全部下沉到 useAppCore。
+ *
+ * ## 渲染隔离策略
+ * - 工具组折叠回调（onSetToolGroupCollapsed）通过 useCallback 稳定引用，
+ *   避免输入时 messageItems useMemo 失效。
+ * - elicitation 空队列复用常量引用，避免每次渲染创建新数组。
+ *
+ * ## 维护
+ * - 新增 state 必须先加到 useAppCore，不在 App 中内联 useState。
+ * - 修改 UI 结构前先读 docs/UI/ui-layout-reference.md。
+ * - IPC 通道新增/修改必须同步 ipc.ts + preload.ts + vite-env.d.ts。
+ */
 import { ChatWorkspace } from './components/ChatWorkspace';
 import { ContextPane } from './components/ContextPane';
 import { ElicitationModal } from './components/ElicitationModal';

@@ -4,7 +4,7 @@
  * 管理 ChatWorkspace 中每组工具调用的折叠/展开状态：
  * - collapsedToolGroupsBySession ref 以 sessionId → { toolGroupId → boolean | undefined } 分桶
  * - collapsedToolGroupsVersion 版本号驱动 React 重渲染（ref 变更不触发渲染）
- * - 回合 done 后自动折叠当前回合的工具组（resetCollapsedToolGroupsForSession）
+ * - 回合 done 后自动折叠当前回合的工具组（外部通过 setGroupCollapsed 触发）
  *
  * 导出方法：
  * - findLatestToolGroupId / collapseAllToolGroupsForSession / resetCollapsedToolGroupsForSession
@@ -12,7 +12,9 @@
  *
  * ## 维护
  * - undefined 表示尚未写入状态，ChatWorkspace 按默认折叠展示。
- * - 切 session 时由调用方调用 resetCollapsedToolGroupsForSession 初始化新折叠桶。
+ * - resetCollapsedToolGroupsForSession 清空指定 session 的折叠桶，用于关闭/切会话/切项目。
+ * - handleSetToolGroupCollapsed 与 bumpCollapsedToolGroups 通过 useCallback 稳定引用，
+ *   供 ChatWorkspace 的 messageItems useMemo 直接使用，避免输入时无意义失效。
  */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChatMessage } from '../types';

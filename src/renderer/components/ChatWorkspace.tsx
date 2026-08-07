@@ -1,3 +1,24 @@
+/**
+ * ChatWorkspace — 中间对话工作区组件。
+ *
+ * 渲染消息流（按回合分组、工具组折叠、Markdown 渲染）和底部输入区（textarea、
+ * slash 命令面板、附件预览、模型/模式/推理强度/审批档位配置入口、加号菜单）。
+ *
+ * ## 渲染隔离设计
+ * - MemoizedMessageStream 将消息历史区与受控输入区隔离；prompt 变化时仅更新 composer，
+ *   不重新渲染历史消息 DOM。
+ * - 消息叶子组件（ToolCallCard / PlanCard / SimpleMessage / MarkdownContent /
+ *   ElicitationMessage / MessageRenderer）均通过 React.memo 包裹，同一消息 props
+ *   不变时跳过渲染。
+ * - Markdown 插件数组和组件映射提升为模块级常量，避免每次渲染重建。
+ * - 审批响应、计划定位、滚动回调通过 useCallback + ref 稳定化，不破坏 memo 链。
+ *
+ * ## 维护
+ * - 新增消息角色时更新 MessageRenderer 分发分支。
+ * - 修改 Markdown 渲染行为时注意 MemoizedMarkdownContent 的比较策略。
+ * - 回合 / 工具组折叠状态走 expandedProcesses（本地 useState）和
+ *   collapsedToolGroups（App 下传）；切 session 时自动清空。
+ */
 import React, { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import ReactMarkdown from 'react-markdown';

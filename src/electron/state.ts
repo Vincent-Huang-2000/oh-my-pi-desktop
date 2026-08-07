@@ -1,3 +1,23 @@
+/**
+ * state — JSON 持久化模块。
+ *
+ * 读写 `userData/oh-my-pi-desktop-state.json`：
+ * - 项目列表（recentProjects）、会话列表（recentSessions）、日志（logs）
+ * - 按项目缓存的 ACP 配置与命令（configCacheByProjectPath）
+ * - 工具调用模型快照（toolModelSnapshotsBySession）
+ * - 全局设置（settings：omp 路径、侧栏布局等）
+ *
+ * ## 写盘策略
+ * - upsertProject / upsertSession / setSetting / updateProjectConfigCache /
+ *   saveToolModelSnapshot → **同步即时写盘**（低频操作，数据不出错优先）。
+ * - addLog → **内存缓冲 + 800ms 防抖批量落盘**（高频流式事件，不阻塞主进程事件循环）。
+ *   退出前由 main.ts 调用 flushPendingLogs() 确保最后一批不丢失。
+ *
+ * ## 维护
+ * - readState / writeState 均为同步 I/O。新增高频写路径必须走防抖策略。
+ * - recentSessions 上限 maxRecentSessions = 200。
+ * - 所有 StoredSession 的 approvalProfile 在读时经 normalizeApprovalProfile 清洗。
+ */
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
