@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import type { ChatMessage } from '../types';
 
-// 工具调用折叠状态：按 sessionId 分桶，key = 「该工具组最后一条 tool 消息的 id」，
-// value = true 表示折叠成摘要卡、false 表示用户主动展开、undefined 表示从未被用户操作过。
-// ChatWorkspace 会把 undefined 也按默认折叠展示；用户主动展开后保持 false 不被覆盖。
+// 工具调用折叠状态：按 sessionId 分桶，key = 「该工具组最后一条 tool 消息的 id」。
+// true 表示折叠成摘要卡，false 表示用户在当前回合执行期间手动展开，undefined 表示尚未写入状态。
+// ChatWorkspace 将 undefined 按默认折叠展示；当前回合收到 done 后，App 会把该回合最后的工具组重新设为 true。
 
 export function useToolGroups(
   selectedSession: StoredSession | null,
@@ -100,7 +100,7 @@ export function useToolGroups(
     bumpCollapsedToolGroups();
   };
 
-  // 直接设置某个 session 指定 groupId 的折叠状态（不限当前 session，用于 done 事件等场景）。
+  // 直接设置某个 session 指定 groupId 的折叠状态（不限当前 session；done 时用于重新收拢本回合工具组）。
   const setGroupCollapsed = (sessionId: string, groupId: string, collapsed: boolean) => {
     const bucket = collapsedToolGroupsBySession.current[sessionId] ?? {};
     if (bucket[groupId] === collapsed) return;

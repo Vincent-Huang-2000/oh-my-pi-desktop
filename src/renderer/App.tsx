@@ -850,8 +850,8 @@ export default function App() {
       if (event.type === 'done' && selectedSessionRef.current?.id === event.sessionId) {
         setAgentStatus('完成');
         setIsAgentBusy(false);
-        // 自动折叠本轮的工具组：扫描当前 session 消息流，找到本轮最后一条 tool 消息的 id 作为 groupId。
-        // 仅在该 groupId 状态为 undefined（用户从未操作）时设为 true；用户主动展开的保持展开。
+        // 回合结束时自动收拢本轮工具组：扫描当前 session 消息流，找到最后一条 tool 消息的 id 作为 groupId。
+        // 用户可在执行期间临时展开；收到 done 后统一折叠，让已完成回合保持紧凑。
         const list = messageCache.current[event.sessionId];
         const groupId = list ? toolGroups.findLatestToolGroupId(list) : undefined;
         if (groupId) {
