@@ -17,7 +17,7 @@ import {
   upsertSession
 } from './state.js';
 import type { AgentPromptContent, AgentService } from './agentService.js';
-import type { ApprovalProfile } from './types.js';
+import type { ApprovalProfile, PaneLayoutSettings } from './types.js';
 
 const MAX_INLINE_UNTRACKED_FILE_SIZE = 512 * 1024;
 
@@ -219,6 +219,26 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   // 读取当前用户指定的 omp 可执行文件路径（空字符串表示使用 PATH 中的 'omp'）。
   ipcMain.handle('desktop:get-omp-path', () => {
     return getSetting('ompExecutablePath') || '';
+  });
+
+  // 保存侧栏布局（宽度与折叠状态）。仅做形状校验，宽度钳制由渲染层在写入/读取时负责。
+  ipcMain.handle('desktop:set-pane-layout', (_event, layout: PaneLayoutSettings) => {
+    if (
+      !layout || typeof layout !== 'object'
+      || typeof layout.leftWidth !== 'number' || !Number.isFinite(layout.leftWidth)
+      || typeof layout.rightWidth !== 'number' || !Number.isFinite(layout.rightWidth)
+      || typeof layout.leftCollapsed !== 'boolean'
+      || typeof layout.rightCollapsed !== 'boolean'
+    ) {
+      return { ok: false, message: '侧栏布局数据格式不正确' };
+    }
+    setSetting('paneLayout', {
+      leftWidth: layout.leftWidth,
+      rightWidth: layout.rightWidth,
+      leftCollapsed: layout.leftCollapsed,
+      rightCollapsed: layout.rightCollapsed
+    });
+    return { ok: true };
   });
 
   // 打开文件选择对话框让用户选择 omp 可执行文件，保存设置并执行 --version 验证。

@@ -52,6 +52,14 @@ type AgentEvent = {
 type DiffSource = 'unstaged' | 'staged';
 type ApprovalProfile = 'always-ask' | 'write' | 'yolo';
 
+// 侧栏布局持久化数据结构，与 src/electron/types.ts 的 PaneLayoutSettings 保持一致。
+type PaneLayoutSettings = {
+  leftWidth: number;
+  rightWidth: number;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+};
+
 const desktop = {
   getState: () => ipcRenderer.invoke('desktop:get-state'),
   // 选择 workspace 目录：主进程弹 dialog.showOpenDialog 并 upsert 项目。
@@ -82,6 +90,8 @@ const desktop = {
   getOmpPath: () => ipcRenderer.invoke('desktop:get-omp-path'),
   // 打开文件选择对话框选择 omp 可执行文件，保存设置并验证。
   selectOmpPath: () => ipcRenderer.invoke('desktop:select-omp-path'),
+  // 保存侧栏布局（宽度与折叠状态）到 settings.paneLayout。
+  setPaneLayout: (layout: PaneLayoutSettings) => ipcRenderer.invoke('desktop:set-pane-layout', layout),
   createSession: (projectPath: string, title: string, approvalProfile: ApprovalProfile) =>
     ipcRenderer.invoke('desktop:create-session', projectPath, title, approvalProfile),
   startAgent: (sessionId: string, workspacePath: string) =>

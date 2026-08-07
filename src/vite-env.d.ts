@@ -52,9 +52,19 @@ type StoredLog = {
   createdAt: string;
 };
 
+// 三栏布局侧栏的持久化状态（宽度 + 折叠标记），与 src/electron/types.ts 保持同步。
+type PaneLayoutSettings = {
+  leftWidth: number;
+  rightWidth: number;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+};
+
 type DesktopSettings = {
   // 用户指定的 omp 可执行文件路径；为空时使用 PATH 中的 'omp'。
   ompExecutablePath?: string;
+  // 侧栏布局（宽度与折叠状态）；缺失时使用默认布局。
+  paneLayout?: PaneLayoutSettings;
 };
 
 type DesktopState = {
@@ -63,7 +73,7 @@ type DesktopState = {
   logs: StoredLog[];
   configCacheByProjectPath: Record<string, StoredProjectConfigCache>;
   toolModelSnapshotsBySession: Record<string, Record<string, ToolModelSnapshot>>;
-  // 全局设置：目前用于指定 omp 可执行文件路径。
+  // 全局设置：omp 可执行文件路径、侧栏布局（宽度与折叠状态）等。
   settings?: DesktopSettings;
 };
 
@@ -146,6 +156,8 @@ interface Window {
     checkOmp: (workspacePath?: string) => Promise<{ installed: boolean; status: string; message: string }>;
     getOmpPath: () => Promise<string>;
     selectOmpPath: () => Promise<{ ok: boolean; path?: string; message?: string }>;
+    // 保存侧栏布局（宽度与折叠状态），启动时随 getState 恢复。
+    setPaneLayout: (layout: PaneLayoutSettings) => Promise<{ ok: boolean; message?: string }>;
     createSession: (
       projectPath: string,
       title: string,
