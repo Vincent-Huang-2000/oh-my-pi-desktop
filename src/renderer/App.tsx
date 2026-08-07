@@ -1,8 +1,6 @@
 import {
   ClipboardEvent,
-  CSSProperties,
   FormEvent,
-  MouseEvent as ReactMouseEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -27,407 +25,25 @@ import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption
 import {
   getElicitationKind,
   getLogLevel,
-  getMessageRole,
   getPayloadAvailableCommands,
   getPayloadConfigOptions,
   getPayloadElicitationField,
   getPayloadFullPlan,
   getPayloadQuestionnaire,
-  getPayloadMessageId,
   getPayloadPermissionOptions,
-  getPayloadPlanChange,
   getPayloadRequestId,
-  getPayloadToolCall,
   splitElicitationPlan
 } from './utils';
+import { type PendingAttachment, classifyAttachment } from './lib/attachments';
+import { DEFAULT_APPROVAL_PROFILE, MAX_IMAGE_BYTES, REVIEW_SOURCE_LABEL, type DraftConfigValues, type PaneSide, type ReviewSource } from './lib/constants';
+import { getElicitationResultText } from './lib/elicitationText';
+import { applyActiveSessionPlan, getActiveSessionPlan, getHistoryLoadedEvents, getHistoryLoadedPlans, insertHistoricalPlans } from './lib/historyLoaders';
+import { mergeAgentEventIntoMessages } from './lib/messageMerge';
+import { type PendingSlashCommand, parseSlashCommand, resolveCommandPendingMeta } from './lib/slashCommands';
+import { usePaneLayout } from './hooks/usePaneLayout';
+import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
 
-// 附件大小上限（图片 / 文本 / 其它统一 8MB）。dataURL 是 base64，长度约为原文件 ×4/3。
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-const LEFT_PANE_DEFAULT_WIDTH = 280;
-const LEFT_PANE_MIN_WIDTH = 120;
-const LEFT_PANE_MAX_WIDTH = 480;
-const LEFT_PANE_COLLAPSE_THRESHOLD = 180;
-const RIGHT_PANE_DEFAULT_WIDTH = 320;
-const RIGHT_PANE_MIN_WIDTH = 180;
-const RIGHT_PANE_MAX_WIDTH = 560;
-const RIGHT_PANE_COLLAPSE_THRESHOLD = 220;
-type PaneSide = 'left' | 'right';
-type ReviewSource = 'unstaged' | 'staged';
-type DraftConfigValues = Partial<Record<'model' | 'mode' | 'thinking', string>>;
-const DEFAULT_APPROVAL_PROFILE: ApprovalProfile = 'write';
-
-// ACP 没有单独的「开始创建计划」事件；通过计划工具标题识别其执行阶段，
-// 先插入可见占位卡，收到正式 plan 事件后再替换为完整计划。
-const isPlanToolCall = (title: string) => {
-  const normalized = title.trim().toLowerCase();
-  return (
-    normalized.includes('update_plan') ||
-    /\b(create|creating|update|updating|write|writing)\s+(the\s+)?plan\b/.test(normalized) ||
-    /(创建|生成|更新|编写|制定).*计划/.test(normalized)
-  );
-};
-
-// 待发送的附件。kind 决定发送时走哪种 ACP 块（见主进程 buildPromptBlocks）：
-//  - image:       omp 能让模型看到（base64 图片）
-//  - text:        base64 解码后追加到 text 块，omp 能让模型看到
-//  - unsupported: 仍发送，但 omp 会兜底成占位符，模型读不到内容（chip 上标警告）
-type PendingAttachment = {
-  dataUrl: string;
-  fileName: string;
-  kind: 'image' | 'text' | 'unsupported';
-};
-
-// 文本类附件扩展名清单：命中则按 text 处理（解码后拼进 text 块）。
-// 未命中且非 image/* 的，按 unsupported 处理。
-const TEXT_EXTENSIONS = [
-  '.txt', '.md', '.markdown', '.json', '.py', '.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx',
-  '.csv', '.log', '.yml', '.yaml', '.toml', '.xml', '.html', '.htm', '.css', '.scss', '.less',
-  '.ini', '.conf', '.sh', '.bash', '.bat', '.ps1', '.rs', '.go', '.java', '.c', '.cpp', '.cc',
-  '.h', '.hpp', '.cs', '.rb', '.php', '.swift', '.kt', '.sql', '.graphql', '.vue', '.svelte'
-];
-
-// 按 MIME + 文件名扩展名判定附件类别。
-const classifyAttachment = (file: File): 'image' | 'text' | 'unsupported' => {
-  if (file.type.startsWith('image/')) {
-    return 'image';
-  }
-  if (file.type.startsWith('text/')) {
-    return 'text';
-  }
-  const lower = file.name.toLowerCase();
-  if (TEXT_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
-    return 'text';
-  }
-  return 'unsupported';
-};
-
-// 待执行的 slash 命令卡片：用户按下发送后、omp 真正回包前展示，
-// 给"按下发送"与"看到输出"之间一个明确的视觉过渡。
-// 按 sessionId 分桶，与 messageCache / permissionBySession / usageBySession 同属多 session 隔离缓存。
-type PendingSlashCommand = {
-  id: string;
-  name: string;
-  args: string;
-  sentAt: string;
-  // 已匹配到的命令元数据（图标 + 说明文案），渲染时直接读，避免每次渲染重新查表。
-  icon: string;
-  label: string;
-};
-
-// 已知 slash 命令的差异化展示元数据。只列几条用户高频命令，
-// 不是完整命令清单——命令清单仍由 omp 通过 available_commands_update 下发。
-const COMMAND_PENDING_META: Record<string, { icon: string; label: string }> = {
-  compact: { icon: '⊜', label: '正在压缩上下文…' },
-  model: { icon: '◆', label: '正在切换模型…' },
-  mode: { icon: '◐', label: '正在切换模式…' },
-  plan: { icon: '□', label: '正在切换 Plan 模式…' },
-  'plan-review': { icon: '□', label: '正在打开最近的计划评审…' },
-  resume: { icon: '↻', label: '正在同步历史会话…' },
-  mcp: { icon: '▦', label: '正在管理 MCP 服务…' }
-};
-const COMMAND_PENDING_DEFAULT = { icon: '▶', label: '正在执行本地命令…' };
-const REVIEW_SOURCE_LABEL: Record<ReviewSource, string> = {
-  unstaged: '未暂存',
-  staged: '已暂存',
-};
-
-// 解析 `/name args` 形式的输入，返回 { name, args }；非 slash 输入返回 null。
-// 解析失败的空字符串命令不视为有效命令，避免把普通消息里的 "/" 当成命令。
-const parseSlashCommand = (
-  text: string
-): { name: string; args: string } | null => {
-  const match = text.match(/^\/([A-Za-z][A-Za-z0-9_-]*)(?:\s+([\s\S]*))?$/);
-  if (!match) {
-    return null;
-  }
-  return { name: match[1].toLowerCase(), args: (match[2] ?? '').trim() };
-};
-
-// 根据命令名查 COMMAND_PENDING_META，没命中回退到默认值。
-const resolveCommandPendingMeta = (name: string): { icon: string; label: string } => {
-  return COMMAND_PENDING_META[name] ?? COMMAND_PENDING_DEFAULT;
-};
-
-const clampPaneWidth = (value: number, min: number, max: number) => {
-  return Math.min(max, Math.max(min, value));
-};
-
-const getHistoryLoadedEvents = (payload: unknown): AgentEvent[] => {
-  if (!payload || typeof payload !== 'object') {
-    return [];
-  }
-  const events = (payload as { events?: unknown }).events;
-  return Array.isArray(events) ? (events as AgentEvent[]) : [];
-};
-
-type HistoricalSessionPlan = {
-  id: string;
-  toolCallId: string;
-  planFilePath: string;
-  content: string;
-};
-
-type ActiveSessionPlan =
-  | { active: false }
-  | { active: true; planFilePath: string; content: string | null };
-
-const getHistoryLoadedPlans = (payload: unknown): HistoricalSessionPlan[] => {
-  if (!payload || typeof payload !== 'object') return [];
-  const plans = (payload as { plans?: unknown }).plans;
-  if (!Array.isArray(plans)) return [];
-  return plans.filter((plan): plan is HistoricalSessionPlan => (
-    typeof plan === 'object' &&
-    plan !== null &&
-    typeof plan.id === 'string' &&
-    typeof plan.toolCallId === 'string' &&
-    typeof plan.planFilePath === 'string' &&
-    typeof plan.content === 'string'
-  ));
-};
-
-const insertHistoricalPlans = (
-  messages: ChatMessage[],
-  plans: HistoricalSessionPlan[]
-) => {
-  const next = [...messages];
-  for (const plan of plans) {
-    if (next.some((message) => message.id === plan.id)) continue;
-    const planMessage: ChatMessage = {
-      id: plan.id,
-      role: 'plan',
-      text: plan.content,
-      planId: plan.id,
-      planContentType: 'markdown',
-      planFilePath: plan.planFilePath
-    };
-    const toolIndex = next.findIndex((message) => message.toolCallId === plan.toolCallId);
-    if (toolIndex >= 0) {
-      next.splice(toolIndex + 1, 0, planMessage);
-    } else {
-      next.push(planMessage);
-    }
-  }
-  return next;
-};
-
-const getActiveSessionPlan = (payload: unknown): ActiveSessionPlan | null => {
-  if (!payload || typeof payload !== 'object') return null;
-  const plan = payload as Record<string, unknown>;
-  if (plan.active === false) return { active: false };
-  if (
-    plan.active !== true ||
-    typeof plan.planFilePath !== 'string' ||
-    (typeof plan.content !== 'string' && plan.content !== null)
-  ) {
-    return null;
-  }
-  return {
-    active: true,
-    planFilePath: plan.planFilePath,
-    content: plan.content
-  };
-};
-
-const applyActiveSessionPlan = (messages: ChatMessage[], plan: ActiveSessionPlan) => {
-  const withoutPreviousActive = messages.filter((message) => !message.planActive);
-  if (!plan.active) return withoutPreviousActive;
-  const withoutDuplicate = withoutPreviousActive.filter(
-    (message) => !message.planPending && message.planFilePath !== plan.planFilePath
-  );
-  return [
-    ...withoutDuplicate,
-    {
-      id: 'active-session-plan',
-      role: 'plan' as const,
-      text: plan.content ?? `方案文件：${plan.planFilePath}\n\n暂时无法读取方案正文。`,
-      planId: 'active-session-plan',
-      planContentType: 'markdown' as const,
-      planActive: true,
-      planFilePath: plan.planFilePath,
-      // 活跃方案来自 session `_meta`，故意不设置 planPreviewRequestId。
-    }
-  ];
-};
-
-const getElicitationResultText = (
-  request: ElicitationRequest,
-  action: 'accept' | 'decline' | 'cancel',
-  content?: Record<string, unknown>
-) => {
-  if (action === 'decline') return '已拒绝';
-  if (action === 'cancel') return '已取消';
-  const value = content?.value;
-  if (value === true) return '已确认';
-  if (request.field.options?.length && typeof value === 'string') {
-    if (value.endsWith(' Done selecting') || value === 'Done selecting') return '已完成选择';
-    return `已选择：${value.replace(/ \(Recommended\)$/, '')}`;
-  }
-  if (value !== undefined) return `已提交：${String(value)}`;
-  return '已提交';
-};
-
-const mergeAgentEventIntoMessages = (
-  current: ChatMessage[],
-  event: AgentEvent,
-  currentModel?: ChatMessage['toolModel']
-): ChatMessage[] => {
-  const messageId = getPayloadMessageId(event.payload);
-  const role = getMessageRole(event.type);
-
-  /* 流式文本合并：回答、思考与用户消息按 messageId + role 分别累积，
-     避免 omp 复用 messageId 时把思考过程拼进最终回答。 */
-  if (messageId && (role === 'agent' || role === 'thought' || role === 'user')) {
-    const existing = current.find((message) => message.id === messageId && message.role === role);
-    if (existing) {
-      return current.map((message) =>
-        message.id === messageId && message.role === role
-          ? { ...message, text: `${message.text}${event.message}` }
-          : message
-      );
-    }
-    return [...current, { id: messageId, role, text: event.message }];
-  }
-
-  /* 工具调用：按 toolCallId 去重/更新，携带结构化数据 */
-  if (event.type === 'tool_call') {
-    const toolData = getPayloadToolCall(event.payload);
-    const appendPlanPending = (messages: ChatMessage[]) => {
-      const canStartPlan = !toolData.status || toolData.status === 'pending' || toolData.status === 'in_progress';
-      if (
-        !canStartPlan ||
-        !isPlanToolCall(toolData.title || event.message) ||
-        messages.some((message) => message.planPending)
-      ) {
-        return messages;
-      }
-      return [
-        ...messages,
-        {
-          id: `plan-pending-${toolData.toolCallId || Date.now()}`,
-          role: 'plan' as const,
-          text: 'Agent 正在整理任务步骤，完成后将在这里展示完整计划。',
-          planPending: true
-        }
-      ];
-    };
-    const existing = current.find(
-      (message) => message.toolCallId && message.toolCallId === toolData.toolCallId
-    );
-    if (existing) {
-      const updated = current.map((message) =>
-        message.toolCallId === toolData.toolCallId
-          ? {
-              ...message,
-              text: event.message,
-              toolKind: (toolData.kind ?? message.toolKind) as ChatMessage['toolKind'],
-              toolStatus: (toolData.status ?? message.toolStatus) as ChatMessage['toolStatus'],
-              toolLocations: toolData.locations ?? message.toolLocations,
-              toolDiffs: toolData.diffs ?? message.toolDiffs,
-              toolOutput: toolData.output ?? message.toolOutput,
-              toolModel: toolData.toolModel ?? message.toolModel
-            }
-          : message
-      );
-      return appendPlanPending(updated);
-    }
-    // 仅在实时事件时使用当前模型快照；历史 replay 事件优先使用主进程带回的快照。
-    const isReplay =
-      typeof event.payload === 'object' &&
-      event.payload !== null &&
-      (event.payload as Record<string, unknown>)._replay === true;
-    const toolModel = toolData.toolModel ?? (!isReplay ? currentModel : undefined);
-    return appendPlanPending([
-      ...current,
-      {
-        id: messageId || `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        role,
-        text: event.message,
-        toolCallId: toolData.toolCallId,
-        toolKind: toolData.kind as ChatMessage['toolKind'],
-        toolStatus: toolData.status as ChatMessage['toolStatus'],
-        toolLocations: toolData.locations,
-        toolDiffs: toolData.diffs,
-        toolOutput: toolData.output,
-        toolModel
-      }
-    ]);
-  }
-
-  /* 旧 plan 只替换无 ID 的结构化执行清单；方案文档与执行进度是两类信息，必须并存。
-     plan_update / plan_removed 仍按 planId 精确更新对应计划。 */
-  if (event.type === 'plan') {
-    const change = getPayloadPlanChange(event.payload);
-    if (!change) return current;
-    if (change.action === 'remove') {
-      return current.filter((message) => message.role !== 'plan' || message.planId !== change.planId);
-    }
-    const withoutReplacedPlan = current.filter((message) => {
-      if (message.role !== 'plan') return true;
-      if (message.planPending) return false;
-      if (change.planId) return message.planId !== change.planId;
-      return message.planContentType !== 'items' || !!message.planId;
-    });
-    return [
-      ...withoutReplacedPlan,
-      {
-        id: change.planId ?? `plan-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        role: 'plan' as const,
-        text: change.text ?? event.message,
-        planId: change.planId,
-        planContentType: change.contentType,
-        planEntries: change.contentType === 'items' ? change.entries : undefined
-      }
-    ];
-  }
-
-  /* Plan 模式占位卡只用于等待正式 plan；回合结束/报错仍未收到 plan 时自动清理。
-     同时收敛没有收到 tool_call_update 终态的工具，避免 ACP 取消、进程退出或协议丢包后卡片永久转圈。 */
-  if (event.type === 'done' || event.type === 'error') {
-    const withoutPendingPlan = current.filter((message) => !message.planPending);
-    const payload = event.payload && typeof event.payload === 'object'
-      ? event.payload as Record<string, unknown>
-      : undefined;
-    const stopReason = typeof payload?.stopReason === 'string' ? payload.stopReason : '';
-    const unresolvedToolResult = event.type === 'error'
-      ? `工具调用因回合错误而中止：${event.message}`
-      : stopReason === 'cancelled'
-        ? '工具调用已随当前回合取消。'
-        : '回合已结束，但未收到工具调用的完成状态。';
-    const settledMessages = withoutPendingPlan.map((message) => {
-      if (
-        message.role !== 'tool' ||
-        (message.toolStatus !== undefined && message.toolStatus !== 'pending' && message.toolStatus !== 'in_progress')
-      ) {
-        return message;
-      }
-      return {
-        ...message,
-        toolStatus: 'failed' as const,
-        toolOutput: message.toolOutput
-          ? `${message.toolOutput}\n\n${unresolvedToolResult}`
-          : unresolvedToolResult
-      };
-    });
-    return [
-      ...settledMessages,
-      {
-        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        role,
-        text: event.message
-      }
-    ];
-  }
-
-  return [
-    ...current,
-    {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      role,
-      text: event.message
-    }
-  ];
-};
 
 export default function App() {
   const [desktopState, setDesktopState] = useState<DesktopState>({
@@ -498,26 +114,9 @@ export default function App() {
   const [ompPath, setOmpPath] = useState('');
   const [, setAgentStatus] = useState('空闲');
   const [isAgentBusy, setIsAgentBusy] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
-  const [leftPaneWidth, setLeftPaneWidth] = useState(LEFT_PANE_DEFAULT_WIDTH);
-  const [rightPaneWidth, setRightPaneWidth] = useState(RIGHT_PANE_DEFAULT_WIDTH);
-  const [resizingSide, setResizingSide] = useState<PaneSide | null>(null);
-  const [collapsePreviewSide, setCollapsePreviewSide] = useState<PaneSide | null>(null);
-  const [leftPreviewMounted, setLeftPreviewMounted] = useState(false);
-  const [leftPreviewOpen, setLeftPreviewOpen] = useState(false);
+  const paneLayout = usePaneLayout();
   // 会话搜索弹窗只承载入口外壳，实际搜索逻辑后续再接入。
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
-  // 拖拽过程用 ref 记录起点，避免 mousemove 高频触发时依赖 React 异步 state。
-  const resizeStateRef = useRef<{
-    side: PaneSide;
-    startX: number;
-    startWidth: number;
-    willCollapse: boolean;
-  } | null>(null);
-  const leftPreviewOpenTimer = useRef<number | null>(null);
-  const leftPreviewCloseTimer = useRef<number | null>(null);
-  const leftPreviewUnmountTimer = useRef<number | null>(null);
   // 项目展开态独立于选中态：允许多个项目同时展开，且点击项目不再改变最近项目排序。
   const [expandedProjectPaths, setExpandedProjectPaths] = useState<string[]>([]);
   const [acpConfigOptions, setAcpConfigOptions] = useState<AcpConfigOption[]>([]);
@@ -588,12 +187,8 @@ export default function App() {
   const pendingSlashCommandBySession = useRef<Record<string, PendingSlashCommand | null>>({});
   const [pendingSlashCommandVersion, setPendingSlashCommandVersion] = useState(0);
   const bumpPendingSlashCommand = () => setPendingSlashCommandVersion((value) => value + 1);
-  // 工具调用折叠状态：按 sessionId 分桶，key = 「该工具组最后一条 tool 消息的 id」，
-  // value = true 表示折叠成摘要卡、false 表示用户主动展开、undefined 表示从未被用户操作过。
-  // ChatWorkspace 会把 undefined 也按默认折叠展示；用户主动展开后保持 false 不被覆盖。
-  const collapsedToolGroupsBySession = useRef<Record<string, Record<string, boolean | undefined>>>({});
-  const [collapsedToolGroupsVersion, setCollapsedToolGroupsVersion] = useState(0);
-  const bumpCollapsedToolGroups = () => setCollapsedToolGroupsVersion((value) => value + 1);
+  const toolGroups = useToolGroups(selectedSession, messageCache);
+
 
   const refreshDiff = useCallback(async (source: ReviewSource, project = selectedProjectRef.current) => {
     const refreshId = diffRefreshIdRef.current + 1;
@@ -693,304 +288,6 @@ export default function App() {
     void refreshGitBranches(selectedProject);
   }, [refreshGitBranches, selectedProject?.path]);
 
-  // 当前选中 session 的折叠 map：供 ChatWorkspace 通过 props 读取。
-  const collapsedToolGroups = useMemo<Record<string, boolean | undefined>>(() => {
-    if (!selectedSession) {
-      return {};
-    }
-    return collapsedToolGroupsBySession.current[selectedSession.id] ?? {};
-  }, [selectedSession, collapsedToolGroupsVersion]);
-
-  // 在消息流末尾反向扫描「最近一个 user 消息之后」的工具组，返回其中最后一条 tool 消息的 id。
-  // 用于 done 时确定本轮工具组的 groupId：所有介于该 user 与末尾之间的 tool 消息视为同一组折叠。
-  const findLatestToolGroupId = (list: ChatMessage[]): string | undefined => {
-    for (let index = list.length - 1; index >= 0; index -= 1) {
-      const message = list[index];
-      if (message.role === 'user') {
-        // 越过 user 还没找到 tool → 这一轮没有工具调用
-        return undefined;
-      }
-      if (message.role === 'tool') {
-        return message.id;
-      }
-    }
-    return undefined;
-  };
-
-  // 扫描整条消息流，找出所有「连续 tool 段」的 groupId（每段最后一条 tool 消息的 id），
-  // 把未操作（undefined）的组设为 true 折叠。用于打开旧会话（load/resume/fork 重放）后一次性折叠全部工具组。
-  const collapseAllToolGroupsForSession = (sessionId: string, messagesForSession?: ChatMessage[]) => {
-    const list = messagesForSession ?? messageCache.current[sessionId];
-    if (!list || list.length === 0) {
-      return;
-    }
-    // 按消息流顺序遍历，连续 tool 消息归为一段，段内最后一条 tool 消息的 id 即 groupId。
-    const groupIds: string[] = [];
-    let lastToolId: string | undefined;
-    for (const message of list) {
-      if (message.role === 'tool') {
-        lastToolId = message.id;
-      } else {
-        if (lastToolId) {
-          groupIds.push(lastToolId);
-          lastToolId = undefined;
-        }
-      }
-    }
-    if (lastToolId) {
-      groupIds.push(lastToolId);
-    }
-    if (groupIds.length === 0) {
-      return;
-    }
-    const bucket = collapsedToolGroupsBySession.current[sessionId] ?? {};
-    let changed = false;
-    const next = { ...bucket };
-    for (const groupId of groupIds) {
-      if (next[groupId] === undefined) {
-        next[groupId] = true;
-        changed = true;
-      }
-    }
-    if (changed) {
-      collapsedToolGroupsBySession.current[sessionId] = next;
-      bumpCollapsedToolGroups();
-    }
-  };
-
-  // 清空指定 session 桶里的折叠 map：用于「重置消息流」场景（关闭会话、新建空会话、切项目）。
-  const resetCollapsedToolGroupsForSession = (sessionId: string | null | undefined) => {
-    if (!sessionId) {
-      return;
-    }
-    if (collapsedToolGroupsBySession.current[sessionId]) {
-      delete collapsedToolGroupsBySession.current[sessionId];
-      bumpCollapsedToolGroups();
-    }
-  };
-
-  // 用户点击摘要卡时通知 App 切换折叠状态。
-  const handleSetToolGroupCollapsed = (groupId: string, collapsed: boolean) => {
-    if (!selectedSession) {
-      return;
-    }
-    const bucket = collapsedToolGroupsBySession.current[selectedSession.id] ?? {};
-    if (bucket[groupId] === collapsed) {
-      return;
-    }
-    collapsedToolGroupsBySession.current[selectedSession.id] = { ...bucket, [groupId]: collapsed };
-    bumpCollapsedToolGroups();
-  };
-
-  const normalizePaneWidth = (side: PaneSide, width: number) => {
-    if (side === 'left') {
-      return width < LEFT_PANE_COLLAPSE_THRESHOLD
-        ? LEFT_PANE_DEFAULT_WIDTH
-        : clampPaneWidth(width, LEFT_PANE_MIN_WIDTH, LEFT_PANE_MAX_WIDTH);
-    }
-    return width < RIGHT_PANE_COLLAPSE_THRESHOLD
-      ? RIGHT_PANE_DEFAULT_WIDTH
-      : clampPaneWidth(width, RIGHT_PANE_MIN_WIDTH, RIGHT_PANE_MAX_WIDTH);
-  };
-
-  const clearLeftPreviewTimers = () => {
-    if (leftPreviewOpenTimer.current !== null) {
-      window.clearTimeout(leftPreviewOpenTimer.current);
-      leftPreviewOpenTimer.current = null;
-    }
-    if (leftPreviewCloseTimer.current !== null) {
-      window.clearTimeout(leftPreviewCloseTimer.current);
-      leftPreviewCloseTimer.current = null;
-    }
-    if (leftPreviewUnmountTimer.current !== null) {
-      window.clearTimeout(leftPreviewUnmountTimer.current);
-      leftPreviewUnmountTimer.current = null;
-    }
-  };
-
-  const closeLeftPreview = () => {
-    if (!leftPreviewMounted) {
-      clearLeftPreviewTimers();
-      return;
-    }
-    clearLeftPreviewTimers();
-    setLeftPreviewOpen(false);
-    leftPreviewUnmountTimer.current = window.setTimeout(() => {
-      setLeftPreviewMounted(false);
-      leftPreviewUnmountTimer.current = null;
-    }, 180);
-  };
-
-  const openLeftPreview = () => {
-    if (!leftCollapsed) {
-      return;
-    }
-    clearLeftPreviewTimers();
-    setLeftPreviewMounted(true);
-    leftPreviewOpenTimer.current = window.setTimeout(() => {
-      setLeftPreviewOpen(true);
-      leftPreviewOpenTimer.current = null;
-    }, 0);
-  };
-
-  const openLeftPreviewLater = () => {
-    if (leftPreviewCloseTimer.current !== null) {
-      window.clearTimeout(leftPreviewCloseTimer.current);
-      leftPreviewCloseTimer.current = null;
-    }
-    if (!leftCollapsed || leftPreviewOpen || leftPreviewOpenTimer.current !== null) {
-      return;
-    }
-    leftPreviewOpenTimer.current = window.setTimeout(() => {
-      leftPreviewOpenTimer.current = null;
-      openLeftPreview();
-    }, 400);
-  };
-
-  const keepLeftPreviewOpen = () => {
-    if (leftPreviewCloseTimer.current !== null) {
-      window.clearTimeout(leftPreviewCloseTimer.current);
-      leftPreviewCloseTimer.current = null;
-    }
-  };
-
-  const closeLeftPreviewLater = () => {
-    if (leftPreviewOpenTimer.current !== null) {
-      window.clearTimeout(leftPreviewOpenTimer.current);
-      leftPreviewOpenTimer.current = null;
-    }
-    if (leftPreviewCloseTimer.current !== null) {
-      window.clearTimeout(leftPreviewCloseTimer.current);
-    }
-    leftPreviewCloseTimer.current = window.setTimeout(() => {
-      leftPreviewCloseTimer.current = null;
-      closeLeftPreview();
-    }, 200);
-  };
-
-  const collapseLeftPane = () => {
-    closeLeftPreview();
-    setLeftCollapsed(true);
-  };
-
-  const expandLeftPane = () => {
-    clearLeftPreviewTimers();
-    setLeftPreviewOpen(false);
-    setLeftPreviewMounted(false);
-    setLeftPaneWidth((width) => normalizePaneWidth('left', width));
-    setLeftCollapsed(false);
-  };
-
-  const toggleLeftPane = () => {
-    if (leftCollapsed) {
-      expandLeftPane();
-      return;
-    }
-    collapseLeftPane();
-  };
-
-  const collapseRightPane = () => {
-    setRightCollapsed(true);
-  };
-
-  const expandRightPane = () => {
-    setRightPaneWidth((width) => normalizePaneWidth('right', width));
-    setRightCollapsed(false);
-  };
-
-  const toggleRightPane = () => {
-    if (rightCollapsed) {
-      expandRightPane();
-      return;
-    }
-    collapseRightPane();
-  };
-
-  const startPaneResize = (side: PaneSide, event: ReactMouseEvent<HTMLDivElement>) => {
-    if ((side === 'left' && leftCollapsed) || (side === 'right' && rightCollapsed)) {
-      return;
-    }
-    event.preventDefault();
-    const startWidth = side === 'left' ? leftPaneWidth : rightPaneWidth;
-    resizeStateRef.current = {
-      side,
-      startX: event.clientX,
-      startWidth,
-      willCollapse: false
-    };
-    setResizingSide(side);
-    setCollapsePreviewSide(null);
-  };
-
-  useEffect(() => {
-    if (!resizingSide) {
-      return;
-    }
-
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const handleMouseMove = (event: MouseEvent) => {
-      const state = resizeStateRef.current;
-      if (!state) {
-        return;
-      }
-      const delta = event.clientX - state.startX;
-      const nextWidth =
-        state.side === 'left'
-          ? clampPaneWidth(state.startWidth + delta, LEFT_PANE_MIN_WIDTH, LEFT_PANE_MAX_WIDTH)
-          : clampPaneWidth(state.startWidth - delta, RIGHT_PANE_MIN_WIDTH, RIGHT_PANE_MAX_WIDTH);
-      const willCollapse =
-        state.side === 'left'
-          ? nextWidth < LEFT_PANE_COLLAPSE_THRESHOLD
-          : nextWidth < RIGHT_PANE_COLLAPSE_THRESHOLD;
-
-      state.willCollapse = willCollapse;
-      setCollapsePreviewSide(willCollapse ? state.side : null);
-      if (state.side === 'left') {
-        setLeftPaneWidth(nextWidth);
-      } else {
-        setRightPaneWidth(nextWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      const state = resizeStateRef.current;
-      if (state?.willCollapse) {
-        if (state.side === 'left') {
-          collapseLeftPane();
-        } else {
-          collapseRightPane();
-        }
-      }
-      resizeStateRef.current = null;
-      setResizingSide(null);
-      setCollapsePreviewSide(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-    };
-  }, [resizingSide]);
-
-  useEffect(() => {
-    if (!leftCollapsed) {
-      clearLeftPreviewTimers();
-      setLeftPreviewOpen(false);
-      setLeftPreviewMounted(false);
-    }
-  }, [leftCollapsed]);
-
-  useEffect(() => {
-    return () => clearLeftPreviewTimers();
-  }, []);
 
   // 派生数据：按当前 project 过滤 session 列表 + 按当前 session 过滤最近日志 + 三个 config 控件。
 
@@ -1491,7 +788,7 @@ export default function App() {
         );
         const nextMessages = insertHistoricalPlans(historyMessages, getHistoryLoadedPlans(event.payload));
         messageCache.current[event.sessionId] = nextMessages;
-        collapseAllToolGroupsForSession(event.sessionId, nextMessages);
+        toolGroups.collapseAllToolGroupsForSession(event.sessionId, nextMessages);
         setLoadingHistorySessionId((current) => (current === event.sessionId ? null : current));
         if (selectedSessionRef.current?.id === event.sessionId) {
           setMessages(nextMessages);
@@ -1556,16 +853,9 @@ export default function App() {
         // 自动折叠本轮的工具组：扫描当前 session 消息流，找到本轮最后一条 tool 消息的 id 作为 groupId。
         // 仅在该 groupId 状态为 undefined（用户从未操作）时设为 true；用户主动展开的保持展开。
         const list = messageCache.current[event.sessionId];
-        const groupId = list ? findLatestToolGroupId(list) : undefined;
+        const groupId = list ? toolGroups.findLatestToolGroupId(list) : undefined;
         if (groupId) {
-          const bucket = collapsedToolGroupsBySession.current[event.sessionId];
-          if (!bucket || bucket[groupId] === undefined) {
-            collapsedToolGroupsBySession.current[event.sessionId] = {
-              ...(bucket ?? {}),
-              [groupId]: true
-            };
-            bumpCollapsedToolGroups();
-          }
+          toolGroups.setGroupCollapsed(event.sessionId, groupId, true);
         }
         // agent 可能刚写完文件或创建/切换了分支；回合结束时同步 Git 状态，让审查面板保持最新。
         void refreshGitBranches(selectedProjectRef.current);
@@ -1677,7 +967,7 @@ export default function App() {
     }
     selectProject(project);
     // 切项目：清理旧 session 的折叠桶，切回时按需重建。
-    resetCollapsedToolGroupsForSession(previousSessionId);
+    toolGroups.resetCollapsedToolGroupsForSession(previousSessionId);
     selectSession(null);
     setMessages([]);
     setLoadingHistorySessionId(null);
@@ -1744,14 +1034,14 @@ export default function App() {
     }
     selectProject(project);
     // 切项目：清理旧 session 的折叠桶。
-    resetCollapsedToolGroupsForSession(previousSessionId);
+    toolGroups.resetCollapsedToolGroupsForSession(previousSessionId);
     // 不再用闭包里的 desktopState 选旧 session：那份数据在 reloadState/syncSessions 完成前是陈旧的，
     // 可能选到不属于本项目的 session。统一置 null，由用户在左栏手动点开，或发消息时新建。
     selectSession(null);
     setMessages([]);
     setLoadingHistorySessionId(null);
     setIsAgentBusy(false);
-    setAcpConfigOptions([]);
+    toolGroups.resetCollapsedToolGroupsForSession(previousSessionId);
     setDraftConfigValues({});
     setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
     setApprovalProfileNotice('');
@@ -1897,7 +1187,7 @@ export default function App() {
       for (const session of sessionsToRemove) {
         delete messageCache.current[session.id];
         delete usageBySession.current[session.id];
-        delete collapsedToolGroupsBySession.current[session.id];
+        toolGroups.resetCollapsedToolGroupsForSession(session.id);
         delete pendingSlashCommandBySession.current[session.id];
       }
       // 清掉当前展示的右栏运行时状态。
@@ -1999,7 +1289,7 @@ export default function App() {
       bumpPendingSlashCommand();
     }
     // 关闭会话：清掉折叠桶，避免重新打开该会话看到旧折叠态残留。
-    resetCollapsedToolGroupsForSession(session.id);
+    toolGroups.resetCollapsedToolGroupsForSession(session.id);
     clearApprovalStateForSession(session.id, { alsoClearActive: isCurrent });
     if (isCurrent) {
       selectSession(null);
@@ -2058,9 +1348,7 @@ export default function App() {
     elicitationBySession.current[newLocalId] = [];
     questionnaireBySession.current[newLocalId] = [];
     usageBySession.current[newLocalId] = '';
-    // fork 占位会话折叠桶初始化为空：fork 完成后由 collapseAllToolGroupsForSession 一次性折叠全部工具组。
-    collapsedToolGroupsBySession.current[newLocalId] = {};
-    bumpCollapsedToolGroups();
+    toolGroups.initBucket(newLocalId);
     selectSession(forked);
     setMessages([]);
     setLoadingHistorySessionId(newLocalId);
@@ -2082,9 +1370,7 @@ export default function App() {
       // fork 失败：清理占位会话的四个缓存条目，避免左栏残留幽灵会话与缓存泄漏。
       delete messageCache.current[newLocalId];
       clearApprovalStateForSession(newLocalId, { alsoClearActive: true });
-      delete usageBySession.current[newLocalId];
-      delete collapsedToolGroupsBySession.current[newLocalId];
-      bumpCollapsedToolGroups();
+      toolGroups.resetCollapsedToolGroupsForSession(newLocalId);
       // 兜底杀掉可能已 spawn 但 ACP 握手/fork 阶段失败的 agent 子进程（不存在则 no-op）。
       window.ohMyPiDesktop.stopSessionProcess(newLocalId);
       setLoadingHistorySessionId((current) => (current === newLocalId ? null : current));
@@ -2138,7 +1424,7 @@ export default function App() {
     );
     // 顶部「新建会话」只进入空白会话界面；真正的本地 session 在首次发送消息时延迟创建。
     // 清理上一个 session 的折叠桶，避免重新进入历史 session 时看到旧折叠态残留。
-    resetCollapsedToolGroupsForSession(selectedSessionRef.current?.id);
+    toolGroups.resetCollapsedToolGroupsForSession(selectedSessionRef.current?.id);
     selectSession(null);
     setMessages([]);
     setLoadingHistorySessionId(null);
@@ -2754,38 +2040,12 @@ export default function App() {
     handleAttachAttachment(file);
   };
 
-  const layoutClassName = [
-    'layout-grid',
-    resizingSide ? 'is-resizing' : ''
-  ].filter(Boolean).join(' ');
-  const appShellClassName = [
-    'app-shell',
-    leftCollapsed ? 'left-pane-collapsed' : '',
-    resizingSide ? 'is-resizing' : ''
-  ].filter(Boolean).join(' ');
-  const layoutStyle = {
-    '--left-pane-width': `${leftCollapsed ? 0 : leftPaneWidth}px`,
-    '--right-pane-width': `${rightCollapsed ? 0 : rightPaneWidth}px`
-  } as CSSProperties;
-  const leftHandleClassName = [
-    'pane-resize-handle',
-    'left',
-    resizingSide === 'left' ? 'active' : '',
-    collapsePreviewSide === 'left' ? 'will-collapse' : ''
-  ].filter(Boolean).join(' ');
-  const rightHandleClassName = [
-    'pane-resize-handle',
-    'right',
-    resizingSide === 'right' ? 'active' : '',
-    collapsePreviewSide === 'right' ? 'will-collapse' : ''
-  ].filter(Boolean).join(' ');
-  const leftPreviewClassName = leftPreviewOpen ? 'left-preview-panel open' : 'left-preview-panel';
 
   return (
-    <main className={appShellClassName} style={layoutStyle}>
-      {!leftCollapsed && (
+    <main className={paneLayout.appShellClassName} style={paneLayout.layoutStyle}>
+      {!paneLayout.leftCollapsed && (
         <ProjectPane
-          onTogglePane={collapseLeftPane}
+          onTogglePane={paneLayout.collapseLeftPane}
           desktopState={desktopState}
           projects={displayedProjects}
           selectedProject={selectedProject}
@@ -2807,11 +2067,11 @@ export default function App() {
           onCloseSession={(project, session) => void handleCloseSession(session)}
         />
       )}
-      {leftCollapsed && (
+      {paneLayout.leftCollapsed && (
         <button
           className="left-pane-restore-button"
           type="button"
-          onClick={expandLeftPane}
+          onClick={paneLayout.expandLeftPane}
           aria-label="展开左侧项目栏"
           title="展开左侧项目栏"
         >
@@ -2827,14 +2087,14 @@ export default function App() {
         sessionTitle={selectedSession?.title}
         ompStatus={ompStatus}
         ompPath={ompPath}
-        leftCollapsed={leftCollapsed}
-        rightCollapsed={rightCollapsed}
-        onToggleLeftPane={toggleLeftPane}
-        onToggleRightPane={toggleRightPane}
+        leftCollapsed={paneLayout.leftCollapsed}
+        rightCollapsed={paneLayout.rightCollapsed}
+        onToggleLeftPane={paneLayout.toggleLeftPane}
+        onToggleRightPane={paneLayout.toggleRightPane}
         onSelectOmpPath={() => void handleSelectOmpPath()}
         onSelectWorkspace={() => void handleSelectWorkspace()}
       />
-      <section className={layoutClassName}>
+      <section className={paneLayout.layoutClassName}>
         <ChatWorkspace
           messages={messages}
           prompt={prompt}
@@ -2844,7 +2104,7 @@ export default function App() {
           canCancel={isAgentBusy}
           availableCommands={displayedCommands}
           pendingSlashCommand={pendingSlashCommand}
-          collapsedToolGroups={collapsedToolGroups}
+          collapsedToolGroups={toolGroups.collapsedToolGroups}
           isHistoryLoading={loadingHistorySessionId === selectedSession?.id}
           historyScrollResetToken={historyScrollResetToken}
           elicitationRequests={elicitationBySession.current[selectedSession?.id ?? ''] ?? []}
@@ -2870,11 +2130,11 @@ export default function App() {
           onCancel={() => void handleCancelTurn()}
           onElicitationRespond={(requestId, action, content) => void handleElicitation(requestId, action, content)}
           onSetToolGroupCollapsed={(groupId, collapsed) =>
-            handleSetToolGroupCollapsed(groupId, collapsed)
+            toolGroups.handleSetToolGroupCollapsed(groupId, collapsed)
           }
         />
 
-        {!rightCollapsed && (
+        {!paneLayout.rightCollapsed && (
           <ContextPane
             selectedProject={selectedProject}
             diffText={diffText}
@@ -2890,47 +2150,47 @@ export default function App() {
             onRefreshReview={() => void handleRefreshGitReview()}
           />
         )}
-        {!rightCollapsed && (
+        {!paneLayout.rightCollapsed && (
           <div
-            className={rightHandleClassName}
+            className={paneLayout.rightHandleClassName}
             role="separator"
             aria-label="调整右侧上下文栏宽度"
             aria-orientation="vertical"
-            title={collapsePreviewSide === 'right' ? '松开将折叠' : '拖拽调整右侧上下文栏宽度，双击折叠'}
-            onMouseDown={(event) => startPaneResize('right', event)}
-            onDoubleClick={collapseRightPane}
+            title={paneLayout.collapsePreviewSide === 'right' ? '松开将折叠' : '拖拽调整右侧上下文栏宽度，双击折叠'}
+            onMouseDown={(event) => paneLayout.startPaneResize('right', event)}
+            onDoubleClick={paneLayout.collapseRightPane}
           />
         )}
       </section>
-      {!leftCollapsed && (
+      {!paneLayout.leftCollapsed && (
         <div
-          className={leftHandleClassName}
+          className={paneLayout.leftHandleClassName}
           role="separator"
           aria-label="调整左侧项目栏宽度"
           aria-orientation="vertical"
-          title={collapsePreviewSide === 'left' ? '松开将折叠' : '拖拽调整左侧项目栏宽度，双击折叠'}
-          onMouseDown={(event) => startPaneResize('left', event)}
-          onDoubleClick={collapseLeftPane}
+          title={paneLayout.collapsePreviewSide === 'left' ? '松开将折叠' : '拖拽调整左侧项目栏宽度，双击折叠'}
+          onMouseDown={(event) => paneLayout.startPaneResize('left', event)}
+          onDoubleClick={paneLayout.collapseLeftPane}
         />
       )}
-      {leftCollapsed && (
+      {paneLayout.leftCollapsed && (
         <div
           className="left-preview-hotzone"
-          onMouseEnter={openLeftPreviewLater}
-          onMouseLeave={closeLeftPreviewLater}
-          onDoubleClick={expandLeftPane}
+          onMouseEnter={paneLayout.openLeftPreviewLater}
+          onMouseLeave={paneLayout.closeLeftPreviewLater}
+          onDoubleClick={paneLayout.expandLeftPane}
           aria-hidden="true"
         />
       )}
-      {leftCollapsed && leftPreviewMounted && (
+      {paneLayout.leftCollapsed && paneLayout.leftPreviewMounted && (
         <div
-          className={leftPreviewClassName}
-          onMouseEnter={keepLeftPreviewOpen}
-          onMouseLeave={closeLeftPreviewLater}
+          className={paneLayout.leftPreviewClassName}
+          onMouseEnter={paneLayout.keepLeftPreviewOpen}
+          onMouseLeave={paneLayout.closeLeftPreviewLater}
         >
           <ProjectPane
             variant="preview"
-            onClosePreview={closeLeftPreview}
+            onClosePreview={paneLayout.closeLeftPreview}
             desktopState={desktopState}
             projects={displayedProjects}
             selectedProject={selectedProject}
@@ -2938,54 +2198,54 @@ export default function App() {
             sessionsForProject={sessionsForProject}
             expandedProjectPaths={expandedProjectPaths}
             onSelectWorkspace={() => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleSelectWorkspace();
             }}
             onToggleProjectExpanded={toggleProjectExpanded}
             onNewSession={() => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleNewSession();
             }}
             onNewProjectSession={(project) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleNewSession(project);
             }}
             onOpenSessionSearch={() => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               setSessionSearchOpen(true);
             }}
             onSyncSessions={() => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               if (selectedProject) {
                 void syncProjectSessions(selectedProject.path);
               }
             }}
             onSelectProjectSession={(project, session) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleSelectProjectSession(project, session);
             }}
             onToggleProjectPinned={(project) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleToggleProjectPinned(project);
             }}
             onRevealProject={(project) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleRevealProject(project);
             }}
             onRenameProject={(project, name) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleRenameProject(project, name);
             }}
             onRemoveProject={(project) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleRemoveProject(project);
             }}
             onForkSession={(project, session) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleForkSession(project, session);
             }}
             onCloseSession={(project, session) => {
-              closeLeftPreview();
+              paneLayout.closeLeftPreview();
               void handleCloseSession(session);
             }}
           />
