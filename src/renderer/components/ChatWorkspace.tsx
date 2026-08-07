@@ -179,6 +179,8 @@ function ToolCallCard({ message }: { message: ChatMessage }) {
   );
 }
 
+const MemoizedToolCallCard = React.memo(ToolCallCard);
+
 /* 计划列表 */
 function PlanCard({ message }: { message: ChatMessage }) {
   if (message.planPending) {
@@ -202,7 +204,7 @@ function PlanCard({ message }: { message: ChatMessage }) {
         {message.planPreviewDegraded && (
           <div className="plan-degraded-hint">⚠️ 未能加载完整方案，以下为摘要，完整内容请查看弹窗或在终端确认。</div>
         )}
-        <div className="plan-document"><MarkdownContent text={message.text} /></div>
+        <div className="plan-document"><MemoizedMarkdownContent text={message.text} /></div>
       </article>
     );
   }
@@ -245,6 +247,8 @@ function PlanCard({ message }: { message: ChatMessage }) {
     </article>
   );
 }
+
+const MemoizedPlanCard = React.memo(PlanCard);
 
 type FloatingPlanPanelProps = {
   messages: ChatMessage[];
@@ -337,6 +341,10 @@ function CodeBlock(props: React.ComponentProps<'pre'>) {
   );
 }
 
+const MARKDOWN_REMARK_PLUGINS = [remarkGfm];
+const MARKDOWN_REHYPE_PLUGINS = [rehypeHighlight];
+const MARKDOWN_COMPONENTS = { pre: CodeBlock };
+
 /* Markdown 渲染组件：用于 user / agent 文本消息，支持 GFM（表格/删除线/任务列表）。
    rehype-highlight 按 fenced code 的语言标识自动注入 .hljs-* token，配色见
    highlight-themes/*.css。react-markdown 默认不解析原始 HTML，安全无需额外处理。 */
@@ -344,15 +352,17 @@ function MarkdownContent({ text }: { text: string }) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={{ pre: CodeBlock }}
+        remarkPlugins={MARKDOWN_REMARK_PLUGINS}
+        rehypePlugins={MARKDOWN_REHYPE_PLUGINS}
+        components={MARKDOWN_COMPONENTS}
       >
         {text}
       </ReactMarkdown>
     </div>
   );
 }
+
+const MemoizedMarkdownContent = React.memo(MarkdownContent);
 
 /* 状态 / 错误 / 用户 / 思考 / Agent 文本消息 */
 function SimpleMessage({ message }: { message: ChatMessage }) {
@@ -380,7 +390,7 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
                 : message.role}
         </span>
       )}
-      {useMarkdown ? <MarkdownContent text={message.text} /> : <p>{message.text}</p>}
+      {useMarkdown ? <MemoizedMarkdownContent text={message.text} /> : <p>{message.text}</p>}
       {!isStatus && (
         <button type="button" className="msg-copy-btn" onClick={handleCopyMessage} title={copyMsgDone ? '已复制' : '复制全文'}>
           {copyMsgDone ? <CheckIcon /> : <CopyIcon />}
@@ -389,6 +399,8 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
     </article>
   );
 }
+
+const MemoizedSimpleMessage = React.memo(SimpleMessage);
 
 /* elicitation 记录：工具审批和 AskTool 原生提问都在消息流内完成并保留结果。 */
 function ElicitationMessage({ message }: { message: ChatMessage }) {
@@ -518,19 +530,23 @@ function ElicitationMessage({ message }: { message: ChatMessage }) {
   );
 }
 
+const MemoizedElicitationMessage = React.memo(ElicitationMessage);
+
 /* 消息分发器：根据 role 和结构化字段选择渲染组件 */
 function MessageRenderer({ message }: { message: ChatMessage }) {
   if (message.role === 'tool' && message.toolCallId) {
-    return <ToolCallCard message={message} />;
+    return <MemoizedToolCallCard message={message} />;
   }
   if (message.role === 'plan') {
-    return <PlanCard message={message} />;
+    return <MemoizedPlanCard message={message} />;
   }
   if (message.role === 'elicitation') {
-    return <ElicitationMessage message={message} />;
+    return <MemoizedElicitationMessage message={message} />;
   }
-  return <SimpleMessage message={message} />;
+  return <MemoizedSimpleMessage message={message} />;
 }
+
+const MemoizedMessageRenderer = React.memo(MessageRenderer);
 
 /* 工具组头部（折叠/展开态共用）：一行展示「N 个工具调用 · 含错误」+ caret 方向。
    - 折叠态 caret=▶，点击展开整组；
@@ -597,15 +613,12 @@ function MessageSequence({ messages, collapsedToolGroups, onSetToolGroupCollapse
     return result;
   }, [messages]);
 
-  const renderMessage = (message: ChatMessage) => (
-    <MessageRenderer key={getMessageRenderKey(message)} message={message} />
-  );
 
   return (
     <>
       {segments.map((segment) => {
         if (segment.kind === 'single') {
-          return renderMessage(segment.message);
+          return <MemoizedMessageRenderer key={getMessageRenderKey(segment.message)} message={segment.message} />;
         }
         const collapsed = collapsedToolGroups[segment.groupId] !== false;
         const hasError = segment.messages.some((message) => message.toolStatus === 'failed');
@@ -618,7 +631,9 @@ function MessageSequence({ messages, collapsedToolGroups, onSetToolGroupCollapse
               expanded={!collapsed}
               onToggle={() => onSetToolGroupCollapsed(segment.groupId, !collapsed)}
             />
-            {!collapsed && segment.messages.map(renderMessage)}
+            {!collapsed && segment.messages.map((message) => (
+              <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
+            ))}
           </Fragment>
         );
       })}
@@ -688,7 +703,7 @@ function TurnBlock({
 
   return (
     <div className="turn-block">
-      <MessageRenderer message={userMessage} />
+      <MemoizedMessageRenderer message={userMessage} />
       {processOnly.length > 0 && (
         <div className="turn-process">
           <button
@@ -714,12 +729,12 @@ function TurnBlock({
         </div>
       )}
       {planMessages.map((message) => (
-        <MessageRenderer key={getMessageRenderKey(message)} message={message} />
+        <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
       ))}
       {elicitationMessages.map((message) => (
-        <MessageRenderer key={getMessageRenderKey(message)} message={message} />
+        <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
       ))}
-      {finalAnswer && <MessageRenderer message={finalAnswer} />}
+      {finalAnswer && <MemoizedMessageRenderer message={finalAnswer} />}
       {tailMessages.length > 0 && (
         <MessageSequence
           messages={tailMessages}
@@ -747,6 +762,74 @@ function CommandPendingCard({ pending }: { pending: PendingSlashCommand }) {
     </article>
   );
 }
+
+type MessageStreamProps = {
+  planMessages: ChatMessage[];
+  conversationMessages: ChatMessage[];
+  messageItems: React.ReactNode;
+  selectedProject: StoredProject | null;
+  pendingSlashCommand: PendingSlashCommand | null;
+  isHistoryLoading: boolean;
+  messageListRef: React.RefObject<HTMLDivElement | null>;
+  showScrollToBottom: boolean;
+  onLocatePlan: (messageId: string) => void;
+  onMessageListScroll: () => void;
+  onScrollToBottom: () => void;
+};
+
+/* 消息流与受控输入区隔离；仅消息、滚动或会话状态变化时才重新渲染历史内容。 */
+function MessageStream({
+  planMessages,
+  conversationMessages,
+  messageItems,
+  selectedProject,
+  pendingSlashCommand,
+  isHistoryLoading,
+  messageListRef,
+  showScrollToBottom,
+  onLocatePlan,
+  onMessageListScroll,
+  onScrollToBottom,
+}: MessageStreamProps) {
+  return (
+    <>
+      {planMessages.length > 0 && (
+        <FloatingPlanPanel messages={planMessages} onLocate={onLocatePlan} />
+      )}
+      <div ref={messageListRef} className="message-list" aria-live="polite" onScroll={onMessageListScroll}>
+        {isHistoryLoading ? (
+          <div className="welcome-message">
+            <h1>正在加载历史会话</h1>
+            <p>消息加载完成后会自动显示。</p>
+          </div>
+        ) : conversationMessages.length === 0 ? (
+          <div className="welcome-message">
+            <h1>向 oh-my-pi agent 说明你想做什么</h1>
+            <p>{selectedProject ? '当前会话等待输入。' : '未选择项目。'}</p>
+          </div>
+        ) : (
+          messageItems
+        )}
+        {/* 待执行 slash 命令卡片：用户已发送但 omp 尚未回包时显示在消息流末尾。 */}
+        {pendingSlashCommand && <CommandPendingCard pending={pendingSlashCommand} />}
+        {/* 滚动到底部浮动按钮：用户向上翻看历史时出现，点击回到最新消息并恢复跟随。 */}
+        {showScrollToBottom && (
+          <button
+            className="scroll-to-bottom-btn"
+            type="button"
+            onClick={onScrollToBottom}
+            aria-label="滚动到底部"
+            title="滚动到底部"
+          >
+            ↓
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
+const MemoizedMessageStream = React.memo(MessageStream);
 
 export function ChatWorkspace({
   messages,
@@ -781,6 +864,19 @@ export function ChatWorkspace({
   onSetToolGroupCollapsed
 }: ChatWorkspaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // App 每次输入都会重新创建审批回调；通过 ref 读取最新实现，保持消息流的 callback identity。
+  const elicitationRespondRef = useRef(onElicitationRespond);
+  elicitationRespondRef.current = onElicitationRespond;
+  const handleElicitationRespond = useCallback<ChatWorkspaceProps['onElicitationRespond']>(
+    (requestId, action, content) => {
+      elicitationRespondRef.current(requestId, action, content);
+    },
+    [],
+  );
+  const elicitationActionValue = useMemo<ElicitationActionContextValue>(
+    () => ({ requests: elicitationRequests, onRespond: handleElicitationRespond }),
+    [elicitationRequests, handleElicitationRespond],
+  );
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const shouldFollowMessagesRef = useRef(true);
   // 是否已离开消息流底部（用于显示「滚动到底部」浮动按钮）。
@@ -835,19 +931,20 @@ export function ChatWorkspace({
     setShowScrollToBottom(false);
   }, [selectedSession?.id]);
 
-  const isMessageListNearBottom = () => {
+  const handleMessageListScroll = useCallback(() => {
     const el = messageListRef.current;
-    if (!el) {
-      return true;
-    }
-    return el.scrollHeight - el.scrollTop - el.clientHeight <= AUTO_SCROLL_BOTTOM_THRESHOLD;
-  };
-
-  const handleMessageListScroll = () => {
-    const nearBottom = isMessageListNearBottom();
+    const nearBottom = !el ||
+      el.scrollHeight - el.scrollTop - el.clientHeight <= AUTO_SCROLL_BOTTOM_THRESHOLD;
     shouldFollowMessagesRef.current = nearBottom;
     setShowScrollToBottom(!nearBottom);
-  };
+  }, []);
+
+  const handleLocatePlan = useCallback((messageId: string) => {
+    document.getElementById(`plan-message-${messageId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, []);
 
   // 命令触发：输入框内容形如 `/<token>`（以 / 开头、尚未输入空格）时，
   // 认为用户正在打命令名，token 即作为搜索词；一旦输入空格（开始填参数）则收起。
@@ -996,58 +1093,31 @@ export function ChatWorkspace({
     return () => cancelAnimationFrame(frameId);
   }, [historyScrollResetToken]);
 
-  // 手动滚动到底部并恢复自动跟随。
-  const handleScrollToBottom = () => {
+  const handleScrollToBottom = useCallback(() => {
     shouldFollowMessagesRef.current = true;
     setShowScrollToBottom(false);
     const el = messageListRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
     }
-  };
+  }, []);
 
   return (
-    <ElicitationActionContext.Provider value={{ requests: elicitationRequests, onRespond: onElicitationRespond }}>
+    <ElicitationActionContext.Provider value={elicitationActionValue}>
     <section className="chat-workspace">
-      {planMessages.length > 0 && (
-        <FloatingPlanPanel
-          messages={planMessages}
-          onLocate={(messageId) => {
-            document.getElementById(`plan-message-${messageId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
-        />
-      )}
-      <div ref={messageListRef} className="message-list" aria-live="polite" onScroll={handleMessageListScroll}>
-        {isHistoryLoading ? (
-          <div className="welcome-message">
-            <h1>正在加载历史会话</h1>
-            <p>消息加载完成后会自动显示。</p>
-          </div>
-        ) : conversationMessages.length === 0 ? (
-          <div className="welcome-message">
-            <h1>向 oh-my-pi agent 说明你想做什么</h1>
-            <p>{selectedProject ? '当前会话等待输入。' : '未选择项目。'}</p>
-          </div>
-) : ((
-  // 按回合渲染：每个 user 消息开启一个 TurnBlock，内部把 agent 思考过程折叠，
-  // 只保留最终 agent 回答展开；工具调用在思考过程内部仍可单独折叠/展开。
-  messageItems
-))}
-        {/* 待执行 slash 命令卡片：用户已发送但 omp 尚未回包时显示在消息流末尾。 */}
-        {pendingSlashCommand && <CommandPendingCard pending={pendingSlashCommand} />}
-        {/* 滚动到底部浮动按钮：用户向上翻看历史时出现，点击回到最新消息并恢复跟随。 */}
-        {showScrollToBottom && (
-          <button
-            className="scroll-to-bottom-btn"
-            type="button"
-            onClick={handleScrollToBottom}
-            aria-label="滚动到底部"
-            title="滚动到底部"
-          >
-            ↓
-          </button>
-        )}
-      </div>
+      <MemoizedMessageStream
+        planMessages={planMessages}
+        conversationMessages={conversationMessages}
+        messageItems={messageItems}
+        selectedProject={selectedProject}
+        pendingSlashCommand={pendingSlashCommand}
+        isHistoryLoading={isHistoryLoading}
+        messageListRef={messageListRef}
+        showScrollToBottom={showScrollToBottom}
+        onLocatePlan={handleLocatePlan}
+        onMessageListScroll={handleMessageListScroll}
+        onScrollToBottom={handleScrollToBottom}
+      />
 
       {/* 待发送附件预览：每个附件一个 chip + 移除按钮。dataURL 保留在 React state 里，
           发送时随 text 一起走 sendAgentMessage。

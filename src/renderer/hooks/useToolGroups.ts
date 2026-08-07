@@ -14,7 +14,7 @@
  * - undefined 表示尚未写入状态，ChatWorkspace 按默认折叠展示。
  * - 切 session 时由调用方调用 resetCollapsedToolGroupsForSession 初始化新折叠桶。
  */
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ChatMessage } from '../types';
 
 // 工具调用折叠状态：按 sessionId 分桶，key = 「该工具组最后一条 tool 消息的 id」。
@@ -27,7 +27,10 @@ export function useToolGroups(
 ) {
   const collapsedToolGroupsBySession = useRef<Record<string, Record<string, boolean | undefined>>>({});
   const [collapsedToolGroupsVersion, setCollapsedToolGroupsVersion] = useState(0);
-  const bumpCollapsedToolGroups = () => setCollapsedToolGroupsVersion((value) => value + 1);
+  const bumpCollapsedToolGroups = useCallback(
+    () => setCollapsedToolGroupsVersion((value) => value + 1),
+    [],
+  );
 
   // 当前选中 session 的折叠 map：供 ChatWorkspace 通过 props 读取。
   const collapsedToolGroups = useMemo<Record<string, boolean | undefined>>(() => {
@@ -104,17 +107,18 @@ export function useToolGroups(
   };
 
   // 用户点击摘要卡时通知切换折叠状态。
-  const handleSetToolGroupCollapsed = (groupId: string, collapsed: boolean) => {
-    if (!selectedSession) {
+  const handleSetToolGroupCollapsed = useCallback((groupId: string, collapsed: boolean) => {
+    const sessionId = selectedSession?.id;
+    if (!sessionId) {
       return;
     }
-    const bucket = collapsedToolGroupsBySession.current[selectedSession.id] ?? {};
+    const bucket = collapsedToolGroupsBySession.current[sessionId] ?? {};
     if (bucket[groupId] === collapsed) {
       return;
     }
-    collapsedToolGroupsBySession.current[selectedSession.id] = { ...bucket, [groupId]: collapsed };
+    collapsedToolGroupsBySession.current[sessionId] = { ...bucket, [groupId]: collapsed };
     bumpCollapsedToolGroups();
-  };
+  }, [bumpCollapsedToolGroups, selectedSession?.id]);
 
   // 直接设置某个 session 指定 groupId 的折叠状态（不限当前 session；done 时用于重新收拢本回合工具组）。
   const setGroupCollapsed = (sessionId: string, groupId: string, collapsed: boolean) => {

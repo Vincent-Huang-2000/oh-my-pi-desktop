@@ -43,6 +43,8 @@ import { useApprovalFlow } from './hooks/useApprovalFlow';
 import { useConfigSync } from './hooks/useConfigSync';
 import './styles.css';
 
+const EMPTY_ELICITATION_REQUESTS: ElicitationRequest[] = [];
+
 
 export default function App() {
   const app = useAppCore();
@@ -128,7 +130,7 @@ export default function App() {
           collapsedToolGroups={toolGroups.collapsedToolGroups}
           isHistoryLoading={app.loadingHistorySessionId === app.selectedSession?.id}
           historyScrollResetToken={app.historyScrollResetToken}
-          elicitationRequests={app.elicitationBySession.current[app.selectedSession?.id ?? ''] ?? []}
+          elicitationRequests={app.elicitationBySession.current[app.selectedSession?.id ?? ''] ?? EMPTY_ELICITATION_REQUESTS}
           modelConfig={app.modelConfig}
           modeConfig={app.modeConfig}
           thinkingConfig={app.thinkingConfig}
@@ -150,9 +152,7 @@ export default function App() {
           onSubmit={(event) => void messageFlow.handleSubmit(event)}
           onCancel={() => void messageFlow.handleCancelTurn()}
           onElicitationRespond={(requestId, action, content) => void approvalFlow.handleElicitation(requestId, action, content)}
-          onSetToolGroupCollapsed={(groupId, collapsed) =>
-            toolGroups.handleSetToolGroupCollapsed(groupId, collapsed)
-          }
+          onSetToolGroupCollapsed={toolGroups.handleSetToolGroupCollapsed}
         />
 
         {!paneLayout.rightCollapsed && (
