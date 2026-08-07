@@ -87,8 +87,9 @@
 
 body {
   margin: 0;
-  min-width: 960px;
-  min-height: 640px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 button,
@@ -1269,7 +1270,7 @@ textarea:disabled {
   display: grid;
   /* 顶部 session-header 已移除（diff 入口归右侧审查 Tab，Fork/关闭归左栏 session ⋯ 菜单），
      中间对话区现在只剩消息流 + 输入区两行。 */
-  grid-template-rows: minmax(0, 1fr) 160px;
+  grid-template-rows: minmax(0, 1fr) minmax(100px, auto);
   min-width: 0;
   min-height: 0;
   /* 对话区保持近实色以保证文字可读性，仅微微透出底层渐变统一观感 */
@@ -2763,6 +2764,7 @@ textarea:disabled {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
   padding: 14px 18px;
   border-top: 1px solid var(--glass-border-subtle);
   background: var(--glass-bg);
@@ -2790,6 +2792,7 @@ textarea:disabled {
 .composer-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
