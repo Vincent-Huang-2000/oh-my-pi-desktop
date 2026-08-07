@@ -1,3 +1,17 @@
+/**
+ * useConfigSync — Agent 配置切换 hook。
+ *
+ * 处理四个 config 选项的切换逻辑：
+ * - model / mode / thinking：无选中 session 时更新 draftConfigValues（占位草稿），
+ *   有 session 时走 IPC setAgentConfigOption 实时生效。
+ * - approvalProfile：切换审批档位会重启 agent 子进程，
+ *   需弹 confirm 确认（繁忙时额外警告"会取消当前回合"）。
+ *
+ * ## 维护
+ * - handleApprovalProfileChange 切换前后各调一次 clearApprovalStateForSession，
+ *   覆盖取消/终止窗口内可能到达的旧审批事件。
+ * - 审批档位切换失败设 approvalRestoreFailed=true，UI 显示红色错误提示。
+ */
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
 import type { useAppCore } from './useAppCore';
 

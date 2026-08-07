@@ -1,3 +1,24 @@
+/**
+ * useAgentEvents — OMP agent 事件订阅 hook。
+ *
+ * 主 useEffect 监听 `agent:event` IPC 通道，分发处理 19 种事件类型：
+ * - config_loaded / available_commands    配置与可用命令
+ * - status_changed / log                  状态变更与日志
+ * - plan / plan_preview / plan_full       计划生成流程
+ * - tool_call / tool_result               工具调用与结果
+ * - permission / elicitation / questionnaire  审批三队列
+ * - turn_complete / turn_error            回合完成 / 错误
+ * - usage                                 用量统计
+ *
+ * ## 参数
+ * @param app          useAppCore 返回的状态对象
+ * @param toolGroups   useToolGroups 返回的折叠管理方法
+ * @param refreshGitBranches, refreshDiff  useGitReview 的刷新函数（done/error 后自动调用）
+ *
+ * ## 维护
+ * - 新增事件类型在本文件末尾追加 else-if 分支。
+ * - 事件 payload 解析走 utils 中的 getPayload* 系列，不在此处内联。
+ */
 import { useEffect } from 'react';
 import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption, PermissionRequest, QuestionnaireRequest } from '../types';
 import {

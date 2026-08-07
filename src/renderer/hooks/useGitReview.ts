@@ -1,3 +1,18 @@
+/**
+ * useGitReview — Git diff / branch 刷新与分支切换。
+ *
+ * - refreshDiff(source, project)：按 source（unstaged/staged）拉取 diff 内容并更新 diffText。
+ *   使用递增 refreshId 防竞态，只有最新一次拉取的结果才写入 state。
+ * - refreshGitBranches()：拉取当前项目 git 分支列表。
+ * - handleGitBranchSwitch(branchName)：切换分支，失败时捕获错误显示专用 Modal。
+ *
+ * refreshDiff 和 refreshGitBranches 均为 useCallback([], ...)，无外部依赖，
+ * 作为参数传给 useAgentEvents 用于回合 done / error 后自动刷新。
+ *
+ * ## 维护
+ * - refreshDiff 内部用 selectedProjectRef.current 防闭包过期。
+ * - GitBranchSwitchError 类型定义在 components/GitBranchSwitchErrorModal。
+ */
 import { useCallback, useEffect } from 'react';
 import { resolveGitBranchSwitchFailure, type GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
 import { REVIEW_SOURCE_LABEL, type ReviewSource } from '../lib/constants';

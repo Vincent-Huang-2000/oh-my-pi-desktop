@@ -1,3 +1,22 @@
+/**
+ * useApprovalFlow — 三方审批弹窗处理。
+ *
+ * 处理 agent 在执行中暂停等待用户决策的三类审批：
+ * - **permission**：handlePermission，工具执行权限的二选一（allow/deny）
+ * - **elicitation**：handleElicitation，工具审批（接受/拒绝）与 AskTool 用户问答
+ * - **questionnaire**：handleQuestionnaire，问卷提交/拒绝，含 stale 失效请求的自动清理
+ *
+ * 内部共享方法：
+ * - advanceToNextQuestionnaire：把指定 requestId 从队列移除，推进弹窗到下一项
+ *
+ * ## 队列隔离
+ * permissionBySession / elicitationBySession / questionnaireBySession 三个 ref 队列
+ * 均以 sessionId 为 key 分桶，切 session 时由 useAppCore.clearApprovalStateForSession 清理。
+ *
+ * ## 维护
+ * - elicitaiton 的 markSubmitting 模式在 IPC 等待前先隐藏操作控件，防用户重复提交。
+ * - questionnaire stale 失败需调用 advanceToNextQuestionnaire 推进队列，否则会卡住后续问卷。
+ */
 import type { ChatMessage, QuestionnaireAnswer } from '../types';
 import { getElicitationResultText } from '../lib/elicitationText';
 import type { useAppCore } from './useAppCore';

@@ -1,3 +1,19 @@
+/**
+ * useProjectActions — 项目栏操作 hook。
+ *
+ * 处理左侧 ProjectPane 的项目级操作：
+ * - handleSelectWorkspace：停旧 agent 进程 → 选新目录 → 更新最近项目列表
+ * - handleToggleProjectPinned / handleRevealProject / handleRenameProject / handleRemoveProject
+ * - handleUseProject：内部方法，执行目录切换逻辑（停进程 + 选项目 + useWorkspace）
+ *
+ * ## 参数
+ * @param app        useAppCore 返回的状态对象
+ * @param toolGroups useToolGroups 返回的折叠管理方法（移除项目时需重置折叠）
+ *
+ * ## 维护
+ * - handleUseProject 被 useSessionLifecycle 引用，export 签名不可随意变更。
+ * - 切项目时必须先 stopSessionProcess 再 clear 相关状态，顺序不能颠倒。
+ */
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
 import { useAppCore } from './useAppCore';
 import { useToolGroups } from './useToolGroups';

@@ -1,3 +1,14 @@
+/**
+ * constants — 布局常量、共享类型与默认值。
+ *
+ * - 侧栏尺寸常量：LEFT_PANE_* / RIGHT_PANE_*
+ * - 共享类型：PaneSide、ReviewSource、DraftConfigValues
+ * - 默认值：DEFAULT_APPROVAL_PROFILE、MAX_IMAGE_BYTES、REVIEW_SOURCE_LABEL
+ *
+ * ## 维护
+ * - 修改 DEFAULT_APPROVAL_PROFILE 需同步检查 useConfigSync 中 handleApprovalProfileChange 逻辑。
+ * - DraftConfigValues 的字段名需与 ACP config options 的 option.id 一致。
+ */
 // 附件大小上限（图片 / 文本 / 其它统一 8MB）。dataURL 是 base64，长度约为原文件 ×4/3。
 export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 

@@ -1,3 +1,22 @@
+/**
+ * useSessionLifecycle — Session 生命周期管理。
+ *
+ * 处理会话的创建、选择、同步、关闭、Fork 全生命周期：
+ * - handleNewSession / handleSelectProjectSession / syncProjectSessions
+ * - handleCloseSession / handleForkSession
+ * - 自动同步 useEffect：选中的项目变化时拉取 session 列表
+ * - session/load 历史回放逻辑
+ *
+ * ## 关键不变量（AGENTS.md）
+ * 三处 cwd 校验必须一致，否则切换项目后指令可能误跑在旧目录：
+ * 1. handleUseProject / handleSelectWorkspace → stopSessionProcess + 重置 selectedSession
+ * 2. sendContent → 校验 session.projectPath === selectedProject.path
+ * 3. agentService.sendAgentMessage → 检测 cwd 变化时重启进程
+ *
+ * ## 维护
+ * - Fork 跨项目时需要先切目录再建占位会话，顺序不可颠倒。
+ * - replay 完成后自动触发 config 恢复（model/mode/thinking）。
+ */
 import { useEffect } from 'react';
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
 import { useAppCore } from './useAppCore';

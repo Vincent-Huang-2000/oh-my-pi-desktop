@@ -1,3 +1,15 @@
+/**
+ * useAppCore — 渲染进程核心状态管理 hook。
+ *
+ * 集中持有 App.tsx 全部的 useState / useRef / useMemo / 核心动作，
+ * 是所有业务 hook 的唯一状态来源。返回的 `app` 对象按 prop 传递，
+ * 避免 Context 引入的渲染开销。
+ *
+ * ## 维护
+ * - 新增 state 在函数体内按现有顺序追加，同步更新返回值结构。
+ * - 所有 state 读写不走 reducer，保持直接 setter 访问——与旧版 App.tsx 一致。
+ * - 类型定义跨进程同步：`src/electron/types.ts` ↔ `src/vite-env.d.ts`。
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSearchItem } from '../components/SessionSearchModal';
 import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionRequest, QuestionnaireRequest } from '../types';

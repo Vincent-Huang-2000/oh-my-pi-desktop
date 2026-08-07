@@ -1,3 +1,13 @@
+/**
+ * attachments — 附件类型定义与分类工具。
+ *
+ * PendingAttachment.kind 决定发送时走哪种 ACP 块（见主进程 buildPromptBlocks）：
+ * - image:       模型可读（base64 图片）
+ * - text:        解码后追加到 text 块
+ * - unsupported: 发送但模型读不到内容（chip 标警告）
+ *
+ * classifyAttachment(dataUrl, fileName) 按 MIME + 扩展名判定 kind。
+ */
 // 待发送的附件。kind 决定发送时走哪种 ACP 块（见主进程 buildPromptBlocks）：
 //  - image:       omp 能让模型看到（base64 图片）
 //  - text:        base64 解码后追加到 text 块，omp 能让模型看到

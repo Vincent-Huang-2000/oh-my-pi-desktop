@@ -1,3 +1,19 @@
+/**
+ * useToolGroups — 工具调用组折叠状态管理 hook。
+ *
+ * 管理 ChatWorkspace 中每组工具调用的折叠/展开状态：
+ * - collapsedToolGroupsBySession ref 以 sessionId → { toolGroupId → boolean | undefined } 分桶
+ * - collapsedToolGroupsVersion 版本号驱动 React 重渲染（ref 变更不触发渲染）
+ * - 回合 done 后自动折叠当前回合的工具组（resetCollapsedToolGroupsForSession）
+ *
+ * 导出方法：
+ * - findLatestToolGroupId / collapseAllToolGroupsForSession / resetCollapsedToolGroupsForSession
+ * - handleSetToolGroupCollapsed / setGroupCollapsed / initBucket
+ *
+ * ## 维护
+ * - undefined 表示尚未写入状态，ChatWorkspace 按默认折叠展示。
+ * - 切 session 时由调用方调用 resetCollapsedToolGroupsForSession 初始化新折叠桶。
+ */
 import { useMemo, useRef, useState } from 'react';
 import type { ChatMessage } from '../types';
 

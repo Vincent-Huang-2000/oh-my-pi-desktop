@@ -1,3 +1,17 @@
+/**
+ * useMessageFlow — 消息发送与附件管理。
+ *
+ * 处理输入区消息发送全流程：
+ * - handleSubmit：解析 slash 命令 → 创建占位卡片 → 应用草稿配置 → 调用 IPC sendContent
+ * - handleCancelTurn：取消当前回合（发送 cancel IPC）
+ * - handleAttachAttachment：粘贴/拖拽/文件选择器添加附件（8MB 上限，MIME + 扩展名判定 kind）
+ * - handlePaste：ClipboardEvent 粘贴处理（图片走 dataURL、忽略非图片文件）
+ * - applyDraftConfigValues：无 session 时先应用草稿 model/mode/thinking 再发送
+ *
+ * ## 维护
+ * - sendContent 校验 session.projectPath === selectedProject.path，这是 cwd 不变量的一环。
+ * - 附件 dataURL 不在此处做 base64 预解码，由主进程负责。
+ */
 import type { ClipboardEvent, FormEvent } from 'react';
 import type { ChatMessage } from '../types';
 import { classifyAttachment, type PendingAttachment } from '../lib/attachments';

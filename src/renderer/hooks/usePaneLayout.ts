@@ -1,3 +1,19 @@
+/**
+ * usePaneLayout — 三栏布局侧栏管理 hook。
+ *
+ * 管理左侧项目栏和右侧上下文栏的折叠/展开/拖拽宽度：
+ * - collapseLeftPane / collapseRightPane         单击折叠按钮切换
+ * - expandLeftPane / expandRightPane             悬停触发区域时展开
+ * - handleLeftResizeStart / handleRightResizeStart  拖拽手柄调整宽度
+ * - 左侧预览面板：计时 300ms 后自动展开（若鼠标仍悬停在触发区域上）
+ *
+ * 返回 appShellClassName（BEM 类名）和 layoutStyle（CSS 变量内联样式），
+ * 供 App.tsx 的 <main> 元素直接使用。
+ *
+ * ## 维护
+ * - 折叠状态和宽度不持久化，刷新后重置为默认值。
+ * - 拖拽过程中靠 mouseup 事件在 document 级别监听，组件卸载时清理。
+ */
 import {
   CSSProperties,
   MouseEvent as ReactMouseEvent,

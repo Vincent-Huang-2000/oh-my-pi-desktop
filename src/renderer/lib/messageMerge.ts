@@ -1,3 +1,18 @@
+/**
+ * messageMerge — Agent 事件消息合流核心逻辑。
+ *
+ * mergeAgentEventIntoMessages(event, messages, plansPath, toolGroups) 是
+ * agent 事件流与 UI 消息列表之间的核心桥接函数（~170 行）。处理：
+ * - 按 messageId 查找现有消息行进行增量更新（plan/tool_call/tool_result/elicitation）
+ * - 新消息追加（assistant 文本、计划摘要卡、usage 行等）
+ * - tool 组折叠状态联动（回合开始时展开、done 后折叠）
+ *
+ * isPlanToolCall(toolCall)：判断某 tool_call 是否为 plan 工具调用。
+ *
+ * ## 维护
+ * - 本函数是渲染进程中对 agent 事件格式最敏感的部分，修改前需逐一确认各种 payload 结构。
+ * - 所有事件类型的分支应保持防御性：未知 payload 只打印日志，不抛异常。
+ */
 import type { ChatMessage } from '../types';
 import {
   getMessageRole,

@@ -1,3 +1,14 @@
+/**
+ * slashCommands — Slash 命令解析与占位卡片类型。
+ *
+ * - PendingSlashCommand：发送后、omp 回包前展示的过渡卡片类型
+ * - parseSlashCommand(text)：从输入文本解析出命令名和参数，返回 null 表示非命令
+ * - resolveCommandPendingMeta(name)：查表获取命令的图标和说明文案
+ *
+ * ## 维护
+ * - 新增命令需同时更新 getPayloadAvailableCommands 能从 agent 返回的事件中取到的命令列表。
+ * - PendingSlashCommand 按 sessionId 分桶，与 messageCache 生命周期一致。
+ */
 // 待执行的 slash 命令卡片：用户按下发送后、omp 真正回包前展示，
 // 给"按下发送"与"看到输出"之间一个明确的视觉过渡。
 // 按 sessionId 分桶，与 messageCache / permissionBySession / usageBySession 同属多 session 隔离缓存。
