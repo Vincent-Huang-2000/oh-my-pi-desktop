@@ -1370,6 +1370,7 @@ export default function App() {
       // fork 失败：清理占位会话的四个缓存条目，避免左栏残留幽灵会话与缓存泄漏。
       delete messageCache.current[newLocalId];
       clearApprovalStateForSession(newLocalId, { alsoClearActive: true });
+      delete usageBySession.current[newLocalId];
       toolGroups.resetCollapsedToolGroupsForSession(newLocalId);
       // 兜底杀掉可能已 spawn 但 ACP 握手/fork 阶段失败的 agent 子进程（不存在则 no-op）。
       window.ohMyPiDesktop.stopSessionProcess(newLocalId);
