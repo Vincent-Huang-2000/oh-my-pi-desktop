@@ -23,7 +23,6 @@ import { useEffect } from 'react';
 import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption, PermissionRequest, QuestionnaireRequest } from '../types';
 import {
   getElicitationKind,
-  getLogLevel,
   getPayloadAvailableCommands,
   getPayloadConfigOptions,
   getPayloadElicitationField,
@@ -50,21 +49,6 @@ export function useAgentEvents(
 ): void {
   useEffect(() => {
     return window.ohMyPiDesktop.onAgentEvent((event) => {
-      // 把所有事件原样写进 app.desktopState.logs：日志缓存按 sessionId 自然隔离，
-      // 目前仅用于主进程持久化调试，渲染端不再展示基础日志。
-      app.setDesktopState((current) => ({
-        ...current,
-        logs: [
-          {
-            id: `${Date.now()}-log-${Math.random().toString(16).slice(2)}`,
-            sessionId: event.sessionId,
-            level: getLogLevel(event.type),
-            message: event.message,
-            createdAt: new Date().toISOString()
-          },
-          ...current.logs
-        ].slice(0, 120)
-      }));
 
       // app.messages 与 app.permissionRequest 必须按 sessionId 分桶：
       // 1) 当前 session 的事件：直接更新当前 state；

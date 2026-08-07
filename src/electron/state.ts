@@ -19,6 +19,34 @@ const stateFileName = 'oh-my-pi-desktop-state.json';
 const maxRecentSessions = 200;
 export const defaultApprovalProfile: ApprovalProfile = 'write';
 
+// 日志写盘批处理：高频率的流式事件（每秒数十次）不应每次都触发同步磁盘 I/O。
+// 写入加到内存缓冲，由防抖定时器统一落盘，避免阻塞主进程的事件循环。
+// 其它写盘路径（upsertSession / upsertProject / setSetting 等）仍保持同步即时写。
+let pendingLogs: StoredLog[] | null = null;
+const FLUSH_LOG_DELAY_MS = 800;
+
+const flushLogsNow = () => {
+  const logs = pendingLogs;
+  pendingLogs = null;
+  if (!logs) return;
+  try {
+    const previousState = readState();
+    writeState({ ...previousState, logs });
+  } catch {
+    // 日志落盘失败不应影响应用运行。
+  }
+};
+
+let flushTimer: ReturnType<typeof setTimeout> | undefined;
+
+const scheduleLogFlush = () => {
+  if (flushTimer !== undefined) return;
+  flushTimer = setTimeout(() => {
+    flushTimer = undefined;
+    flushLogsNow();
+  }, FLUSH_LOG_DELAY_MS);
+};
+
 export const normalizeApprovalProfile = (value: unknown): ApprovalProfile => {
   return value === 'always-ask' || value === 'write' || value === 'yolo'
     ? value
@@ -82,18 +110,33 @@ export const setSetting = <K extends keyof DesktopSettings>(
 
 
 export const addLog = (sessionId: string, level: StoredLog['level'], message: string) => {
-  const state = readState();
-  state.logs = [
-    {
-      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      sessionId,
-      level,
-      message,
-      createdAt: new Date().toISOString()
-    },
-    ...state.logs
-  ].slice(0, 120);
-  writeState(state);
+  const entry: StoredLog = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    sessionId,
+    level,
+    message,
+    createdAt: new Date().toISOString()
+  };
+  // 首次写入或距上次 flush 较久时，从磁盘补齐旧日志头，避免只写本次缓冲丢失历史。
+  // 正常流式运行期间，同一批次的追加调用会复用 pendingLogs。
+  if (!pendingLogs) {
+    try {
+      pendingLogs = readState().logs;
+    } catch {
+      pendingLogs = [];
+    }
+  }
+  pendingLogs = [entry, ...pendingLogs].slice(0, 120);
+  scheduleLogFlush();
+};
+
+// 进程退出前强制落盘，确保最后一批日志不丢失。
+export const flushPendingLogs = () => {
+  if (flushTimer !== undefined) {
+    clearTimeout(flushTimer);
+    flushTimer = undefined;
+  }
+  flushLogsNow();
 };
 
 // 按项目缓存最近一次真实 ACP session 返回的配置。草稿会话不创建 ACP session，

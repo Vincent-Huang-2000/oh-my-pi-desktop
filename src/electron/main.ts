@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createAgentService } from './agentService.js';
+import { flushPendingLogs } from './state.js';
 import { registerDesktopIpcHandlers } from './ipc.js';
 import type { AgentEvent } from './types.js';
 import { createWindow } from './window.js';
@@ -37,5 +38,6 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   agentService.stopAll();
+  flushPendingLogs();
 });
 
