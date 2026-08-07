@@ -93,6 +93,8 @@
   overflow-y: auto;
   /* 始终为滚动条保留空间，折叠/展开会话时滚动条轨道的出现/消失不会导致布局偏移。 */
   scrollbar-gutter: stable;
+  /* 内容与滚动条之间的呼吸间距，避免高亮背景紧贴滚动条轨道。 */
+  padding-right: 6px;
 }
 
 .project-group {
@@ -301,6 +303,8 @@
   min-height: 32px;
   padding: 0 4px 0 10px;
   color: var(--color-text);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .session-item.active {
