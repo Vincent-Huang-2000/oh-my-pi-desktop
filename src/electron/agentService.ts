@@ -28,6 +28,7 @@ import {
   getToolModelSnapshot,
   normalizeApprovalProfile,
   readState,
+  removeSession,
   saveToolModelSnapshot,
   updateProjectCommandsCache,
   updateProjectConfigCache,
@@ -1396,17 +1397,24 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const forkSession = (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => {
     // 先持久化占位会话（带渲染层传入的正确 title），确保 startAgent 的 readState() 能找到，
     // 避免 localSessionTitle fallback 到 '新的 agent 会话'。
+    // 注意：此时 acpSessionId 尚未确定，restoreAcpSession 末尾的 upsertSession 会补全它。
     upsertSession(workspacePath, localSessionId, title, undefined, undefined, true);
     const sourceSession = readState().recentSessions.find(
       (session) => session.projectPath === workspacePath && session.acpSessionId === sourceAcpSessionId
     );
-    return attachToAcpSession(
-      localSessionId,
-      workspacePath,
-      sourceAcpSessionId,
-      'session/fork',
-      normalizeApprovalProfile(sourceSession?.approvalProfile)
-    );
+    try {
+      return attachToAcpSession(
+        localSessionId,
+        workspacePath,
+        sourceAcpSessionId,
+        'session/fork',
+        normalizeApprovalProfile(sourceSession?.approvalProfile)
+      );
+    } catch (error) {
+      // attachToAcpSession 失败时清理已持久化的占位记录，避免 state 中残留幽灵 session。
+      removeSession(localSessionId);
+      throw error;
+    }
   };
 
   // 切换审批档位会重建该会话的 omp acp 进程；ACP mode/config 与消息缓存保持不变。

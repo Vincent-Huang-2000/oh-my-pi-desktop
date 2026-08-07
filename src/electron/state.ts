@@ -317,6 +317,18 @@ export const removeProject = (workspacePath: string) => {
   return existing;
 };
 
+// 从 recentSessions 中按 id 删除一条会话记录。用于 fork 失败时回滚已持久化的占位 session。
+export const removeSession = (id: string) => {
+  const state = readState();
+  const existing = state.recentSessions.find((item) => item.id === id);
+  if (!existing) {
+    return null;
+  }
+  state.recentSessions = state.recentSessions.filter((item) => item.id !== id);
+  writeState(state);
+  return existing;
+};
+
 // 首次启动兜底：在用户文档目录下创建 omp-desktop 文件夹并 upsert 为项目。
 // 返回该项目，供渲染端作为默认执行目录使用。
 export const ensureDefaultWorkspace = (): StoredProject => {
