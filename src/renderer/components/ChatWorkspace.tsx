@@ -1212,17 +1212,79 @@ export function ChatWorkspace({
               </div>
             </div>
           )}
-          <textarea
-            ref={textareaRef}
-            value={prompt}
-            onChange={(event) => handlePromptChange(event.target.value)}
-            onKeyDown={handleTextareaKeyDown}
-            onPaste={onPaste}
-            placeholder="向 oh-my-pi agent 说明你想做什么（输入 / 唤起命令，支持粘贴图片）..."
-            disabled={!selectedProject}
-          />
-        </div>
-        <div className="composer-actions">
+          {/* 输入框顶部工具栏：左侧配置区（模型/模式/推理/审批），右侧操作按钮。 */}
+          <div className="composer-config-row">
+            <div className="config-group">
+              <div className="model-picker-anchor config-segment">
+                <button
+                  ref={modelButtonRef}
+                  type="button"
+                  className="model-picker-trigger segment-select-trigger"
+                  aria-haspopup="dialog"
+                  aria-expanded={modelPickerOpen}
+                  aria-label="模型选择"
+                  disabled={modelOptions.length === 0}
+                  onClick={() => setModelPickerOpen((open) => !open)}
+                >
+                  <span className="segment-select-label">{currentModelName}</span>
+                  <svg
+                    className="segment-select-chevron"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    aria-hidden="true"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                {modelPickerOpen && (
+                  <ModelPickerPopover
+                    value={currentModelValue}
+                    options={modelOptions}
+                    emptyLabel={modelEmptyLabel}
+                    triggerRef={modelButtonRef}
+                    showDetail={false}
+                    onChange={onModelChange}
+                    onClose={() => setModelPickerOpen(false)}
+                  />
+                )}
+              </div>
+              <div className="config-segment">
+                <SegmentSelect
+                  ariaLabel="Agent 模式"
+                  options={modeOptions}
+                  value={currentMode}
+                  emptyLabel={modeEmptyLabel}
+                  onChange={onModeChange}
+                />
+              </div>
+              <div className="config-segment">
+                <SegmentSelect
+                  ariaLabel="推理强度"
+                  options={thinkingOptions}
+                  value={currentThinking}
+                  emptyLabel={thinkingEmptyLabel}
+                  onChange={onThinkingChange}
+                />
+              </div>
+              <div
+                className="config-segment approval-config-segment"
+                title="当前会话的工具审批档位"
+              >
+                <SegmentSelect
+                  ariaLabel="审批档位"
+                  options={APPROVAL_PROFILE_OPTIONS}
+                  value={approvalProfile}
+                  emptyLabel="自动编辑"
+                  disabled={!selectedProject}
+                  onChange={(value) => onApprovalProfileChange(value as ApprovalProfile)}
+                />
+              </div>
+            </div>
+            <div className="composer-actions-right">
           {/* 加号入口：替代原先的 hint 文字。
               - 点击按钮切换弹出菜单（添加文件 / 插入 / 命令）
               - 「添加文件」交给 App 打开系统文件选择器（accept 不限，任意文件均可选）
@@ -1239,19 +1301,19 @@ export function ChatWorkspace({
               disabled={!selectedProject}
               onClick={() => setAttachMenuOpen((open) => !open)}
             >
-              {/* 加号图标 */}
+              {/* 回形针图标 */}
               <svg
-                width="18"
-                height="18"
+                width="16"
+                height="16"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
+                strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
             </button>
             {attachMenuOpen && (
@@ -1284,78 +1346,6 @@ export function ChatWorkspace({
               </div>
             )}
           </div>
-          {/* 会话配置区：模型 / Agent 模式 / 推理强度 / 审批档位，四者紧邻成组，
-              紧贴发送按钮左侧，作为「本次会话配置」入口。 */}
-          <div className="config-group">
-            <div className="model-picker-anchor config-segment">
-              <button
-                ref={modelButtonRef}
-                type="button"
-                className="model-picker-trigger segment-select-trigger"
-                aria-haspopup="dialog"
-                aria-expanded={modelPickerOpen}
-                aria-label="模型选择"
-                disabled={modelOptions.length === 0}
-                onClick={() => setModelPickerOpen((open) => !open)}
-              >
-                <span className="segment-select-label">{currentModelName}</span>
-                <svg
-                  className="segment-select-chevron"
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  aria-hidden="true"
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-              {modelPickerOpen && (
-                <ModelPickerPopover
-                  value={currentModelValue}
-                  options={modelOptions}
-                  emptyLabel={modelEmptyLabel}
-                  triggerRef={modelButtonRef}
-                  showDetail={false}
-                  onChange={onModelChange}
-                  onClose={() => setModelPickerOpen(false)}
-                />
-              )}
-            </div>
-            <div className="config-segment">
-              <SegmentSelect
-                ariaLabel="Agent 模式"
-                options={modeOptions}
-                value={currentMode}
-                emptyLabel={modeEmptyLabel}
-                onChange={onModeChange}
-              />
-            </div>
-            <div className="config-segment">
-              <SegmentSelect
-                ariaLabel="推理强度"
-                options={thinkingOptions}
-                value={currentThinking}
-                emptyLabel={thinkingEmptyLabel}
-                onChange={onThinkingChange}
-              />
-            </div>
-            <div
-              className="config-segment approval-config-segment"
-              title="当前会话的工具审批档位"
-            >
-              <SegmentSelect
-                ariaLabel="审批档位"
-                options={APPROVAL_PROFILE_OPTIONS}
-                value={approvalProfile}
-                emptyLabel="自动编辑"
-                disabled={!selectedProject}
-                onChange={(value) => onApprovalProfileChange(value as ApprovalProfile)}
-              />
-            </div>
-          </div>
           {/* 发送/停止合并为一个图标按钮：
               - agent 运行中（canCancel）显示「停止」图标，点击触发 onCancel
               - 否则显示「发送」图标，点击提交；输入为空或未选项目时禁用 */}
@@ -1380,6 +1370,15 @@ export function ChatWorkspace({
               </svg>
             )}
           </button>
+            </div>
+          </div>
+          <textarea
+            ref={textareaRef}
+            value={prompt}
+            onChange={(event) => handlePromptChange(event.target.value)}
+            placeholder="向 oh-my-pi agent 说明你想做什么（输入 / 唤起命令，支持粘贴图片）..."
+            disabled={!selectedProject}
+          />
         </div>
         {(approvalProfile === 'yolo' || approvalProfileNotice) && (
           <div className="approval-profile-notice" aria-live="polite">

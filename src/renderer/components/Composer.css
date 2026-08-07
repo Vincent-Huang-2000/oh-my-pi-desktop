@@ -19,39 +19,58 @@
   height: 88px;
   resize: none;
   padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 0;
   color: var(--color-text);
-  background: var(--color-surface);
+  background: transparent;
+  outline: none;
 }
 
-/* 输入框区域：相对定位容器，命令面板从输入框上方弹出。 */
+.composer textarea:focus-visible {
+  outline: none;
+}
+
+/* 输入框卡片容器：统一外框承载配置栏与文本区，圆角 + 柔和阴影。 */
 .composer-input {
   position: relative;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 2px 12px rgba(30, 40, 37, 0.08);
 }
 
-/* 输入框下方一行：左侧提示，右侧「会话配置组 + 发送/停止按钮」成组靠右。 */
-.composer-actions {
+/* 卡片顶部工具栏行：左侧配置区，右侧操作按钮。 */
+.composer-config-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
-/* 加号入口默认贴左；右侧成组（config-group + 发送按钮）靠右。 */
-.composer-attach-anchor {
-  position: relative;
-  margin-right: auto;
+/* 行内 config-group 去独立外框，融入工具栏。 */
+.composer-config-row .config-group {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 0;
 }
 
-/* 配置区下放到 composer 后，下拉菜单需要向上展开（composer 位于窗口底部，
-   向下展开会跑出屏幕）。翻转 segment-select 与 model-picker 的弹出方向。 */
-.composer-actions .segment-select-menu {
+/* 右侧操作按钮组：加号 + 发送，靠右排列。 */
+.composer-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* 配置区下拉菜单向上展开（卡片在窗口底部）。 */
+.composer-input .segment-select-menu {
   top: auto;
   bottom: calc(100% + 6px);
 }
 
-.composer-actions .model-picker-popover {
+.composer-input .model-picker-popover {
   top: auto;
   bottom: calc(100% + 6px);
   background: rgba(255, 255, 255, 0.94);
@@ -126,11 +145,44 @@
   color: var(--color-text);
 }
 
-/* 加号菜单：从按钮上方弹出（composer 在窗口底部，向下弹会跑出屏幕），白底阴影、
-   风格对齐 command-palette。 */
+/* 加号入口作为 attach-menu 的定位锚点。 */
+.composer-attach-anchor {
+  position: relative;
+}
+
+/* 卡片工具栏内的按钮：缩小 + 统一轻量中性风格，去紫色填充。 */
+.composer-actions-right .composer-icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border-color: var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.composer-actions-right .composer-icon-button:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+/* 停止按钮保留红色警示。 */
+.composer-actions-right .composer-icon-button.is-stop {
+  background: var(--color-error-border);
+  border-color: var(--color-error-border);
+  color: var(--color-error-text);
+}
+
+.composer-actions-right .composer-icon-button.is-stop:hover {
+  background: var(--color-error-border);
+  border-color: var(--color-error-border);
+}
+
+/* 加号菜单：从按钮上方弹出，右对齐防止溢出卡片边缘。 */
 .attach-menu {
   position: absolute;
-  left: 0;
+  right: 0;
+  left: auto;
   bottom: calc(100% + 6px);
   z-index: 20;
   min-width: 168px;
