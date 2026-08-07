@@ -1,0 +1,186 @@
+/* ============================================================
+ * QuestionnaireModal —— Plan 兼容问卷
+ * ============================================================ */
+
+/* Plan 兼容问卷：让用户聚焦在需求选择，而非底层工具授权。 */
+.questionnaire-modal {
+  width: min(620px, calc(100vw - 48px));
+}
+
+.questionnaire-modal-header,
+.questionnaire-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.questionnaire-kicker {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--color-accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.questionnaire-modal h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.questionnaire-count,
+.questionnaire-chip {
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-strong);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.questionnaire-count {
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.questionnaire-intro {
+  margin-bottom: 16px !important;
+}
+
+.questionnaire-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.questionnaire-queue button {
+  padding: 5px 9px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  font-size: 12px;
+}
+
+.questionnaire-queue button.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-subtle);
+}
+
+.questionnaire-list {
+  display: grid;
+  gap: 12px;
+}
+
+.questionnaire-item {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .5);
+}
+
+.questionnaire-item legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  padding: 0 4px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.questionnaire-item legend small {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.questionnaire-chip {
+  padding: 2px 7px;
+}
+
+.questionnaire-options {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.questionnaire-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.questionnaire-option:hover {
+  background: var(--color-accent-hover);
+}
+
+.questionnaire-option.selected {
+  border-color: var(--color-accent-subtle);
+  background: var(--color-accent-subtle);
+}
+
+.questionnaire-option input {
+  position: absolute;
+  opacity: 0;
+}
+
+.questionnaire-option-mark {
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.questionnaire-item:has(input[type='checkbox']) .questionnaire-option-mark {
+  border-radius: 4px;
+}
+
+.questionnaire-option.selected .questionnaire-option-mark {
+  border: 4px solid var(--color-accent);
+}
+
+.questionnaire-option strong,
+.questionnaire-option small {
+  display: block;
+}
+
+.questionnaire-option strong {
+  font-size: 13px;
+}
+
+.questionnaire-option small {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.questionnaire-actions {
+  margin-top: 18px;
+}
+
+.questionnaire-actions button {
+  padding: 9px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.questionnaire-actions button:not(:disabled):not(.primary-action):not(.danger-action):hover {
+  background: var(--color-surface-sunken);
+}
+
+.questionnaire-actions button:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+}

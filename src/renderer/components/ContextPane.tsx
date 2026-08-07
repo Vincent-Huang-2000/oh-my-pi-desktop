@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ReviewDiffView } from './ReviewDiffView';
+import './ContextPane.css';
+
 
 type ReviewSource = 'unstaged' | 'staged';
 type ContextTab = 'review' | 'terminal';

@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { QuestionnaireAnswer, QuestionnaireRequest } from '../types';
+import './QuestionnaireModal.css';
+
 
 type QuestionnaireModalProps = {
   request: QuestionnaireRequest;

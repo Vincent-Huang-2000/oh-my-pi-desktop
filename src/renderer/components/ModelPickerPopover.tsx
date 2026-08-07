@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import type { AcpConfigOption } from '../types';
 import { fuzzyMatch, groupModelOptions, type GroupedModelOptions } from '../utils';
+import './ModelPickerPopover.css';
+
 
 type ModelOption = NonNullable<AcpConfigOption['options']>[number];
 

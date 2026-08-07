@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import './SessionSearchModal.css';
+
 
 export type SessionSearchItem = {
   project: StoredProject;

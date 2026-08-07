@@ -1,0 +1,1052 @@
+/* ============================================================
+ * ChatWorkspace —— 对话工作区（消息流、工具卡片、计划、回合折叠）
+ * ============================================================ */
+
+/* ── 对话区容器 ── */
+.chat-workspace {
+  grid-column: 1;
+  position: relative;
+  display: grid;
+  /* 中间对话区只有消息流 + 输入区两行。 */
+  grid-template-rows: minmax(0, 1fr) minmax(100px, auto);
+  min-width: 0;
+  min-height: 0;
+  /* 对话区保持近实色以保证文字可读性，仅微微透出底层渐变统一观感 */
+  background: rgba(255, 255, 255, 0.88);
+}
+
+/* ── 消息列表 ── */
+.message-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 22px;
+}
+
+.scroll-to-bottom-btn {
+  position: sticky;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: -36px;
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: var(--color-accent-subtle);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px);
+}
+
+.scroll-to-bottom-btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+/* ── 欢迎消息 ── */
+.welcome-message {
+  max-width: 640px;
+  margin: 10vh auto 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.welcome-message h1 {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.welcome-message p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+/* ── 消息基础 ── */
+.message {
+  max-width: 100%;
+  margin-bottom: 10px;
+  padding: 4px 12px 4px 14px;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: none;
+}
+
+.message.user {
+  /* 用户消息：去掉左侧竖线，改用气泡包裹 */
+  margin-left: auto;                       /* 气泡右对齐（贴近对话区右侧） */
+  max-width: 85%;                          /* 限制气泡宽度，避免占满整行 */
+  padding: 10px 14px;
+  border: none;
+  border-radius: 14px;                     /* 圆角气泡 */
+  background: var(--color-accent-subtle);  /* 强调色浅底 */
+  box-shadow: var(--glass-shadow);
+  position: relative;
+}
+
+.message.tool {
+  padding: 0;
+  border-left: none;
+}
+
+.message.error {
+  border-left-color: var(--color-error-border);
+}
+
+.message.status {
+  border-left-color: var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Agent 消息：无左边框，靠内容本身区分 */
+.message.agent {
+  border-left-color: transparent;
+}
+
+/* 思考消息：保留可读性，同时用弱化色、字号和斜体与最终回答区分。 */
+.message.thought {
+  border-left-color: var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.message.thought pre,
+.message.thought code {
+  font-style: normal;
+}
+
+/* elicitation 内联记录：弱于对话气泡，但保留清晰的处理状态与结果。 */
+.message.elicitation {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-surface-sunken);
+}
+
+.elicitation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 5px;
+}
+
+.elicitation-title {
+  color: var(--color-accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.elicitation-header time {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.message.elicitation .elicitation-question,
+.message.elicitation .elicitation-result {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.message.elicitation .elicitation-question {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.message.elicitation .elicitation-result {
+  margin-top: 5px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.message.elicitation-accepted {
+  border-left-color: var(--color-done);
+}
+
+.message.elicitation-declined,
+.message.elicitation-cancelled {
+  border-left-color: var(--color-border);
+}
+
+.message.elicitation-failed {
+  border-left-color: var(--color-error-border);
+}
+
+.message.elicitation-failed .elicitation-title,
+.message.elicitation-failed .elicitation-result {
+  color: var(--color-error-text);
+}
+
+/* ── 待执行 slash 命令卡片 ── */
+.command-pending {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-strong);
+}
+
+.command-pending-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--color-accent-strong);
+  animation: command-pending-spin 1.2s ease-in-out infinite;
+}
+
+.command-pending-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.command-pending-name {
+  font-family: 'SFMono-Regular', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-accent-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.command-pending-label {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+@keyframes command-pending-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ── 消息内部 ── */
+.message > span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* 消息底部全文复制按钮：图标风方钮 */
+.msg-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 6px;
+  margin-left: auto;
+  padding: 0;
+  color: var(--color-border);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+
+/* 用户气泡内的复制按钮：改为绝对定位浮于气泡左下角外侧，不挤压气泡内容 */
+.message.user .msg-copy-btn {
+  position: absolute;
+  bottom: 4px;
+  left: -32px;                              /* 浮在气泡左下角外侧 */
+  margin: 0;
+}
+
+.message:hover .msg-copy-btn,
+.msg-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.msg-copy-btn:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+/* ── 状态指示器增强 ── */
+.message.status {
+  max-width: 100%;
+  margin-bottom: 6px;
+  padding: 6px 12px;
+  border: 0;
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 12px;
+  background: var(--color-surface-sunken);
+}
+
+.message.status p {
+  margin: 0;
+  font-size: 12px;
+}
+/* ── Markdown 渲染样式 ── */
+.markdown-body {
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.markdown-body p {
+  margin: 0 0 8px 0;
+  white-space: normal;
+  line-height: 1.65;
+}
+
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body strong {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.markdown-body em {
+  font-style: italic;
+  color: var(--color-text-faint);
+}
+
+/* 行内代码 */
+.markdown-body code {
+  font-family: 'SFMono-Regular', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent-strong);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* 代码块容器：相对定位，承载复制按钮 + <pre> */
+.code-block-wrapper {
+  position: relative;
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface);
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--color-surface-sunken);
+  overflow-x: auto;
+}
+
+.code-block-wrapper pre code {
+  background: none;
+  color: var(--color-text);
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+/* 代码块右上角复制按钮：浅色风格 */
+.code-copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  z-index: 1;
+}
+
+.code-block-wrapper:hover .code-copy-btn,
+.code-copy-btn:focus-visible {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+/* 有序 / 无序列表 */
+.markdown-body ul,
+.markdown-body ol {
+  margin: 4px 0 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-body li {
+  margin-bottom: 2px;
+}
+
+.markdown-body li > p {
+  margin: 0;
+}
+
+/* 引用块 */
+.markdown-body blockquote {
+  margin: 8px 0;
+  padding: 6px 12px;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-tertiary);
+}
+
+.markdown-body blockquote p {
+  margin: 0;
+}
+
+/* 链接 */
+.markdown-body a {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body a:hover {
+  color: var(--color-text-faint);
+}
+
+/* 分割线 */
+.markdown-body hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* 表格 */
+.markdown-body table {
+  margin: 8px 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.markdown-body th {
+  background: var(--color-surface-sunken);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.markdown-body tr:nth-child(even) td {
+  background: var(--color-surface-sunken);
+}
+
+/* 标题 */
+.markdown-body h1 { font-size: 1.4em; margin: 12px 0 6px 0; font-weight: 600; color: var(--color-text); }
+.markdown-body h2 { font-size: 1.25em; margin: 10px 0 6px 0; font-weight: 600; color: var(--color-text); }
+.markdown-body h3 { font-size: 1.1em; margin: 8px 0 4px 0; font-weight: 600; color: var(--color-text); }
+.markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 1em; margin: 6px 0 4px 0; font-weight: 600; color: var(--color-text-muted); }
+
+/* 删除线 */
+.markdown-body del {
+  color: var(--color-pending);
+}
+
+/* 图片 */
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* 任务列表 */
+.markdown-body input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--color-accent);
+}
+
+/* user / thought / agent 消息中 markdown 首元素去顶边距 */
+.message.user .markdown-body > :first-child,
+.message.thought .markdown-body > :first-child,
+.message.agent .markdown-body > :first-child {
+  margin-top: 0;
+}
+
+/* ── 工具调用卡片 ── */
+.tool-card {
+  border-left: 4px solid var(--color-border);
+  padding: 0;
+  overflow: hidden;
+}
+/* 工具卡片内隐藏全局 message span/p 样式 */
+.tool-card > span,
+.tool-card > p { display: none; }
+
+.tool-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 14px;
+  /* 工具卡片头部轻透明，不加 blur 避免流式更新性能开销 */
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.tool-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.tool-kind-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--color-border-subtle);
+}
+
+.tool-title {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 工具种类左边框着色 */
+.tool-read    { border-left-color: var(--color-read); }
+.tool-edit    { border-left-color: var(--color-edit); }
+.tool-delete  { border-left-color: var(--color-delete); }
+.tool-execute { border-left-color: var(--color-execute); }
+.tool-search  { border-left-color: var(--color-search); }
+.tool-think   { border-left-color: var(--color-think); }
+.tool-fetch   { border-left-color: var(--color-fetch); }
+.tool-switch_mode { border-left-color: var(--color-other); }
+
+/* 工具状态标签 */
+.tool-status {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-pending  { color: var(--color-other); background: var(--color-surface-sunken); }
+.status-running  { color: var(--color-accent-strong); background: var(--color-surface-sunken); }
+.status-done     { color: var(--color-text-faint); background: var(--color-surface-sunken); }
+.status-error    { color: var(--color-error-text); background: var(--color-surface-sunken); }
+
+/* 工具调用模型徽标：紧邻状态标签，浅紫胶囊显示当时使用的模型展示名 */
+.tool-model {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: var(--theme-grad-2);
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 进行中状态的旋转指示器：让编辑/执行过程可见「正在进行」 */
+.tool-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: tool-spin 0.7s linear infinite;
+}
+
+@keyframes tool-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 进行中的工具卡片左边框轻微脉冲，强化「实时」感 */
+.tool-card:has(.status-running) {
+  border-left-color: var(--color-accent-strong);
+  animation: tool-card-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes tool-card-pulse {
+  0%, 100% { border-left-color: var(--color-accent-strong); }
+  50% { border-left-color: var(--color-accent); }
+}
+
+/* 工具文件位置 */
+.tool-locations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 14px 8px;
+}
+
+.tool-file {
+  padding: 2px 8px;
+  background: var(--color-border-subtle);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  color: var(--color-text-muted);
+  text-transform: none;
+}
+
+/* 工具 diff 块 */
+.tool-diffs {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 8px 14px;
+  background: var(--color-surface-sunken);
+}
+
+.tool-diff-block {
+  font-size: 12px;
+}
+
+.tool-diff-block summary {
+  cursor: pointer;
+  color: var(--color-other);
+  padding: 4px 0;
+}
+
+.diff-content {
+  margin: 6px 0 0;
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-x: auto;
+}
+
+.diff-content code {
+  white-space: pre;
+}
+
+/* 工具流式文本输出（命令输出 / 读取结果等中间产物） */
+.tool-output {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 8px 14px;
+  background: var(--color-surface-sunken);
+  font-size: 12px;
+}
+
+.tool-output summary {
+  cursor: pointer;
+  color: var(--color-other);
+  padding: 4px 0;
+}
+
+.tool-output-content {
+  margin: 6px 0 0;
+  padding: 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  font-size: 11px;
+  line-height: 1.45;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── 计划卡片 ── */
+.floating-plan-panel {
+  position: absolute;
+  z-index: 8;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-strong);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  backdrop-filter: var(--glass-blur-light);
+}
+
+.floating-plan-toggle {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.floating-plan-toggle:hover {
+  background: var(--color-accent-hover);
+}
+
+.floating-plan-pending {
+  justify-content: flex-start;
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.floating-plan-pending:hover {
+  background: transparent;
+}
+
+.floating-plan-toggle:active {
+  transform: translateY(1px);
+}
+
+.floating-plan-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.floating-plan-locate {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.message.plan {
+  max-width: 100%;
+  margin-bottom: 10px;
+  /* 顶部定位时避开右上角的计划摘要浮层，确保方案标题完整可见。 */
+  scroll-margin-top: 64px;
+  padding: 0;
+  border: 1px solid var(--color-accent-subtle);
+  border-left-width: 1px;
+  border-radius: 6px;
+  /* 计划卡片轻微透明，透出对话区底色 */
+  background: rgba(255, 255, 255, 0.55);
+}
+/* 计划卡片内不显示全局 message span/p 样式 */
+.message.plan > span,
+.message.plan > p { display: none; }
+
+.plan-empty {
+  padding: 12px 14px;
+  color: var(--color-text-muted);
+}
+
+.plan-loading {
+  border-color: var(--color-border-subtle);
+  background: var(--color-surface-sunken);
+}
+
+.plan-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-accent-subtle);
+}
+
+/* 未能从磁盘读到完整方案、仅展示摘要时的降级提示。 */
+.plan-degraded-hint {
+  padding: 6px 14px;
+  font-size: 12px;
+  color: #b8860b;
+  background: #fff8e1;
+  border-bottom: 1px solid var(--color-accent-subtle);
+}
+
+.plan-loading-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-hover-strong);
+  animation: plan-loading-pulse 1.1s ease-in-out infinite;
+}
+
+.plan-loading-body {
+  padding: 10px 14px 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@keyframes plan-loading-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.plan-progress {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+}
+
+.plan-document {
+  padding: 10px 14px 12px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.plan-document .markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.plan-document .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.plan-entries {
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+}
+
+.plan-entry {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.plan-status-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 11px;
+}
+
+.plan-pending .plan-status-icon     { color: var(--color-pending); }
+.plan-in_progress .plan-status-icon { color: var(--color-running); }
+.plan-completed .plan-status-icon   { color: var(--color-done); }
+
+.plan-pending .plan-entry-content     { color: var(--color-pending); }
+.plan-in_progress .plan-entry-content { color: var(--color-text); font-weight: 500; }
+.plan-completed .plan-entry-content   { color: var(--color-other); text-decoration: line-through; }
+
+/* ── 工具组头部 ── */
+.tool-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  margin: 4px 0;
+  background: var(--color-tool);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.tool-group-header:hover {
+  background: var(--color-border-subtle);
+  border-color: var(--color-border);
+}
+
+.tool-group-header-error {
+  border-left: 3px solid var(--color-error-text);
+}
+
+.tool-group-header-caret {
+  color: var(--color-accent);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.tool-group-header-label {
+  color: var(--color-text);
+}
+
+/* ── 回合折叠：把 user → 思考过程 → 最终回答组织在一起 ── */
+.turn-block {
+  margin-bottom: 10px;
+}
+
+/* 思考过程折叠容器：用淡虚线左边框暗示它属于上方 user 消息 */
+.turn-process {
+  margin: 4px 0 10px 12px;
+  padding-left: 12px;
+  border-left: 2px dashed var(--color-border);
+}
+
+/* 思考过程折叠/展开按钮 */
+.turn-process-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.turn-process-header:hover {
+  color: var(--color-text);
+}
+
+.turn-process-caret {
+  flex-shrink: 0;
+  color: var(--color-accent);
+  font-size: 11px;
+}
+
+.turn-process-label {
+  flex: 1;
+}
+
+/* 思考过程展开后的内容区 */
+.turn-process-content {
+  padding-top: 4px;
+}
+
+.turn-process-content .message:first-child {
+  margin-top: 0;
+}
+
+/* ── 待发送附件 ── */
+.pending-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 18px 0;
+  background: var(--color-surface-sunken);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.image-chip {
+  position: relative;
+  display: inline-block;
+}
+
+.image-chip button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 10px;
+  background: var(--color-error);
+  border-color: var(--color-error-border);
+  color: var(--color-error-text);
+}
+
+/* 非图片附件 chip：用文件名 + 标签替代缩略图。 */
+.image-chip-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.image-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--color-text);
+}
+
+/* 不支持类型：橙色警告色（对齐停止按钮的警示色系）。 */
+.image-chip.is-unsupported .image-chip-file {
+  border-color: var(--color-error-border);
+  background: var(--color-surface-sunken);
+}
+
+.image-chip-warn {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 8px;
+  background: var(--color-error-border);
+  color: var(--color-error-text);
+}
+
+/* 文本类附件：中性灰标签。 */
+.image-chip-tag {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+  border-radius: 8px;
+  background: var(--color-border-subtle);
+  color: var(--color-text-muted);
+}

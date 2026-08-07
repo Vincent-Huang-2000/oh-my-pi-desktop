@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ElicitationRequest } from '../types';
 import { formatElicitationOptionLabel, isElicitationOtherOption } from '../utils';
+import './ElicitationModal.css';
+
 
 type ElicitationModalProps = {
   request: ElicitationRequest;

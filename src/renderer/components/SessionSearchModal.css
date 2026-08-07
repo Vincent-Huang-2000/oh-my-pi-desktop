@@ -1,0 +1,161 @@
+/* ============================================================
+ * SessionSearchModal —— 会话搜索弹窗
+ * ============================================================ */
+
+.session-search-modal {
+  width: min(520px, calc(100vw - 48px));
+  padding: 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.session-search-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.session-search-modal h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.session-search-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-alt);
+}
+
+.session-search-close:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.session-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+
+.session-search-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.session-search-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.session-search-scope button {
+  height: 28px;
+  padding: 0 10px;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-alt);
+  font-size: 12px;
+}
+
+.session-search-scope button:hover:not(:disabled),
+.session-search-scope button.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.session-search-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.session-search-sort select {
+  height: 28px;
+  min-width: 112px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+
+.session-search-results {
+  display: grid;
+  gap: 8px;
+  max-height: min(380px, calc(100vh - 270px));
+  margin-top: 14px;
+  overflow-y: auto;
+}
+
+.session-search-result {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border-color: var(--color-border);
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-surface);
+}
+
+.session-search-result:hover,
+.session-search-result.selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-hover);
+}
+
+.session-search-result.active {
+  border-color: var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.session-search-result-title {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-search-result-meta,
+.session-search-result-preview {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-search-result-preview {
+  color: var(--color-text-muted);
+}
+
+.session-search-empty {
+  padding: 18px;
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  color: var(--color-text-muted);
+  text-align: center;
+  background: var(--color-surface-alt);
+}

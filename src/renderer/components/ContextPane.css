@@ -1,0 +1,563 @@
+/* ============================================================
+ * ContextPane —— 右侧上下文栏（审查、终端）
+ * ============================================================ */
+
+/* ── 右侧栏容器 ── */
+.context-pane {
+  position: relative;
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 0;
+  border-left: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* ── Tab 栏 ── */
+.context-tabbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+.context-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-weight: 600;
+}
+
+.context-tab:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.context-tab.active {
+  border-color: var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: inset 0 -2px 0 var(--color-accent);
+}
+
+.context-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.context-panel-review {
+  overflow: hidden;
+}
+
+/* ── 审查工具栏 ── */
+.review-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.review-source,
+.review-branch {
+  position: relative;
+}
+
+.review-branch {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.review-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.review-source-button,
+.review-branch-button,
+.review-refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border-color: var(--color-border);
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.review-source-button {
+  min-width: 108px;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.review-branch-button {
+  justify-content: space-between;
+  width: 100%;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.review-branch-button span {
+  overflow: hidden;
+  flex: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-source-button:hover,
+.review-branch-button:hover,
+.review-refresh-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.review-source-menu,
+.review-branch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  width: 160px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: 0 12px 28px rgba(30, 40, 37, 0.14);
+}
+
+.review-branch-menu {
+  width: max(100%, 190px);
+  max-width: 280px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.review-branch-menu .review-source-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-branch-notice {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-source-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  color: var(--color-text);
+  background: transparent;
+  text-align: left;
+}
+
+.review-source-option:hover,
+.review-source-option.active {
+  color: var(--color-text);
+  background: var(--color-accent-hover);
+}
+
+/* ── Diff 查看器 ── */
+.review-diff-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.review-diff-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-diff-summary-meta {
+  display: flex;
+  align-items: center;
+  flex: 1 1 160px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.review-diff-summary-meta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-diff-summary strong {
+  color: var(--color-text);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.review-diff-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.review-diff-action {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-diff-action:hover,
+.review-diff-action.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.review-status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-diff-files {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.review-diff-file {
+  position: relative;
+  overflow: visible;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+}
+
+.review-diff-file-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 12px auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: 0 1px 0 var(--color-border-subtle);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  user-select: none;
+}
+
+.review-diff-file-header::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--color-text-muted);
+  transition: transform 0.12s ease;
+}
+
+.review-diff-file.open > .review-diff-file-header::before {
+  transform: rotate(90deg);
+}
+
+.review-diff-file-header:hover {
+  background: var(--color-accent-hover);
+}
+
+.review-diff-file-header:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.review-diff-file-status {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.review-diff-file-status-added {
+  color: var(--color-text-faint);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-file-status-deleted {
+  color: var(--color-error-text);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-file-status-renamed,
+.review-diff-file-status-binary {
+  color: var(--color-text-faint);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-file-path {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-diff-file-stat {
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.review-diff-file-additions {
+  color: var(--color-accent-strong);
+}
+
+.review-diff-file-deletions {
+  color: var(--color-error-text);
+}
+
+.review-diff-code {
+  max-height: min(420px, 52vh);
+  overflow-x: auto;
+  overflow-y: auto;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-alt);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.review-diff-hunk-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  border-top: 1px solid var(--color-border-subtle);
+  background: var(--color-accent-hover);
+}
+
+.review-diff-hunk-nav-label {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.review-diff-hunk-button {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-faint);
+  background: var(--color-surface);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.review-diff-hunk-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.review-diff-hunk {
+  scroll-margin-top: 6px;
+}
+
+.review-diff-hunk + .review-diff-hunk {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.review-diff-line {
+  display: grid;
+  grid-template-columns: 38px 38px 18px max-content;
+  width: max-content;
+  min-width: 100%;
+  background: var(--color-surface-alt);
+  white-space: pre;
+}
+
+.review-diff-line-context {
+  color: var(--color-text);
+}
+
+.review-diff-line-added {
+  color: var(--color-text-faint);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-line-removed {
+  color: var(--color-error-text);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-line-hunk {
+  grid-template-columns: 94px max-content;
+  color: var(--color-text-faint);
+  background: var(--color-border-subtle);
+  font-weight: 650;
+}
+
+.review-diff-line-meta {
+  grid-template-columns: 94px max-content;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-sunken);
+}
+
+.review-diff-gutter,
+.review-diff-prefix {
+  position: sticky;
+  z-index: 1;
+  display: block;
+  padding: 0 6px;
+  color: var(--color-text-tertiary);
+  background: inherit;
+  text-align: right;
+  user-select: none;
+}
+
+.review-diff-gutter {
+  left: 0;
+}
+
+.review-diff-new-line {
+  left: 38px;
+}
+
+.review-diff-prefix {
+  left: 76px;
+  box-shadow: 1px 0 0 rgba(223, 228, 221, 0.9);
+  text-align: center;
+}
+
+.review-diff-line-added .review-diff-prefix,
+.review-diff-line-added .review-diff-new-line {
+  color: var(--color-accent-strong);
+}
+
+.review-diff-line-removed .review-diff-prefix,
+.review-diff-line-removed .review-diff-old-line {
+  color: var(--color-error-text);
+}
+
+.review-diff-code-text {
+  padding-right: 12px;
+}
+
+.review-diff-binary-note {
+  padding: 12px;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-tertiary);
+  background: var(--color-surface-alt);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.review-diff-box {
+  min-height: 0;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ── 空状态 ── */
+.context-empty {
+  display: grid;
+  flex: 1;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  min-height: 280px;
+  padding: 40px 12px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.context-empty svg {
+  color: var(--color-text-tertiary);
+}
+
+.context-empty strong {
+  max-width: 280px;
+  color: var(--color-text-faint);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.context-empty span {
+  max-width: 280px;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  line-height: 1.6;
+}

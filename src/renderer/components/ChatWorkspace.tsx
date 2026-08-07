@@ -7,6 +7,9 @@ import { ModelPickerPopover } from './ModelPickerPopover';
 import { SegmentSelect } from './SegmentSelect';
 import type { AcpConfigOption, ChatMessage, ElicitationRequest, PlanEntry, ToolCallDiffBlock, ToolCallLocation, ToolKind, ToolCallStatus } from '../types';
 import { formatElicitationOptionLabel, isElicitationOtherOption } from '../utils';
+import './ChatWorkspace.css';
+import './Composer.css';
+
 
 // 待执行 slash 命令卡片：由 App 在用户按发送时立即插入、由 onAgentEvent 首个回复事件清除。
 type PendingSlashCommand = {

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AcpConfigOption } from '../types';
+import './SegmentSelect.css';
+
 
 type Option = NonNullable<AcpConfigOption['options']>[number];
 

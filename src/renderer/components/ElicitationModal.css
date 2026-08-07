@@ -1,0 +1,55 @@
+/* ============================================================
+ * ElicitationModal —— ACP elicitation 表单
+ * ============================================================ */
+
+/* ACP elicitation 表单输入框（文本/数字类字段） */
+.elicitation-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  background: var(--glass-bg);
+  font-size: 14px;
+  color: var(--color-text);
+  outline: none;
+}
+.elicitation-input:focus {
+  border-color: var(--accent-primary, #8fd0b1);
+}
+
+.elicitation-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.elicitation-inline-actions small {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+}
+
+.elicitation-inline-actions button {
+  padding: 8px 12px;
+}
+
+.elicitation-inline-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.elicitation-custom-answer {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.elicitation-custom-answer .elicitation-inline-input {
+  flex: 1 1 220px;
+}

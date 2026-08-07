@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import './ProjectPane.css';
+
 
 // 通用 SVG 图标（Feather 风格，统一 14x14 / 16x16 viewBox）
 const IconPlus = () => (

@@ -1,0 +1,273 @@
+/* ============================================================
+ * TopBar —— 顶部工具栏
+ * ============================================================ */
+
+/* ── 顶栏容器 ── */
+.topbar {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  /* 三类元素左右贴边、配置区居中：身份 ← ... [配置] ... → 运行时 */
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* ── 第一类：身份区。品牌 + 当前项目名，弱视觉权重。 ── */
+.topbar-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--color-text-tertiary);
+}
+
+.topbar-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* 会话标题：位于项目名左侧，权重略高于项目名。
+   与项目名之间用竖线分隔；过长自动省略号截取，hover 显示完整标题。 */
+.topbar-session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+  flex-shrink: 1;
+  padding-right: 10px;
+  border-right: 1px solid var(--color-border-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-strong);
+}
+
+/* 身份区"打开项目目录"按钮：紧贴项目名，作为切换工作目录的入口。
+   视觉权重低于品牌、高于普通文字按钮。 */
+.topbar-open-workspace-button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border-radius: 6px;
+}
+
+.topbar-open-workspace-button:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+/* ── 第二类：会话配置区。模型 / 模式 / 推理强度 连续成组，
+   用共享外框 + 内部分隔线让三者看起来像「一组配置」。
+   每个 config-segment 都自带 position: relative 作为下拉菜单的锚点。 ── */
+.config-group {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  overflow: visible; /* 允许下拉菜单溢出容器 */
+}
+
+.config-segment {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+/* 相邻配置项之间用细分隔线串联，强化「成组」感 */
+.config-segment + .config-segment::before {
+  content: '';
+  align-self: stretch;
+  margin: 6px 0;
+  border-left: 1px solid var(--color-border-subtle);
+}
+
+.approval-config-segment .segment-select-trigger {
+  min-width: 96px;
+}
+
+/* 会话配置下拉共享触发按钮样式（模型触发器通过并排 .segment-select-trigger 复用）。 */
+.segment-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 100%;
+  min-width: 92px;
+  max-width: 220px;
+  padding: 0 8px 0 12px;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text);
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.segment-select-trigger:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+}
+
+.segment-select-trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 展开/选中态：用主色浅底强调当前正在编辑的段，避免外发光在成组容器里溢出。 */
+.segment-select-trigger[aria-expanded="true"],
+.model-picker-anchor .segment-select-trigger[aria-expanded="true"] {
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-strong);
+}
+
+.segment-select-chevron {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.segment-select-trigger:hover:not(:disabled) .segment-select-chevron,
+.segment-select-trigger[aria-expanded="true"] .segment-select-chevron {
+  color: var(--color-text-faint);
+}
+
+.segment-select-trigger[aria-expanded="true"] .segment-select-chevron {
+  transform: rotate(180deg);
+}
+
+/* 模型段去掉独立边框/圆角，完全融入 config-group。
+   anchor 自身保持 relative，作为 ModelPickerPopover 的定位锚点，
+   并 stretch 填满 32px 高度，让触发按钮的 hover 背景覆盖整段。 */
+.config-group .model-picker-anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.segment-select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── 第三类：运行时区。omp 状态 + 齿轮，弱化为环境状态指示。 ── */
+.runtime-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.pane-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-border-subtle);
+}
+
+.pane-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.pane-toggle-button:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-surface-sunken);
+}
+
+.pane-toggle-button.active {
+  color: var(--color-accent-strong);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px rgba(30, 40, 37, 0.12);
+}
+
+/* ── 状态指示 ── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+/* 状态点：第一眼传递「连接状态指示」语义而非普通标签 */
+.status-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--color-done);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+}
+
+.status-dot.danger {
+  background: var(--color-error-text);
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18);
+}
+
+.status-pill.danger {
+  border-color: var(--color-error-border);
+  color: var(--color-error-text);
+  background: var(--color-error);
+}
+
+/* ── omp 路径设置按钮 ── */
+.omp-path-setting-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.omp-path-setting-button:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.omp-path-setting-button:active {
+  background: var(--color-accent-hover);
+}

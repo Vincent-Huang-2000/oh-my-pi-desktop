@@ -1,3 +1,5 @@
+import './StatusBar.css';
+
 type StatusBarProps = {
   selectedProject: StoredProject | null;
   hasDiff: boolean;

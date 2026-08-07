@@ -1,0 +1,389 @@
+/* ============================================================
+ * ProjectPane —— 左侧项目栏
+ * ============================================================ */
+
+/* ── 项目栏容器 ── */
+.project-pane {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1 / 4;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--glass-border-subtle);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+
+/* ── 标题区操作按钮 ── */
+.pane-heading-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.pane-heading-placeholder {
+  width: 28px;
+  height: 28px;
+}
+
+.pane-heading-actions .sync-sessions {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  line-height: 1;
+}
+
+.pane-heading-actions .sync-sessions:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+/* 标题区入口：新建会话图标按钮，与同步按钮外观一致。 */
+.pane-heading-actions .new-session-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  line-height: 1;
+}
+
+.pane-heading-actions .new-session-icon:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.pane-heading-actions .search-session-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  line-height: 1;
+}
+
+.pane-heading-actions .search-session-icon:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+.session-header button {
+  padding: 8px 10px;
+}
+
+/* ── 项目列表 ── */
+.project-list {
+  display: grid;
+  gap: 14px;
+  /* 可滚动列表占满剩余高度时，避免 grid 自动行被平均拉伸。 */
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.project-group {
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  position: relative;
+}
+
+.project-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  border-radius: 8px;
+}
+
+.project-header.active {
+  background: var(--color-accent-subtle);
+}
+
+.project-title,
+.session-item {
+  width: 100%;
+  border: 0;
+  text-align: left;
+  background: transparent;
+}
+
+.project-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 8px;
+  font-weight: 700;
+}
+
+.project-title.active {
+  background: transparent;
+}
+
+/* 项目标题展开指示器：chevron 图标，展开时旋转 90 度 */
+.project-chevron-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+.project-group.expanded .project-chevron-icon {
+  transform: rotate(90deg);
+}
+
+.project-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  position: relative;
+}
+
+.project-header.active .project-actions {
+  opacity: 0.5;
+}
+
+/* 选中项目的 .project-actions 默认半透明（0.5），但当 ⋯ 菜单打开（焦点落在其内部）
+   时必须完全不透明，否则绝对定位的弹出菜单会继承 0.5 透明度。此规则需排在 .active
+   规则之后，并通过 .active + :focus-within 提高优先级覆盖 0.5。 */
+.project-header:hover .project-actions,
+.project-actions:focus-within,
+.project-header.active .project-actions:focus-within {
+  opacity: 1;
+}
+
+.project-action-button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.project-action-button:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
+}
+
+/* 已置顶项目的星标：与项目名同行，置于右侧，颜色呼应置顶。 */
+.project-pin-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding-right: 4px;
+  color: var(--color-pin);
+  line-height: 1;
+}
+
+/* ⋯ 弹出菜单：绝对定位到项目 header 右下角，避免重排项目列表。 */
+.project-menu {
+  position: absolute;
+  top: 30px;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 168px;
+  padding: 4px;
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.project-menu-item {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.project-menu-item:hover {
+  background: var(--color-accent-hover);
+}
+
+/* 移除项目等危险项：hover 时用淡红提示破坏性。 */
+.project-menu-item-danger {
+  color: var(--color-error-text);
+}
+
+.project-menu-item-danger:hover {
+  background: var(--color-error-bg-hover);
+}
+
+/* 重命名内联输入框：在标题位置顶替 .project-title，外观尽量贴合原按钮。 */
+.project-rename-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+/* ── 会话列表 ── */
+.session-list {
+  display: grid;
+  gap: 3px;
+  padding-left: 22px;
+}
+
+/* 会话列表分页控制：展开/折叠按钮并行排列在会话列表底部。
+   复用弱化文字风格，避免抢夺会话项的视觉焦点。 */
+.session-list-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 4px 2px 10px;
+}
+
+.session-list-pager-button {
+  padding: 2px 4px;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+}
+
+.session-list-pager-button:hover {
+  color: var(--color-accent-strong);
+}
+
+.session-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 4px 0 10px;
+  color: var(--color-text);
+}
+
+.session-item.active {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-subtle);
+}
+
+/* 非选中会话的 hover 高亮：复用语义令牌 --color-accent-hover（强调色 8%），
+   比选中态 --color-accent-subtle（12%）更淡，形成 "默认 → hover → 选中" 三层层次。
+   :not(.active) 确保已选中行 hover 时仍保持更深的选中底色，不被 hover 覆盖。 */
+.session-item:not(.active):hover {
+  background: var(--color-accent-hover);
+}
+
+.session-item.active::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  content: '';
+}
+
+/* session 行主体（标题 + 时间）：点击切换会话，撑满左侧剩余空间。 */
+.session-item-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 6px 4px;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.session-item-main:hover {
+  color: var(--color-text);
+}
+
+/* session 行右侧 ⋯ 操作区：与项目行一致，默认半透明可见，hover/选中/菜单展开时全不透明。
+   注意：菜单打开时必须 opacity:1，否则绝对定位的 .session-menu 会继承透明度。 */
+.session-actions {
+  display: flex;
+  align-items: center;
+  opacity: 0.5;
+  transition: opacity 0.12s ease;
+}
+
+.session-item:hover .session-actions,
+.session-item.active .session-actions,
+.session-actions:focus-within {
+  opacity: 1;
+}
+
+.session-action-button {
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* session ⋯ 菜单：复用 .project-menu 基础样式，定位到 session 行右侧。 */
+.session-menu {
+  top: 28px;
+  right: 0;
+  left: auto;
+  min-width: 132px;
+}
+
+.session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-time {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  white-space: nowrap;
+}

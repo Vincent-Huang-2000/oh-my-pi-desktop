@@ -1,3 +1,5 @@
+import './TopBar.css';
+
 type TopBarProps = {
   projectName?: string;
   // 当前选中会话的标题；为空（无会话）时不显示。
