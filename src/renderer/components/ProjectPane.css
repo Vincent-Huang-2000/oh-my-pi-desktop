@@ -309,7 +309,6 @@
   padding: 0 4px 0 10px;
   color: var(--color-text);
   border-radius: 8px;
-  overflow: hidden;
 }
 
 .session-item.active {
