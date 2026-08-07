@@ -278,7 +278,7 @@ export type AgentService = {
     workspacePath: string,
     acpSessionId: string
   ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
-  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string) => Promise<SessionActionResult>;
+  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => Promise<SessionActionResult>;
   closeSession: (localSessionId: string) => SessionActionResult;
   // 彻底杀掉指定 session 的子进程（丢弃 session 时调用）。
   stopSessionProcess: (localSessionId: string) => void;

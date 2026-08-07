@@ -220,7 +220,8 @@ interface Window {
     forkSession: (
       localSessionId: string,
       workspacePath: string,
-      acpSessionId: string
+      acpSessionId: string,
+      title: string
     ) => Promise<{ ok: boolean; sessionId?: string; message?: string }>;
     closeSession: (localSessionId: string) => Promise<{ ok: boolean; message?: string }>;
     stopSessionProcess: (localSessionId: string) => Promise<{ ok: boolean }>;

@@ -641,6 +641,31 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       }
       copyToolModelSnapshots(acpSessionId, response.sessionId);
       process.acpSessionId = response.sessionId;
+      // omp 的 session/fork 可能不重放历史消息（replayEvents 为空）；
+      // 此时 fallback 到 session/load，确保渲染层能收到完整的历史事件流。
+      if (replayEvents.length === 0) {
+        process.isReplaying = true;
+        process.replayMode = 'buffer';
+        process.replayEvents = [];
+        try {
+          const loadResponse = await sendRequest(process, 'session/load', {
+            sessionId: process.acpSessionId,
+            cwd: process.workspacePath,
+            mcpServers: []
+          });
+          replayEvents = process.replayEvents;
+          // 用 session/load 返回的 config 更新配置选项
+          if (isRecord(loadResponse)) {
+            updateConfigOptions(process, loadResponse.configOptions);
+          }
+          // session/load 可能返回不同的 active plan 状态
+          emitActivePlanUpdate(process, loadResponse);
+        } finally {
+          process.isReplaying = false;
+          process.replayMode = undefined;
+          process.replayEvents = [];
+        }
+      }
     } else {
       process.acpSessionId = acpSessionId;
     }
@@ -1368,7 +1393,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     }
   };
 
-  const forkSession = (localSessionId: string, workspacePath: string, sourceAcpSessionId: string) => {
+  const forkSession = (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => {
+    // 先持久化占位会话（带渲染层传入的正确 title），确保 startAgent 的 readState() 能找到，
+    // 避免 localSessionTitle fallback 到 '新的 agent 会话'。
+    upsertSession(workspacePath, localSessionId, title, undefined, undefined, true);
     const sourceSession = readState().recentSessions.find(
       (session) => session.projectPath === workspacePath && session.acpSessionId === sourceAcpSessionId
     );

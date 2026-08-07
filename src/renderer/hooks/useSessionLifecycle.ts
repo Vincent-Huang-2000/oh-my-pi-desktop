@@ -292,7 +292,7 @@ export function useSessionLifecycle(
     app.setPermissionRequest(null);
     app.setElicitationRequest(null);
     app.setQuestionnaireRequest(null);
-    const result = await window.ohMyPiDesktop.forkSession(newLocalId, project.path, sourceAcpSessionId);
+    const result = await window.ohMyPiDesktop.forkSession(newLocalId, project.path, sourceAcpSessionId, forked.title);
     if (!result.ok) {
       // fork 失败：清理占位会话的四个缓存条目，避免左栏残留幽灵会话与缓存泄漏。
       delete app.messageCache.current[newLocalId];

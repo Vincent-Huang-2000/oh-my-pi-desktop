@@ -446,9 +446,9 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
 
   ipcMain.handle(
     'desktop:fork-session',
-    (_event, localSessionId: string, workspacePath: string, sourceAcpSessionId: string) => {
+    (_event, localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => {
       return runWorkspaceSessionOperation(workspacePath, () =>
-        agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId)
+        agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId, title)
       );
     }
   );

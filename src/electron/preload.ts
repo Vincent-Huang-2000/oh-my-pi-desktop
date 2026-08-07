@@ -137,8 +137,8 @@ const desktop = {
     ipcRenderer.invoke('desktop:resume-session', localSessionId, workspacePath, acpSessionId),
   refreshSessionConfig: (localSessionId: string, workspacePath: string, acpSessionId: string) =>
     ipcRenderer.invoke('desktop:refresh-session-config', localSessionId, workspacePath, acpSessionId),
-  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string) =>
-    ipcRenderer.invoke('desktop:fork-session', localSessionId, workspacePath, sourceAcpSessionId),
+  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) =>
+    ipcRenderer.invoke('desktop:fork-session', localSessionId, workspacePath, sourceAcpSessionId, title),
   closeSession: (localSessionId: string) => ipcRenderer.invoke('desktop:close-session', localSessionId),
   stopSessionProcess: (localSessionId: string) => ipcRenderer.invoke('desktop:stop-session-process', localSessionId),
   getGitBranches: (workspacePath: string) =>
