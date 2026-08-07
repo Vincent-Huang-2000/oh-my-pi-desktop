@@ -994,6 +994,15 @@ export function ChatWorkspace({
     onPromptChange(value);
   };
 
+  // 自动调整 textarea 高度：内容增多时先拉高，超过最大高度显示滚动条。
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const maxHeight = 240; // 约 10 行
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
+  }, [prompt]);
+
   // 点击命令：把 `/<name> ` 填回输入框（方案乙），光标移到末尾；
   // 末尾空格会让触发条件失配，面板随即自动收起，由用户补参数后发送。
   const insertCommand = (name: string) => {

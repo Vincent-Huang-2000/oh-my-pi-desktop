@@ -16,7 +16,7 @@
 
 .composer textarea {
   width: 100%;
-  height: 88px;
+  min-height: 88px;
   resize: none;
   padding: 12px;
   border: 0;
@@ -24,6 +24,7 @@
   color: var(--color-text);
   background: transparent;
   outline: none;
+  overflow-y: auto;
 }
 
 .composer textarea:focus-visible {
