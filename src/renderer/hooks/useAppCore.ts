@@ -333,6 +333,13 @@ export function useAppCore() {
       const savedOmpPath = await window.ohMyPiDesktop.getOmpPath();
       setOmpPath(savedOmpPath);
       await reloadState();
+      // reloadState 已通过 selectProject 同步 selectedProjectRef，用其路径检测 OMP 状态，
+      // 避免重启后 ompStatus 停留在初始值 '未检测'。
+      const projectPath = selectedProjectRef.current?.path;
+      if (projectPath) {
+        const status = await window.ohMyPiDesktop.checkOmp(projectPath);
+        setOmpStatus(status.installed ? status.message : '未安装 omp');
+      }
     })();
   }, []);
   // 首次恢复默认项目时自动展开一次，之后由用户手动控制每个项目的展开/折叠。
