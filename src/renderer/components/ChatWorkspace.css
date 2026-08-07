@@ -338,8 +338,8 @@
 .markdown-body code {
   font-family: 'SFMono-Regular', 'Cascadia Code', Consolas, 'Courier New', monospace;
   font-size: 13px;
-  background: var(--color-accent-subtle);
-  color: var(--color-accent-strong);
+  background: var(--color-code-inline-bg);
+  color: var(--color-code-inline-text);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -357,7 +357,7 @@
 .code-block-wrapper pre {
   margin: 0;
   padding: 12px 14px;
-  background: var(--color-surface-sunken);
+  background: var(--color-code-block-bg);
   overflow-x: auto;
 }
 
@@ -463,13 +463,13 @@
 }
 
 .markdown-body th {
-  background: var(--color-surface-sunken);
+  background: var(--color-table-header-bg);
   font-weight: 600;
   color: var(--color-text);
 }
 
 .markdown-body tr:nth-child(even) td {
-  background: var(--color-surface-sunken);
+  background: var(--color-table-stripe-bg);
 }
 
 /* 标题 */

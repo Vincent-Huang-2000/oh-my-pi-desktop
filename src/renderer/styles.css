@@ -40,6 +40,13 @@
   --color-text-muted:    #6d7873;
   --color-text-tertiary: #909a94;                                               /* 第三级文字（列表项默认色） */
   --color-text-faint:    #b8c0ba;                                               /* 更弱的次要文字/图标 */
+  /* —— Markdown 代码与表格（脱离中性色的绿色倾向） —— */
+  --color-code-inline-bg: #f4effc;
+  --color-code-inline-text: #6941a5;
+  --color-code-block-bg:  #f4f6fb;
+  --color-table-header-bg:#f3f5fa;
+  --color-table-stripe-bg:#fafbfe;
+
 
   /* —— 毛玻璃令牌 —— */
   --glass-bg:            rgba(255, 255, 255, 0.62);
