@@ -1,7 +1,26 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import path from 'node:path';
+/**
+ * agentService — ACP Agent 服务的编排层。
+ *
+ * 职责：
+ * - 管理多个 `omp acp` 子进程的生命周期（spawn/kill/重启）。
+ * - 维护按 localSessionId 分桶的进程状态、审批队列与询问队列。
+ * - 将 ACP JSON-RPC 的响应/通知/请求转换为 AgentEvent 流推向渲染端。
+ * - 对外暴露 AgentService 接口（发送消息、生命周期、权限/问卷响应、
+ *   config 读写、session 列表/加载/恢复/fork/关闭、审批档位切换）。
+ *
+ * 实现：
+ * - 闭包内持有 agentProcesses / pendingPermissions / pendingElicitations
+ *   三张状态表，所有内部函数通过闭包共享这些状态。
+ * - 类型定义 → agentTypes；纯工具函数 → agentUtils；
+ *   问卷解析 → agentQuestionnaire；方案操作 → agentPlan。
+ * - 通过 re-export 保持对 ipc.ts / main.ts 的向后兼容。
+ *
+ * 关键不变量（与 AGENTS.md 中的 workspace 切换约束一致）：
+ * - restartAgentForWorkspace 在检测到 cwd 变化时杀掉旧进程并用新 cwd 重启。
+ * - suppressCloseEvent 标记防止进程切换时的中间态事件污染消息缓存。
+ */
+import { spawn } from 'node:child_process';
+import { Buffer } from 'node:buffer';
 import {
   addLog,
   copyToolModelSnapshots,
@@ -15,787 +34,65 @@ import {
   updateSessionApprovalProfile,
   upsertSession
 } from './state.js';
+import type { AgentEvent, ApprovalProfile, AcpAvailableCommand } from './types.js';
 import type {
-  AcpAvailableCommand,
-  AcpConfigOption,
-  AgentEvent,
-  ApprovalProfile,
-  StoredLog,
-  StoredSession,
-  ToolModelSnapshot
-} from './types.js';
-
-export type AgentEventSender = (event: AgentEvent) => void;
-const APPROVAL_SWITCH_CANCEL_TIMEOUT_MS = 1200;
-const MAX_PLAN_PREVIEW_BYTES = 1024 * 1024;
-
-type HistoricalSessionPlan = {
-  id: string;
-  toolCallId: string;
-  planFilePath: string;
-  content: string;
-};
-
-type AcpActivePlan =
-  | { version: 1; active: false }
-  | { version: 1; active: true; planFilePath: string; content: string | null };
-
-export type AgentService = {
-  startAgent: (
-    sessionId: string,
-    workspacePath: string,
-    approvalProfile?: ApprovalProfile
-  ) => Promise<{ ok: boolean; message: string }>;
-  // 发送消息支持富内容：纯文本或 文本+图片块。
-  // 图片以 dataURL 形式传入，由 AgentService 解出 mime + base64 写入 ACP `image` content block。
-  sendAgentMessage: (
-    sessionId: string,
-    workspacePath: string,
-    content: AgentPromptContent
-  ) => Promise<{ ok: boolean; message?: string }>;
-  getSessionConfig: (
-    sessionId: string,
-    workspacePath: string
-  ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
-  // session 级 config：value 可以是字符串（select）或布尔（boolean config option）。
-  setSessionConfigOption: (
-    sessionId: string,
-    workspacePath: string,
-    configId: string,
-    value: string | boolean
-  ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
-  updateApprovalProfile: (
-    sessionId: string,
-    workspacePath: string,
-    approvalProfile: ApprovalProfile
-  ) => Promise<{ ok: boolean; session?: StoredSession; message?: string }>;
-  cancelTurn: (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
-  respondPermissionOption: (requestId: string, optionId: string) => { ok: boolean; message?: string };
-  respondPermission: (requestId: string, allow: boolean) => { ok: boolean; message?: string };
-  respondElicitation: (
-    requestId: string,
-    action: 'accept' | 'decline' | 'cancel',
-    content?: Record<string, unknown>
-  ) => { ok: boolean; message?: string };
-  respondQuestionnaire: (
-    requestId: string,
-    action: 'submit' | 'deny',
-    answers?: QuestionnaireAnswer[]
-  ) => QuestionnaireResponseResult;
-  // 会话生命周期：列表 / 加载 / 恢复 / Fork / 关闭，全部对应 ACP 原生方法。
-  listSessions: (workspacePath: string, cursor?: string) => Promise<ListSessionsResult>;
-  loadSession: (localSessionId: string, workspacePath: string, acpSessionId: string) => Promise<SessionActionResult>;
-  resumeSession: (localSessionId: string, workspacePath: string, acpSessionId: string) => Promise<SessionActionResult>;
-  refreshSessionConfig: (
-    localSessionId: string,
-    workspacePath: string,
-    acpSessionId: string
-  ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
-  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string) => Promise<SessionActionResult>;
-  closeSession: (localSessionId: string) => SessionActionResult;
-  // 彻底杀掉指定 session 的子进程（丢弃 session 时调用）。
-  stopSessionProcess: (localSessionId: string) => void;
-  stopAll: () => void;
-};
-
-export type AgentPromptContent = {
-  text: string;
-  // 附件：图片 / 文本 / 其它。替换原先的 images 字段，统一承载文件选择器选中的任意文件。
-  attachments?: AgentPromptAttachment[];
-};
-
-export type AgentPromptAttachment = {
-  // 形如 "data:image/png;base64,xxxx"，AgentService 内部拆出 mime 和 data。
-  dataUrl: string;
-  // 文件名，用于 chip 展示和 ACP 块的标识。
-  fileName?: string;
-  // 由渲染层按 MIME + 扩展名预判定的类别，决定走哪种 ACP 块：
-  //  - image:      走 { type: 'image' }，omp 能让模型看到（base64 图片）
-  //  - text:       base64 解码成字符串后追加到 text 块，omp 能让模型看到
-  //  - unsupported: 仍走 { type: 'image' }，omp 会兜底成 `[embedded resource: <uri>]` 占位符，
-  //                 模型读不到内容（chip 上由渲染层标警告）
-  kind: 'image' | 'text' | 'unsupported';
-};
-
-export type ListSessionsResult = {
-  ok: boolean;
-  sessions?: AcpSessionInfo[];
-  nextCursor?: string;
-  message?: string;
-};
-
-export type AcpSessionInfo = {
-  sessionId: string;
-  cwd: string;
-  title?: string;
-  updatedAt?: string;
-};
-
-export type SessionActionResult = {
-  ok: boolean;
-  message?: string;
-  sessionId?: string;
-};
-
-type JsonRpcId = string | number | null;
-
-type JsonRpcRequest = {
-  jsonrpc: '2.0';
-  id: JsonRpcId;
-  method: string;
-  params?: unknown;
-};
-
-type JsonRpcNotification = {
-  jsonrpc: '2.0';
-  method: string;
-  params?: unknown;
-};
-
-type JsonRpcResponse = {
-  jsonrpc: '2.0';
-  id: JsonRpcId;
-  result?: unknown;
-  error?: {
-    code: number;
-    message: string;
-    data?: unknown;
-  };
-};
-
-type PendingRequest = {
-  resolve: (value: unknown) => void;
-  reject: (error: Error) => void;
-};
-
-type AcpProcessState = {
-  child: ChildProcessWithoutNullStreams;
-  localSessionId: string;
-  localSessionTitle: string;
-  workspacePath: string;
-  lineBuffer: string;
-  nextRequestId: number;
-  pendingRequests: Map<JsonRpcId, PendingRequest>;
-  ready: Promise<void>;
-  acpSessionId?: string;
-  restoredAcpSessionId?: string;
-  // undefined 仅用于 session/list 临时进程；真实会话始终显式传入审批档位。
-  approvalProfile?: ApprovalProfile;
-  // 第一次 session/prompt 之前用来恢复/创建 ACP session 的方法。
-  // 缺省走 session/load（保留旧行为）；`loadSession/resumeSession/forkSession` 会显式设置。
-  initMethod: 'session/load' | 'session/resume' | 'unstable_session/fork';
-  configOptions: AcpConfigOption[];
-  // ACP `available_commands_update` 通知维护的可用 slash 命令。
-  // 桌面端不做语义解析，仅透传给 UI 由用户触发 `/<name>` 文本。
-  availableCommands: AcpAvailableCommand[];
-  closed: boolean;
-  // 是否处于 session/load|resume|fork 重放历史的窗口期：
-  // 用于在 mapSessionUpdate 给重放出来的 tool_call 加 _replay 标记，
-  // 渲染层据此区分实时事件与历史回放；历史模型从本地快照中补回。
-  isReplaying: boolean;
-  // replay 窗口内聊天事件的处理方式：
-  // buffer 用于 session/load 与 fork，suppress 用于只恢复配置的 session/resume。
-  replayMode?: 'buffer' | 'suppress';
-  replayEvents: AgentEvent[];
-  // 当前是否有 session/prompt 尚未结束，用于切换审批档位前受控取消。
-  turnActive: boolean;
-  // 问卷提交后必须等当前 ACP 回合结束再续发，避免新 prompt 中断仍在执行的 eval。
-  questionnaireFollowUps: QuestionnaireFollowUp[];
-  // 主动停止子进程后不再向渲染端广播后续进程事件，避免污染对应 session 的消息缓存。
-  suppressCloseEvent?: boolean;
-};
-
-type PendingPermissionRequest = {
-  process: AcpProcessState;
-  rpcId: JsonRpcId;
-  options: PermissionOption[];
-};
-
-type PendingElicitationRequest = {
-  process: AcpProcessState;
-  rpcId: JsonRpcId;
-  questionnaire?: QuestionnaireDefinition;
-};
-
-type QuestionnaireOption = {
-  label: string;
-  description?: string;
-};
-
-type QuestionnaireQuestion = {
-  question: string;
-  header?: string;
-  options: QuestionnaireOption[];
-  multiSelect: boolean;
-};
-
-type QuestionnaireDefinition = {
-  questions: QuestionnaireQuestion[];
-};
-
-export type QuestionnaireAnswer = {
-  questionIndex: number;
-  selections: string[];
-};
-
-// 问卷响应结果。失败时 reason 用于区分：
-// - 'stale'：pending 请求已不存在，渲染端应从队列移除并推进下一项；
-// - 'invalid-answers'：答案校验未通过，pending 请求仍有效，应保留供用户重试。
-// 成功时不携带 reason。
-export type QuestionnaireResponseResult = {
-  ok: boolean;
-  message?: string;
-  reason?: 'stale' | 'invalid-answers';
-};
-
-type QuestionnaireFollowUp = {
-  requestId: string;
-  text: string;
-};
-
-type PermissionOption = {
-  optionId: string;
-  name: string;
-  kind: string;
-  description?: string;
-};
-
-type SessionNotification = {
-  sessionId?: unknown;
-  update?: {
-    sessionUpdate?: unknown;
-    configOptions?: unknown;
-    currentModeId?: unknown;
-    availableCommands?: unknown;
-    title?: unknown;
-    updatedAt?: unknown;
-    used?: unknown;
-    size?: unknown;
-    [key: string]: unknown;
-  };
-};
-
-const ACP_PROTOCOL_VERSION = 1;
-const CLIENT_VERSION = '0.1.0';
-
-const getLogLevel = (eventType: AgentEvent['type']): StoredLog['level'] => {
-  if (eventType === 'tool_call') {
-    return 'tool';
-  }
-  if (eventType === 'done') {
-    return 'done';
-  }
-  if (eventType === 'diff') {
-    return 'diff';
-  }
-  if (eventType === 'error') {
-    return 'error';
-  }
-  return 'info';
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
-
-// 仅识别 Plan 模式约定的静态 Python 问卷；不执行、不推断任意 Python 代码。
-const parseQuestionnaireEval = (message: string): QuestionnaireDefinition | null => {
-  const header = /^Allow tool:\s*eval\s*\r?\nLanguage:\s*python\s*\r?\nCode:\s*\r?\n([\s\S]+)$/.exec(message);
-  if (!header) return null;
-  const code = header[1];
-  const assignment = /^[ \t]*questions[ \t]*=[ \t]*/.exec(code);
-  if (!assignment || code[assignment[0].length] !== '[') return null;
-
-  const start = assignment[0].length;
-  let depth = 0;
-  let quote = '';
-  let escaped = false;
-  let end = -1;
-  for (let index = start; index < code.length; index += 1) {
-    const char = code[index];
-    if (quote) {
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === quote) quote = '';
-      continue;
-    }
-    if (char === '"' || char === "'") quote = char;
-    else if (char === '[') depth += 1;
-    else if (char === ']') {
-      depth -= 1;
-      if (depth === 0) {
-        end = index + 1;
-        break;
-      }
-      if (depth < 0) return null;
-    }
-  }
-  if (end < 0 || quote) return null;
-
-  // 列表之外只允许 json 导入和 questions 序列化打印，避免任意 eval 被伪装为问卷。
-  const tail = code.slice(end);
-  if (!/^\s*import\s+json\s*\r?\n\s*print\s*\(\s*json\.dumps\s*\(\s*questions(?:\s*,\s*(?:ensure_ascii\s*=\s*(?:True|False)|indent\s*=\s*\d+))*\s*\)\s*\)\s*$/.test(tail)) {
-    return null;
-  }
-
-  // 示例为 JSON 风格字面量，只额外兼容 Python 的 True/False/None 常量。
-  const literal = code.slice(start, end);
-  let normalized = '';
-  quote = '';
-  escaped = false;
-  for (let index = 0; index < literal.length; index += 1) {
-    const char = literal[index];
-    if (quote) {
-      normalized += char;
-      if (escaped) escaped = false;
-      else if (char === '\\') escaped = true;
-      else if (char === quote) quote = '';
-      continue;
-    }
-    if (char === '"' || char === "'") {
-      quote = char;
-      normalized += char;
-      continue;
-    }
-    const word = /^(True|False|None)\b/.exec(literal.slice(index));
-    if (word) {
-      normalized += word[1] === 'True' ? 'true' : word[1] === 'False' ? 'false' : 'null';
-      index += word[1].length - 1;
-    } else {
-      normalized += char;
-    }
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(normalized);
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(parsed) || parsed.length === 0) return null;
-
-  const questions: QuestionnaireQuestion[] = [];
-  for (const item of parsed) {
-    if (!isRecord(item) || typeof item.question !== 'string' || !item.question.trim() ||
-      typeof item.multiSelect !== 'boolean' || !Array.isArray(item.options) || item.options.length === 0) {
-      return null;
-    }
-    const options: QuestionnaireOption[] = [];
-    for (const option of item.options) {
-      if (!isRecord(option) || typeof option.label !== 'string' || !option.label.trim() ||
-        (option.description !== undefined && typeof option.description !== 'string')) {
-        return null;
-      }
-      options.push({
-        label: option.label,
-        ...(typeof option.description === 'string' ? { description: option.description } : {})
-      });
-    }
-    questions.push({
-      question: item.question,
-      ...(typeof item.header === 'string' && item.header.trim() ? { header: item.header } : {}),
-      options,
-      multiSelect: item.multiSelect
-    });
-  }
-  return { questions };
-};
-
-const validateQuestionnaireAnswers = (
-  questionnaire: QuestionnaireDefinition,
-  answers: QuestionnaireAnswer[] | undefined
-): QuestionnaireAnswer[] | null => {
-  if (!Array.isArray(answers) || answers.length !== questionnaire.questions.length) return null;
-  const normalized: QuestionnaireAnswer[] = [];
-  for (let index = 0; index < questionnaire.questions.length; index += 1) {
-    const answer = answers.find((item) => item?.questionIndex === index);
-    const question = questionnaire.questions[index];
-    if (!answer || !Array.isArray(answer.selections) || answer.selections.length === 0 ||
-      (!question.multiSelect && answer.selections.length !== 1)) {
-      return null;
-    }
-    const allowed = new Set(question.options.map((option) => option.label));
-    const selections = [...new Set(answer.selections)];
-    if (selections.length !== answer.selections.length || selections.some((value) => typeof value !== 'string' || !allowed.has(value))) {
-      return null;
-    }
-    normalized.push({ questionIndex: index, selections });
-  }
-  return normalized;
-};
-
-const formatQuestionnaireFollowUp = (
-  questionnaire: QuestionnaireDefinition,
-  answers: QuestionnaireAnswer[]
-) => [
-  '用户已提交问卷答案，请据此继续当前 Plan 工作：',
-  ...answers.map((answer) => {
-    const question = questionnaire.questions[answer.questionIndex];
-    return `- ${question.header ? `[${question.header}] ` : ''}${question.question}：${answer.selections.join('、')}`;
-  })
-].join('\n');
-
-const isJsonRpcRequest = (value: unknown): value is JsonRpcRequest => {
-  return isRecord(value) && value.jsonrpc === '2.0' && 'id' in value && typeof value.method === 'string';
-};
-
-const isJsonRpcNotification = (value: unknown): value is JsonRpcNotification => {
-  return isRecord(value) && value.jsonrpc === '2.0' && !('id' in value) && typeof value.method === 'string';
-};
-
-const isJsonRpcResponse = (value: unknown): value is JsonRpcResponse => {
-  return isRecord(value) && value.jsonrpc === '2.0' && 'id' in value && !('method' in value);
-};
-
-const getTextContent = (value: unknown): string => {
-  if (!isRecord(value)) {
-    return '';
-  }
-  const text = value.text;
-  return typeof text === 'string' ? text : '';
-};
-
-const stringifySafe = (value: unknown) => {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-};
-
-const getToolCallMessage = (update: Record<string, unknown>) => {
-  const title = update.title;
-  if (typeof title === 'string' && title.trim()) {
-    return title;
-  }
-  return '';
-};
-
-const getToolCallId = (update: Record<string, unknown>) => {
-  return typeof update.toolCallId === 'string' ? update.toolCallId : '';
-};
-
-const getAcpSessionIdForSnapshot = (process: AcpProcessState, params: SessionNotification) => {
-  if (typeof params.sessionId === 'string') {
-    return params.sessionId;
-  }
-  return process.acpSessionId ?? process.restoredAcpSessionId ?? '';
-};
-
-const getCurrentModelSnapshot = (configOptions: AcpConfigOption[]): ToolModelSnapshot | undefined => {
-  const modelOpt = configOptions.find((option) => option.id === 'model');
-  if (!modelOpt || typeof modelOpt.currentValue !== 'string') {
-    return undefined;
-  }
-  const id = modelOpt.currentValue;
-  const name = modelOpt.options?.find((option) => option.value === id)?.name ?? id;
-  return { id, name };
-};
-
-const getPermissionMessage = (params: unknown) => {
-  if (!isRecord(params)) {
-    return 'agent 请求权限审批';
-  }
-
-  const directMessage = params.message ?? params.prompt ?? params.question ?? params.title;
-  if (typeof directMessage === 'string' && directMessage.trim()) {
-    return directMessage.trim();
-  }
-
-  if (!isRecord(params.toolCall)) {
-    return 'agent 请求你选择下一步';
-  }
-
-  const title = params.toolCall.title;
-  if (typeof title === 'string' && title.trim()) {
-    return title;
-  }
-
-  return 'agent 请求权限审批';
-};
-
-const getPlanMessage = (update: Record<string, unknown>) => {
-  const entries = Array.isArray(update.entries) ? update.entries : [];
-  if (entries.length === 0) {
-    return 'agent 清空了任务计划';
-  }
-
-  const statusMap: Record<string, string> = {
-    pending: '待处理',
-    in_progress: '进行中',
-    completed: '已完成'
-  };
-
-  return entries
-    .map((entry, index) => {
-      if (!isRecord(entry)) {
-        return `${index + 1}. 未知任务`;
-      }
-      const content = typeof entry.content === 'string' ? entry.content : '未知任务';
-      const status = typeof entry.status === 'string' ? statusMap[entry.status] ?? entry.status : '未知状态';
-      return `${index + 1}. [${status}] ${content}`;
-    })
-    .join('\n');
-};
-
-const findSessionLocalDir = async (process: AcpProcessState) => {
-  const sessionId = process.localSessionId;
-  const acpSessionId = process.acpSessionId ?? process.restoredAcpSessionId;
-  if (!acpSessionId) {
-    addLog(sessionId, 'info', `[plan-preview] acpSessionId 缺失，无法定位方案文件`);
-    return null;
-  }
-  const agentDir = globalThis.process.env.PI_CODING_AGENT_DIR?.trim() || path.join(homedir(), '.omp', 'agent');
-  const sessionsRoot = path.join(agentDir, 'sessions');
-  try {
-    const projects = await readdir(sessionsRoot, { withFileTypes: true });
-    for (const project of projects) {
-      if (!project.isDirectory()) continue;
-      const projectRoot = path.join(sessionsRoot, project.name);
-      const sessions = await readdir(projectRoot, { withFileTypes: true });
-      const session = sessions.find((entry) => entry.isDirectory() && entry.name.endsWith(`_${acpSessionId}`));
-      if (!session) continue;
-      return path.join(projectRoot, session.name, 'local');
-    }
-    // 遍历完所有项目目录都没找到以 _<acpSessionId> 结尾的 session 目录。
-    addLog(sessionId, 'info', `[plan-preview] 未找到 session 目录（应 endsWith _${acpSessionId}），已扫描根：${sessionsRoot}`);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    addLog(sessionId, 'info', `[plan-preview] 定位 session 目录抛异常：${reason}`);
-  }
-  return null;
-};
-
-const getAcpActivePlan = (response: unknown): AcpActivePlan | null => {
-  if (!isRecord(response) || !isRecord(response._meta)) return null;
-  const planMode = response._meta['omp.planMode'];
-  if (!isRecord(planMode) || planMode.version !== 1 || typeof planMode.active !== 'boolean') {
-    return null;
-  }
-  if (!planMode.active) {
-    return { version: 1, active: false };
-  }
-  if (
-    typeof planMode.planFilePath !== 'string' ||
-    (typeof planMode.content !== 'string' && planMode.content !== null)
-  ) {
-    return null;
-  }
-  return {
-    version: 1,
-    active: true,
-    planFilePath: planMode.planFilePath,
-    content: planMode.content
-  };
-};
-
-const readPlanFile = async (
-  process: AcpProcessState,
-  localDir: string,
-  filePath: string,
-  logPrefix: 'plan-preview' | 'plan-history'
-) => {
-  try {
-    const fileStat = await stat(filePath);
-    if (!fileStat.isFile() || fileStat.size > MAX_PLAN_PREVIEW_BYTES) {
-      if (fileStat.size > MAX_PLAN_PREVIEW_BYTES) {
-        addLog(process.localSessionId, 'info', `[${logPrefix}] 方案文件超 ${(MAX_PLAN_PREVIEW_BYTES / 1024 / 1024).toFixed(0)}MB 上限：${fileStat.size} 字节，${filePath}`);
-      }
-      return null;
-    }
-    // realpath 同时防止历史 payload 通过符号链接逃逸到当前 ACP session 的 local 目录外。
-    const [resolvedLocalDir, resolvedFilePath] = await Promise.all([realpath(localDir), realpath(filePath)]);
-    const relativePath = path.relative(resolvedLocalDir, resolvedFilePath);
-    if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
-      return null;
-    }
-    return await readFile(resolvedFilePath, 'utf8');
-  } catch {
-    return null;
-  }
-};
-
-const resolveHistoricalPlanPath = (localDir: string, planFilePath: string) => {
-  if (!planFilePath.startsWith('local://')) {
-    return null;
-  }
-  const fileName = planFilePath.slice('local://'.length);
-  // OMP plan-mode 文件位于 local 根目录；拒绝子目录、绝对路径与目录穿越。
-  if (!fileName || path.basename(fileName) !== fileName || !/(?:^|-)plan\.md$/i.test(fileName)) {
-    return null;
-  }
-  return path.join(localDir, fileName);
-};
-
-// 实时审批没有通过协议携带精确 planFilePath，继续扫描当前 session 的 local 目录，
-// 取 mtime 最新的 *-plan.md；历史恢复则走下方的精确路径读取，不使用这个降级。
-const readFullPlanForApproval = async (process: AcpProcessState) => {
-  const localDir = await findSessionLocalDir(process);
-  if (!localDir) return null;
-  try {
-    const localEntries = await readdir(localDir, { withFileTypes: true });
-    const planFiles = localEntries.filter((entry) => entry.isFile() && entry.name.endsWith('-plan.md'));
-    if (planFiles.length === 0) {
-      // 无 *-plan.md 文件——可能不是 plan 审批（如普通工具审批），静默返回。
-      return null;
-    }
-    // 取 mtime 最新的一个；并发写入时最新的即当前方案。
-    let latest: { path: string; mtime: number; size: number } | null = null;
-    for (const entry of planFiles) {
-      const filePath = path.join(localDir, entry.name);
-      const fileStat = await stat(filePath);
-      if (!fileStat.isFile()) continue;
-      if (fileStat.mtimeMs > (latest?.mtime ?? -1)) {
-        latest = { path: filePath, mtime: fileStat.mtimeMs, size: fileStat.size };
-      }
-    }
-    if (!latest) {
-      addLog(process.localSessionId, 'info', `[plan-preview] local 下 *-plan.md 均非常规文件：${localDir}`);
-      return null;
-    }
-    const content = await readPlanFile(process, localDir, latest.path, 'plan-preview');
-    if (content) {
-      addLog(process.localSessionId, 'info', `[plan-preview] 命中磁盘完整方案：${latest.path}（${latest.size} 字节）`);
-    }
-    return content;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    addLog(process.localSessionId, 'info', `[plan-preview] 读取磁盘方案抛异常：${reason}`);
-    return null;
-  }
-};
-
-const readHistoricalSessionPlans = async (
-  process: AcpProcessState,
-  replayEvents: AgentEvent[]
-): Promise<HistoricalSessionPlan[]> => {
-  const applyToolCallIds = new Set<string>();
-  const referencedPlans = new Map<string, { toolCallId: string; planFilePath: string }>();
-  for (const event of replayEvents) {
-    if (event.type !== 'tool_call' || !isRecord(event.payload)) continue;
-    const update = isRecord(event.payload.update) ? event.payload.update : undefined;
-    if (!update || typeof update.toolCallId !== 'string') continue;
-    if (update.title === 'resolve' && isRecord(update.rawInput) && update.rawInput.action === 'apply') {
-      applyToolCallIds.add(update.toolCallId);
-    }
-    const rawOutput = isRecord(update.rawOutput) ? update.rawOutput : undefined;
-    const details = rawOutput && isRecord(rawOutput.details) ? rawOutput.details : undefined;
-    const planFilePath = details?.planFilePath;
-    if (
-      !applyToolCallIds.has(update.toolCallId) ||
-      details?.planExists !== true ||
-      typeof planFilePath !== 'string'
-    ) {
-      continue;
-    }
-    // 同一路径可能经历多次“继续完善”；只保留最后一次 resolve apply 的最终文件内容。
-    referencedPlans.delete(planFilePath);
-    referencedPlans.set(planFilePath, { toolCallId: update.toolCallId, planFilePath });
-  }
-  if (referencedPlans.size === 0) return [];
-  const localDir = await findSessionLocalDir(process);
-  if (!localDir) return [];
-  const plans: HistoricalSessionPlan[] = [];
-  for (const reference of referencedPlans.values()) {
-    const filePath = resolveHistoricalPlanPath(localDir, reference.planFilePath);
-    if (!filePath) {
-      addLog(process.localSessionId, 'info', `[plan-history] 拒绝不安全或非 plan 路径：${reference.planFilePath}`);
-      continue;
-    }
-    const content = await readPlanFile(process, localDir, filePath, 'plan-history');
-    if (!content) {
-      addLog(process.localSessionId, 'info', `[plan-history] 历史方案文件不存在或不可读：${reference.planFilePath}`);
-      continue;
-    }
-    plans.push({
-      id: `history-plan-${reference.toolCallId}`,
-      toolCallId: reference.toolCallId,
-      planFilePath: reference.planFilePath,
-      content
-    });
-  }
-  return plans;
-};
-
-const getPlanUpdateMessage = (update: Record<string, unknown>) => {
-  if (!isRecord(update.plan)) {
-    return 'agent 更新了任务计划';
-  }
-  if (update.plan.type === 'items') {
-    return getPlanMessage(update.plan);
-  }
-  if (update.plan.type === 'markdown' && typeof update.plan.content === 'string') {
-    return update.plan.content;
-  }
-  if (update.plan.type === 'file' && typeof update.plan.uri === 'string') {
-    return `计划文件：${update.plan.uri}`;
-  }
-  return 'agent 更新了任务计划';
-};
-
-const normalizeConfigOptions = (value: unknown): AcpConfigOption[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!isRecord(item) || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.type !== 'string') {
-      return [];
-    }
-
-    const options = Array.isArray(item.options)
-      ? item.options.flatMap((option) => {
-          if (!isRecord(option) || typeof option.value !== 'string' || typeof option.name !== 'string') {
-            return [];
-          }
-          return [
-            {
-              value: option.value,
-              name: option.name,
-              description: typeof option.description === 'string' ? option.description : undefined
-            }
-          ];
-        })
-      : undefined;
-
-    return [
-      {
-        id: item.id,
-        name: item.name,
-        category: typeof item.category === 'string' ? item.category : undefined,
-        type: item.type,
-        currentValue:
-          typeof item.currentValue === 'string' || typeof item.currentValue === 'boolean' ? item.currentValue : undefined,
-        options
-      }
-    ];
-  });
-};
-
-const normalizePermissionOptions = (value: unknown): PermissionOption[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (
-      !isRecord(item) ||
-      typeof item.optionId !== 'string' ||
-      typeof item.name !== 'string' ||
-      typeof item.kind !== 'string'
-    ) {
-      return [];
-    }
-    return [
-      {
-        optionId: item.optionId,
-        name: item.name,
-        kind: item.kind,
-        description: typeof item.description === 'string' ? item.description : undefined
-      }
-    ];
-  });
-};
+  AcpProcessState,
+  AgentEventSender,
+  AgentPromptContent,
+  AgentService,
+  JsonRpcId,
+  JsonRpcNotification,
+  JsonRpcRequest,
+  JsonRpcResponse,
+  ListSessionsResult,
+  PendingElicitationRequest,
+  PendingPermissionRequest,
+  QuestionnaireAnswer,
+  QuestionnaireResponseResult,
+  SessionActionResult,
+  SessionNotification
+} from './agentTypes.js';
+import { APPROVAL_SWITCH_CANCEL_TIMEOUT_MS } from './agentTypes.js';
+import {
+  getLogLevel,
+  isJsonRpcRequest,
+  isJsonRpcNotification,
+  isJsonRpcResponse,
+  isRecord,
+  getTextContent,
+  stringifySafe,
+  getToolCallMessage,
+  getToolCallId,
+  getAcpSessionIdForSnapshot,
+  getCurrentModelSnapshot,
+  getPermissionMessage,
+  normalizePermissionOptions,
+  normalizeConfigOptions,
+} from './agentUtils.js';
+import {
+  parseQuestionnaireEval,
+  validateQuestionnaireAnswers,
+  formatQuestionnaireFollowUp,
+} from './agentQuestionnaire.js';
+import {
+  getPlanMessage,
+  getPlanUpdateMessage,
+  readFullPlanForApproval,
+  readHistoricalSessionPlans,
+  getAcpActivePlan,
+} from './agentPlan.js';
+
+// ── 重导出公共类型，保持向后兼容 ──
+
+export type {
+  AgentEventSender,
+  AgentPromptContent,
+  AgentService,
+  QuestionnaireAnswer,
+  QuestionnaireResponseResult,
+} from './agentTypes.js';
+
+// ── AgentService 编排层 ──
 
 export const createAgentService = (sendAgentEvent: AgentEventSender): AgentService => {
   const agentProcesses = new Map<string, AcpProcessState>();
@@ -1055,7 +352,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     //   1) 协议未来若改回 `command_output`，桌面端能直接兼容；
     //   2) 第三方 agent 实现走 ACP 规范中描述的 `command_output` 通道时也能透出。
     // 命中后以普通 `output` 形式进入现有消息流（与 chunk 路径一致），避免出现
-    // “执行了命令但界面无反馈”的情况。
+    // "执行了命令但界面无反馈"的情况。
     if (sessionUpdate === 'command_output') {
       const output = typeof update.output === 'string' ? update.output : '';
       return output ? [{ sessionId, type: 'output', message: output, payload: params }] : [];
@@ -1254,11 +551,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
   const initializeAcp = async (process: AcpProcessState) => {
     const initResult = await sendRequest(process, 'initialize', {
-      protocolVersion: ACP_PROTOCOL_VERSION,
+      protocolVersion: 1, // ACP_PROTOCOL_VERSION
       clientInfo: {
         name: 'oh-my-pi-desktop',
         title: 'Oh My Pi Desktop',
-        version: CLIENT_VERSION
+        version: '0.1.0' // CLIENT_VERSION
       },
       // 声明 elicitation.form 能力：omp 内置的 ExtensionToolWrapper 第2层审批门控
       // 在 always-ask/write 模式下会走 unstable_createElicitation（form 模式）请求用户确认，
