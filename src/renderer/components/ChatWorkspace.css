@@ -85,8 +85,9 @@
 
 .message.user {
   /* 用户消息：去掉左侧竖线，改用气泡包裹 */
+  width: fit-content;                      /* 根据内容自动收缩宽度 */
+  max-width: 85%;                          /* 限制气泡宽度上限，避免长消息占满整行 */
   margin-left: auto;                       /* 气泡右对齐（贴近对话区右侧） */
-  max-width: 85%;                          /* 限制气泡宽度，避免占满整行 */
   padding: 10px 14px;
   border: none;
   border-radius: 14px;                     /* 圆角气泡 */
