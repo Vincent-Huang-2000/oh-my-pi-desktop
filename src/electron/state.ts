@@ -8,8 +8,8 @@
  * - 全局设置（settings：omp 路径、侧栏布局等）
  *
  * ## 写盘策略
- * - upsertProject / upsertSession / setSetting / updateProjectConfigCache /
- *   saveToolModelSnapshot → **同步即时写盘**（低频操作，数据不出错优先）。
+ * - upsertProject / upsertSession / removeSession / setSetting /
+ *   updateProjectConfigCache / saveToolModelSnapshot → **同步即时写盘**（低频操作，数据不出错优先）。
  * - addLog → **内存缓冲 + 800ms 防抖批量落盘**（高频流式事件，不阻塞主进程事件循环）。
  *   退出前由 main.ts 调用 flushPendingLogs() 确保最后一批不丢失。
  *

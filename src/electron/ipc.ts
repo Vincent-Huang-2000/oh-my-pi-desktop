@@ -1,3 +1,38 @@
+/**
+ * ipc — Electron 主进程 IPC 处理器注册。
+ *
+ * 通过 `registerDesktopIpcHandlers(agentService)` 将渲染进程需要的所有
+ * `ipcMain.handle` 通道集中注册于此。每个 handler 对应 preload.ts 中暴露的
+ * `desktop:<channel>`，两端必须逐字段同步（见 AGENTS.md 的 IPC 约束）。
+ *
+ * ## 职责范围
+ * - **项目管理**：workspace 选择/添加/删除、置顶、显示名、资源管理器打开
+ * - **会话生命周期**：create / start / load / resume / fork / close / sync
+ * - **Agent 交互**：发送消息、取消回合、权限/elicitation/questionnaire 响应
+ * - **配置与审批**：ACP configOption 读写、审批档位切换
+ * - **omp 环境**：可执行文件路径设置、版本检测
+ * - **Git 工具**：分支列表/切换（含错误分类）、diff 获取（含未跟踪文件处理）
+ * - **侧栏布局**：宽度与折叠状态持久化
+ *
+ * ## 并发控制
+ * `workspaceSessionOperationTails`：同一 workspace 下对持久化会话列表有删除语义
+ * 的操作（sync-sessions 的 reconcile、fork-session 的 upsert）通过按 workspacePath
+ * 分桶的 Promise 链串行化，不同项目可并发。避免 reconcile 和 fork 并发时互相覆盖。
+ *
+ * ## Git 工具
+ * - `classifyGitBranchSwitchFailure`：将 git switch 失败输出归类为
+ *   unmerged-files / local-changes / untracked-files / git-operation-in-progress，
+ *   并返回面向用户的中文提示。
+ * - `getUntrackedFilesDiff`：收集未跟踪文件并合成 diff 文本，大文件/二进制文件
+ *   只展示文件级提示（MAX_INLINE_UNTRACKED_FILE_SIZE = 512KB）。
+ *
+ * ## 维护
+ * - 新增/修改 IPC 通道时必须同步 `ipc.ts` + `preload.ts` + `vite-env.d.ts` 三端。
+ * - handler 内避免同步 I/O；状态读写走 state.ts（已处理同步/异步策略）。
+ * - 所有与 agentService 互动的 handler 均为 async 或返回 Promise，
+ *   确保主进程事件循环不被长时间阻塞。
+ */
+
 import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { dialog, ipcMain, shell } from 'electron';
