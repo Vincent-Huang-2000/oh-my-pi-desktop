@@ -152,6 +152,31 @@ const getUntrackedFilesDiff = async (workspacePath: string) => {
 };
 
 export const registerDesktopIpcHandlers = (agentService: AgentService) => {
+
+  // 同一 workspace 下，对持久化会话列表有删除语义的操作（sync-sessions 的 reconcile
+  // 和 fork-session 的 upsert）必须互斥。队列按 workspacePath 分桶，不同项目可并发。
+  const workspaceSessionOperationTails = new Map<string, Promise<void>>();
+  const runWorkspaceSessionOperation = async <T>(
+    workspacePath: string,
+    operation: () => Promise<T>
+  ): Promise<T> => {
+    const previous = workspaceSessionOperationTails.get(workspacePath) ?? Promise.resolve();
+    let releaseCurrent: () => void = () => {};
+    const currentGate = new Promise<void>((resolve) => {
+      releaseCurrent = resolve;
+    });
+    const currentTail = previous.catch(() => undefined).then(() => currentGate);
+    workspaceSessionOperationTails.set(workspacePath, currentTail);
+    await previous.catch(() => undefined);
+    try {
+      return await operation();
+    } finally {
+      releaseCurrent();
+      if (workspaceSessionOperationTails.get(workspacePath) === currentTail) {
+        workspaceSessionOperationTails.delete(workspacePath);
+      }
+    }
+  };
   ipcMain.handle('desktop:get-state', () => readState());
   // 首次启动兜底：在用户文档目录下创建 omp-desktop 文件夹并 upsert 为项目，返回该项目。
   ipcMain.handle('desktop:ensure-default-workspace', () => ensureDefaultWorkspace());
@@ -370,30 +395,32 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   // ACP 会话生命周期
   // 以 omp 的 session/list 为准重建该 workspace 的本地会话列表：分页拉全 + 去重 + 清理幽灵。
   // 用完即杀临时 __list__ 子进程，避免每次同步累积常驻进程。
-  ipcMain.handle('desktop:sync-sessions', async (_event, workspacePath: string, keepLocalId?: string) => {
-    const remote: { sessionId: string; cwd: string; title?: string; updatedAt?: string }[] = [];
-    let cursor: string | undefined;
-    let firstError: string | undefined;
-    for (let page = 0; page < 20; page += 1) {
-      const result = await agentService.listSessions(workspacePath, cursor);
-      if (!result.ok) {
-        firstError = result.message;
-        break;
+  ipcMain.handle('desktop:sync-sessions', (_event, workspacePath: string, keepLocalId?: string) => {
+    return runWorkspaceSessionOperation(workspacePath, async () => {
+      const remote: { sessionId: string; cwd: string; title?: string; updatedAt?: string }[] = [];
+      let cursor: string | undefined;
+      let firstError: string | undefined;
+      for (let page = 0; page < 20; page += 1) {
+        const result = await agentService.listSessions(workspacePath, cursor);
+        if (!result.ok) {
+          firstError = result.message;
+          break;
+        }
+        if (result.sessions) {
+          remote.push(...result.sessions);
+        }
+        cursor = result.nextCursor;
+        if (!cursor) {
+          break;
+        }
       }
-      if (result.sessions) {
-        remote.push(...result.sessions);
+      agentService.stopSessionProcess(`__list__${workspacePath}`);
+      if (remote.length === 0 && firstError) {
+        return { ok: false, message: firstError, state: readState() };
       }
-      cursor = result.nextCursor;
-      if (!cursor) {
-        break;
-      }
-    }
-    agentService.stopSessionProcess(`__list__${workspacePath}`);
-    if (remote.length === 0 && firstError) {
-      return { ok: false, message: firstError, state: readState() };
-    }
-    const state = reconcileProjectSessions(workspacePath, remote, keepLocalId);
-    return { ok: true, state };
+      const state = reconcileProjectSessions(workspacePath, remote, keepLocalId);
+      return { ok: true, state };
+    });
   });
 
   ipcMain.handle(
@@ -420,7 +447,9 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   ipcMain.handle(
     'desktop:fork-session',
     (_event, localSessionId: string, workspacePath: string, sourceAcpSessionId: string) => {
-      return agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId);
+      return runWorkspaceSessionOperation(workspacePath, () =>
+        agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId)
+      );
     }
   );
 
