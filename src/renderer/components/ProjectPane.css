@@ -117,6 +117,11 @@
   background: var(--color-accent-subtle);
 }
 
+/* 非选中项目标题 hover 时浅色背景反馈，与 session 条目 hover 一致。 */
+.project-header:not(.active):hover {
+  background: var(--color-accent-hover);
+}
+
 .project-title,
 .session-item {
   width: 100%;
@@ -355,7 +360,7 @@
 .session-actions {
   display: flex;
   align-items: center;
-  opacity: 0.5;
+  opacity: 0;
   transition: opacity 0.12s ease;
 }
 
@@ -365,11 +370,34 @@
   opacity: 1;
 }
 
+.session-item.active .session-actions {
+  opacity: 0.5;
+}
+
+.session-item.active:hover .session-actions {
+  opacity: 1;
+}
+
+.session-item.active .session-actions:focus-within {
+  opacity: 1;
+}
+
 .session-action-button {
   width: 22px;
   height: 22px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: pointer;
   font-size: 13px;
   line-height: 1;
+}
+
+.session-action-button:hover {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-hover);
 }
 
 /* session ⋯ 菜单：复用 .project-menu 基础样式，定位到 session 行右侧。 */
