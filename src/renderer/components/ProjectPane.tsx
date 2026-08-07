@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import './ProjectPane.css';
 
 
@@ -292,7 +292,7 @@ function ProjectGroupItem({
   }, [isRenaming]);
 
   return (
-    <section className={isExpanded ? 'project-group expanded' : 'project-group'}>
+    <section className={isExpanded ? 'project-group expanded' : 'project-group'} data-project-path={project.path}>
       <div className={isSelected ? 'project-header active' : 'project-header'}>
         {/* 点击目录名仅展开/折叠，不切换执行目录；只有点击 session 才进入执行目录。
             高亮的 session 不因点击目录名而改变。
@@ -489,9 +489,43 @@ export function ProjectPane({
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
   const projectList = projects ?? desktopState.recentProjects;
   const paneClassName = variant === 'preview' ? 'project-pane project-pane-preview' : 'project-pane';
-  // 用 mousedown 关闭外侧菜单：避免在外层 onClick 先吃掉点击之前漏关。
-  // 同时响应 Esc 键关闭。任一菜单打开时挂载，关闭后自动卸载。
   const paneRef = useRef<HTMLElement | null>(null);
+  // 滚动条位置稳定化：折叠/展开项目时补偿 scrollTop，保持被点击项目在视口中的位置不变。
+  const projectListRef = useRef<HTMLDivElement | null>(null);
+  const pendingScrollAdjustRef = useRef<{ projectPath: string; headerViewportTop: number } | null>(null);
+  // 包装 toggleProjectExpanded：操作前记录被点击项目标题在视口中的 Y 坐标，
+  // 然后通过 useLayoutEffect 在 DOM 更新后（浏览器 paint 前）调整 scrollTop 补偿高度变化。
+  const handleToggleExpanded = (projectPath: string) => {
+    if (projectListRef.current) {
+      const groupEl = projectListRef.current.querySelector(
+        `[data-project-path="${CSS.escape(projectPath)}"]`
+      ) as HTMLElement | null;
+      if (groupEl) {
+        const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
+        pendingScrollAdjustRef.current = {
+          projectPath,
+          headerViewportTop: headerEl ? headerEl.getBoundingClientRect().top : 0,
+        };
+      }
+    }
+    onToggleProjectExpanded(projectPath);
+  };
+  useLayoutEffect(() => {
+    const pending = pendingScrollAdjustRef.current;
+    if (!pending || !projectListRef.current) return;
+    pendingScrollAdjustRef.current = null;
+    const groupEl = projectListRef.current.querySelector(
+      `[data-project-path="${CSS.escape(pending.projectPath)}"]`
+    ) as HTMLElement | null;
+    if (!groupEl) return;
+    const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
+    if (!headerEl) return;
+    const newTop = headerEl.getBoundingClientRect().top;
+    const delta = newTop - pending.headerViewportTop;
+    if (Math.abs(delta) > 0.5) {
+      projectListRef.current.scrollTop += delta;
+    }
+  }, [expandedProjectPaths]);
   useEffect(() => {
     if (!openMenuForPath && !openSessionMenuId) {
       return;
@@ -606,7 +640,7 @@ export function ProjectPane({
               避免与"添加项目目录"等 ＋ 入口撞符号、也与顶部操作区职责区分。 */}
         </div>
       </div>
-      <div className="project-list">
+      <div className="project-list" ref={projectListRef}>
         {projectList.length === 0 ? (
           // 空状态引导：列表无项目时展示一张占位卡片，引导用户选择目录。
           // 这是"打开目录"在左栏的主要落点（紧贴它影响的列表）。
@@ -637,7 +671,7 @@ export function ProjectPane({
                   isExpanded={isExpanded}
                   sessions={projectSessions}
                   selectedSession={selectedSession}
-                  onToggleExpanded={onToggleProjectExpanded}
+                  onToggleExpanded={handleToggleExpanded}
                   onSelectSession={onSelectProjectSession}
                   onTogglePinned={onToggleProjectPinned}
                   onReveal={onRevealProject}
