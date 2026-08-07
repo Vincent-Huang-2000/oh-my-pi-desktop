@@ -880,6 +880,7 @@ export function ChatWorkspace({
   onSetToolGroupCollapsed
 }: ChatWorkspaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   // App 每次输入都会重新创建审批回调；通过 ref 读取最新实现，保持消息流的 callback identity。
   const elicitationRespondRef = useRef(onElicitationRespond);
   elicitationRespondRef.current = onElicitationRespond;
@@ -1008,11 +1009,25 @@ export function ChatWorkspace({
     });
   };
 
-  // 面板打开时按 Esc 收起（不清空已输入内容）。
+  // 键盘事件：Esc 收起命令面板；单独 Enter 发送消息；Shift+Enter 换行；Ctrl+Enter 无操作。
   const handleTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Escape' && paletteOpen) {
       event.preventDefault();
       setPaletteDismissed(true);
+      return;
+    }
+    if (event.key === 'Enter') {
+      // Ctrl+Enter 不换行也不发送
+      if (event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+      // 单独 Enter（无修饰键、非 IME 组合态）发送消息
+      if (!event.shiftKey && !event.metaKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+      // Shift+Enter / Meta+Enter / IME 组合态：由浏览器处理换行
     }
   };
 
@@ -1165,7 +1180,7 @@ export function ChatWorkspace({
         </div>
       )}
 
-      <form className="composer" onSubmit={onSubmit}>
+      <form ref={formRef} className="composer" onSubmit={onSubmit}>
         <div className="composer-input">
           {/* 命令面板：在输入框输入以 "/" 开头的命令名时自动弹出（实时过滤 + 描述），
               选中后把 `/<name> ` 填回输入框，由用户补参数再发送。 */}
