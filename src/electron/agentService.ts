@@ -59,6 +59,7 @@ import {
   isJsonRpcNotification,
   isJsonRpcResponse,
   isRecord,
+  getImageMarkdown,
   getTextContent,
   stringifySafe,
   getToolCallMessage,
@@ -308,6 +309,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return message ? [{ sessionId, type: 'user_message', message, payload: params }] : [];
     }
     if (sessionUpdate === 'agent_message_chunk') {
+      // v17.2.9+ agent 在 agent_message_chunk 中推送 image 内容块
+      // （{ type:'image', data, mimeType }），转为 Markdown data: URL 图片，
+      // 复用已有 ReactMarkdown 渲染。
+      const imageMarkdown = getImageMarkdown(update.content);
+      if (imageMarkdown) {
+        return [{ sessionId, type: 'output', message: imageMarkdown, payload: params }];
+      }
       const message = getTextContent(update.content);
       return message ? [{ sessionId, type: 'output', message, payload: params }] : [];
     }
@@ -583,7 +591,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     if (method === 'session/resume') {
       return '恢复';
     }
-    if (method === 'unstable_session/fork') {
+    if (method === 'session/fork') {
       return 'fork';
     }
     return '加载';
@@ -608,7 +616,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   ) => {
     // 标记重放窗口：sendRequest 期间 omp 会通过 session/update 把历史消息流回来。
     // load/fork 先缓存聊天事件，resume 仅用于刷新配置，直接丢弃聊天事件。
-    const shouldBufferReplay = method === 'session/load' || method === 'unstable_session/fork';
+    const shouldBufferReplay = method === 'session/load' || method === 'session/fork';
     process.isReplaying = true;
     process.replayMode = shouldBufferReplay ? 'buffer' : 'suppress';
     process.replayEvents = [];
@@ -626,10 +634,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       process.replayMode = undefined;
       process.replayEvents = [];
     }
-    if (method === 'unstable_session/fork') {
+    if (method === 'session/fork') {
       // fork 返回新 sessionId，刷新本地记录；load/resume 沿用原 id。
       if (!isRecord(response) || typeof response.sessionId !== 'string') {
-        throw new Error('unstable_session/fork 未返回有效 sessionId');
+        throw new Error('session/fork 未返回有效 sessionId');
       }
       copyToolModelSnapshots(acpSessionId, response.sessionId);
       process.acpSessionId = response.sessionId;
@@ -1267,7 +1275,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     localSessionId: string,
     workspacePath: string,
     acpSessionId: string,
-    initMethod: 'session/load' | 'session/resume' | 'unstable_session/fork',
+    initMethod: 'session/load' | 'session/resume' | 'session/fork',
     approvalProfile: ApprovalProfile
   ): Promise<SessionActionResult> => {
     let processState = agentProcesses.get(localSessionId);
@@ -1296,7 +1304,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     processState.initMethod = initMethod;
     try {
       const resolvedSessionId =
-        processState.acpSessionId && initMethod !== 'unstable_session/fork'
+        processState.acpSessionId && initMethod !== 'session/fork'
           ? await restoreAcpSession(processState, acpSessionId, initMethod)
           : await ensureAcpSession(processState);
       return { ok: true, sessionId: resolvedSessionId };
@@ -1368,7 +1376,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       localSessionId,
       workspacePath,
       sourceAcpSessionId,
-      'unstable_session/fork',
+      'session/fork',
       normalizeApprovalProfile(sourceSession?.approvalProfile)
     );
   };

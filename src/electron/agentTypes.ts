@@ -82,7 +82,7 @@ export type AcpProcessState = {
   approvalProfile?: ApprovalProfile;
   // 第一次 session/prompt 之前用来恢复/创建 ACP session 的方法。
   // 缺省走 session/load（保留旧行为）；`loadSession/resumeSession/forkSession` 会显式设置。
-  initMethod: 'session/load' | 'session/resume' | 'unstable_session/fork';
+  initMethod: 'session/load' | 'session/resume' | 'session/fork';
   configOptions: AcpConfigOption[];
   // ACP `available_commands_update` 通知维护的可用 slash 命令。
   // 桌面端不做语义解析，仅透传给 UI 由用户触发 `/<name>` 文本。

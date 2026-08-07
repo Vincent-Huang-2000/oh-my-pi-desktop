@@ -63,6 +63,20 @@ export const getTextContent = (value: unknown): string => {
   return typeof text === 'string' ? text : '';
 };
 
+// v17.2.9+ agent 在 agent_message_chunk 中推送 image 内容块（{ type:'image', data, mimeType }）。
+// 将其转为 data: URL 的 Markdown 图片，交由渲染层的 ReactMarkdown 展示。
+export const getImageMarkdown = (value: unknown): string => {
+  if (!isRecord(value)) {
+    return '';
+  }
+  const data = value.data;
+  const mimeType = value.mimeType;
+  if (typeof data !== 'string' || typeof mimeType !== 'string') {
+    return '';
+  }
+  return `![image](data:${mimeType};base64,${data})`;
+};
+
 export const stringifySafe = (value: unknown) => {
   try {
     return JSON.stringify(value);
