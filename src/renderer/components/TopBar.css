@@ -8,13 +8,13 @@
   grid-row: 1;
   display: flex;
   align-items: center;
+
   /* 三类元素左右贴边、配置区居中：身份 ← ... [配置] ... → 运行时 */
   justify-content: space-between;
   gap: 16px;
   padding: 0 18px;
   border-bottom: 1px solid var(--glass-border-subtle);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
 
@@ -215,7 +215,7 @@
 .pane-toggle-button.active {
   color: var(--color-accent-strong);
   background: var(--color-surface);
-  box-shadow: 0 1px 3px rgba(30, 40, 37, 0.12);
+  box-shadow: 0 1px 3px rgb(30 40 37 / 12%);
 }
 
 /* ── 状态指示 ── */
@@ -239,12 +239,12 @@
   flex-shrink: 0;
   border-radius: 50%;
   background: var(--color-done);
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.18);
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 18%);
 }
 
 .status-dot.danger {
   background: var(--color-error-text);
-  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.18);
+  box-shadow: 0 0 0 2px rgb(220 38 38 / 18%);
 }
 
 .status-pill.danger {

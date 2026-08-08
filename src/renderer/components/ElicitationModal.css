@@ -13,6 +13,7 @@
   color: var(--color-text);
   outline: none;
 }
+
 .elicitation-input:focus {
   border-color: var(--color-accent);
 }

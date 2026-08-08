@@ -7,12 +7,14 @@
   grid-column: 1;
   position: relative;
   display: grid;
+
   /* 中间对话区只有消息流 + 输入区两行。 */
   grid-template-rows: minmax(0, 1fr) minmax(100px, auto);
   min-width: 0;
   min-height: 0;
+
   /* 对话区保持近实色以保证文字可读性，仅微微透出底层渐变统一观感 */
-  background: rgba(255, 255, 255, 0.88);
+  background: rgb(255 255 255 / 88%);
 }
 
 /* ── 消息列表 ── */
@@ -38,7 +40,7 @@
   color: var(--color-text-muted);
   font-size: 16px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
   transition:
     background 0.15s,
     box-shadow 0.15s,
@@ -47,7 +49,7 @@
 
 .scroll-to-bottom-btn:hover {
   background: var(--color-accent-subtle);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
   transform: translateY(-1px);
 }
 
@@ -108,11 +110,6 @@
   border-left-color: var(--color-error-border);
 }
 
-.message.status {
-  border-left-color: var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
 
 /* Agent 消息：无左边框，靠内容本身区分 */
 .message.agent {
@@ -230,7 +227,7 @@
 }
 
 .command-pending-name {
-  font-family: 'SFMono-Regular', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-family: SFMono-Regular, 'Cascadia Code', Consolas, 'Courier New', monospace;
   font-size: 13px;
   font-weight: 500;
   color: var(--color-accent-strong);
@@ -249,6 +246,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -304,6 +302,7 @@
 
 /* ── 状态指示器增强 ── */
 .message.status {
+  color: var(--color-text-muted);
   max-width: 100%;
   margin-bottom: 6px;
   padding: 6px 12px;
@@ -318,14 +317,15 @@
   margin: 0;
   font-size: 12px;
 }
+
 /* ── Markdown 渲染样式 ── */
 .markdown-body {
   line-height: 1.65;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .markdown-body p {
-  margin: 0 0 8px 0;
+  margin: 0 0 8px;
   white-space: normal;
   line-height: 1.65;
 }
@@ -346,7 +346,7 @@
 
 /* 行内代码 */
 .markdown-body code {
-  font-family: 'SFMono-Regular', 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-family: SFMono-Regular, 'Cascadia Code', Consolas, 'Courier New', monospace;
   font-size: 13px;
   background: var(--color-code-inline-bg);
   color: var(--color-code-inline-text);
@@ -375,10 +375,12 @@
 .code-block-wrapper pre::-webkit-scrollbar {
   height: 6px;
 }
+
 .code-block-wrapper pre::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
+
 .code-block-wrapper pre::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -429,7 +431,7 @@
 /* 有序 / 无序列表 */
 .markdown-body ul,
 .markdown-body ol {
-  margin: 4px 0 8px 0;
+  margin: 4px 0 8px;
   padding-left: 24px;
 }
 
@@ -500,27 +502,30 @@
 /* 标题 */
 .markdown-body h1 {
   font-size: 1.4em;
-  margin: 12px 0 6px 0;
+  margin: 12px 0 6px;
   font-weight: 600;
   color: var(--color-text);
 }
+
 .markdown-body h2 {
   font-size: 1.25em;
-  margin: 10px 0 6px 0;
+  margin: 10px 0 6px;
   font-weight: 600;
   color: var(--color-text);
 }
+
 .markdown-body h3 {
   font-size: 1.1em;
-  margin: 8px 0 4px 0;
+  margin: 8px 0 4px;
   font-weight: 600;
   color: var(--color-text);
 }
+
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
   font-size: 1em;
-  margin: 6px 0 4px 0;
+  margin: 6px 0 4px;
   font-weight: 600;
   color: var(--color-text-muted);
 }
@@ -556,6 +561,7 @@
   padding: 0;
   overflow: hidden;
 }
+
 /* 工具卡片内隐藏全局 message p 样式 */
 .tool-card > p {
   display: none;
@@ -566,8 +572,9 @@
   align-items: center;
   gap: var(--space-2);
   padding: 10px 14px;
+
   /* 工具卡片头部轻透明，不加 blur 避免流式更新性能开销 */
-  background: rgba(255, 255, 255, 0.5);
+  background: rgb(255 255 255 / 50%);
 }
 
 .tool-icon {
@@ -600,24 +607,31 @@
 .tool-read {
   border-left-color: var(--color-read);
 }
+
 .tool-edit {
   border-left-color: var(--color-edit);
 }
+
 .tool-delete {
   border-left-color: var(--color-delete);
 }
+
 .tool-execute {
   border-left-color: var(--color-execute);
 }
+
 .tool-search {
   border-left-color: var(--color-search);
 }
+
 .tool-think {
   border-left-color: var(--color-think);
 }
+
 .tool-fetch {
   border-left-color: var(--color-fetch);
 }
+
 .tool-switch_mode {
   border-left-color: var(--color-other);
 }
@@ -639,14 +653,17 @@
   color: var(--color-other);
   background: var(--color-surface-sunken);
 }
+
 .status-running {
   color: var(--color-accent-strong);
   background: var(--color-surface-sunken);
 }
+
 .status-done {
   color: var(--color-text-faint);
   background: var(--color-surface-sunken);
 }
+
 .status-error {
   color: var(--color-error-text);
   background: var(--color-surface-sunken);
@@ -672,7 +689,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 2px solid currentColor;
+  border: 2px solid currentcolor;
   border-top-color: transparent;
   animation: tool-spin 0.7s linear infinite;
 }
@@ -694,6 +711,7 @@
   100% {
     border-left-color: var(--color-accent-strong);
   }
+
   50% {
     border-left-color: var(--color-accent);
   }
@@ -712,7 +730,7 @@
   background: var(--color-border-subtle);
   border-radius: 4px;
   font-size: 11px;
-  font-family: Consolas, 'SFMono-Regular', monospace;
+  font-family: Consolas, SFMono-Regular, monospace;
   color: var(--color-text-muted);
   text-transform: none;
 }
@@ -749,10 +767,12 @@
 .diff-content::-webkit-scrollbar {
   height: 6px;
 }
+
 .diff-content::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
+
 .diff-content::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -786,7 +806,7 @@
   max-height: 320px;
   overflow: auto;
   white-space: pre-wrap;
-  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* 工具输出滚动条：随主题色自动适配 */
@@ -794,10 +814,12 @@
   width: 6px;
   height: 6px;
 }
+
 .tool-output-content::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
+
 .tool-output-content::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -815,7 +837,6 @@
   border-radius: var(--radius-md);
   background: var(--glass-bg-strong);
   box-shadow: var(--glass-shadow);
-  -webkit-backdrop-filter: var(--glass-blur-light);
   backdrop-filter: var(--glass-blur-light);
 }
 
@@ -869,19 +890,23 @@
 .message.plan {
   max-width: 100%;
   margin-bottom: 10px;
+
   /* 顶部定位时避开右上角的计划摘要浮层，确保方案标题完整可见。 */
   scroll-margin-top: 64px;
   padding: 0;
   border: 1px solid var(--color-accent-subtle);
   border-left-width: 1px;
   border-radius: 6px;
+
   /* 计划卡片轻微透明，透出对话区底色 */
-  background: rgba(255, 255, 255, 0.55);
+  background: rgb(255 255 255 / 55%);
 }
+
 /* 计划卡片内隐藏全局 message p 样式 */
 .message.plan > p {
   display: none;
 }
+
 .plan-empty {
   padding: 12px 14px;
   color: var(--color-text-muted);
@@ -933,6 +958,7 @@
     opacity: 0.45;
     transform: scale(0.9);
   }
+
   50% {
     opacity: 1;
     transform: scale(1);
@@ -987,9 +1013,11 @@
 .plan-pending .plan-status-icon {
   color: var(--color-pending);
 }
+
 .plan-in_progress .plan-status-icon {
   color: var(--color-running);
 }
+
 .plan-completed .plan-status-icon {
   color: var(--color-done);
 }
@@ -997,10 +1025,12 @@
 .plan-pending .plan-entry-content {
   color: var(--color-pending);
 }
+
 .plan-in_progress .plan-entry-content {
   color: var(--color-text);
   font-weight: 500;
 }
+
 .plan-completed .plan-entry-content {
   color: var(--color-other);
   text-decoration: line-through;

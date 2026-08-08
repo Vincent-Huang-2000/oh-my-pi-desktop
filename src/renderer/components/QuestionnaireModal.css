@@ -78,7 +78,7 @@
   padding: 12px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.5);
+  background: rgb(255 255 255 / 50%);
 }
 
 .questionnaire-item legend {
@@ -176,7 +176,7 @@
   background: transparent;
 }
 
-.questionnaire-actions button:not(:disabled):not(.primary-action):not(.danger-action):hover {
+.questionnaire-actions button:not(:disabled, .primary-action, .danger-action):hover {
   background: var(--color-surface-sunken);
 }
 

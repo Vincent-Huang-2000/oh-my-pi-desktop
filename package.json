@@ -15,7 +15,9 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "eslint": "eslint .",
     "eslint:fix": "eslint --fix .",
-    "lint": "npm run typecheck && npm run eslint && npm run format:check",
+    "stylelint": "stylelint \"src/**/*.css\"",
+    "stylelint:fix": "stylelint --fix \"src/**/*.css\"",
+    "lint": "npm run typecheck && npm run eslint && npm run stylelint && npm run format:check",
     "dist:win": "npm run build && electron-builder --win portable",
     "start": "electron .",
     "preview": "vite preview"
@@ -44,6 +46,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.9.0",
+    "stylelint": "^17.14.1",
+    "stylelint-config-standard": "^40.0.0",
     "typescript-eslint": "^8.66.0",
     "wait-on": "^8.0.0"
   },

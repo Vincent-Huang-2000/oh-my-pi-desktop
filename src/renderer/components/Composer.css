@@ -10,7 +10,6 @@
   padding: 14px 18px;
   border-top: 1px solid var(--glass-border-subtle);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
 
@@ -31,10 +30,12 @@
 .composer textarea::-webkit-scrollbar {
   width: 6px;
 }
+
 .composer textarea::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
+
 .composer textarea::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -49,7 +50,7 @@
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
-  box-shadow: 0 2px 12px rgba(30, 40, 37, 0.08);
+  box-shadow: 0 2px 12px rgb(30 40 37 / 8%);
 }
 
 /* 卡片顶部工具栏行：左侧配置区，右侧操作按钮。 */
@@ -86,10 +87,9 @@
 .composer-input .model-picker-popover {
   top: auto;
   bottom: calc(100% + 6px);
-  background: rgba(255, 255, 255, 0.94);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  background: rgb(255 255 255 / 94%);
   backdrop-filter: blur(24px) saturate(200%);
-  box-shadow: 0 -8px 28px rgba(30, 40, 37, 0.14);
+  box-shadow: 0 -8px 28px rgb(30 40 37 / 14%);
 }
 
 /* 审批档位提示紧贴会话配置区；只展示风险/恢复失败，不挤占消息主区域。 */
@@ -207,7 +207,7 @@
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);
-  box-shadow: 0 6px 18px rgba(30, 40, 37, 0.12);
+  box-shadow: 0 6px 18px rgb(30 40 37 / 12%);
 }
 
 .attach-menu-item {
@@ -241,7 +241,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(31, 42, 37, 0.14);
+  box-shadow: 0 8px 24px rgb(31 42 37 / 14%);
 }
 
 .command-palette-list {
@@ -270,7 +270,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
-  font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+  font-family: 'Cascadia Code', Consolas, ui-monospace, monospace;
 }
 
 .command-palette-desc {

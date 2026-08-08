@@ -12,7 +12,6 @@
   border-top: 1px solid var(--glass-border-subtle);
   color: var(--color-text-tertiary);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   font-size: 12px;
   white-space: nowrap;

@@ -23,34 +23,37 @@
    * ============================================================ */
 
   /* —— 强调色（由 --theme-accent-* HSL 派生，换肤改色相即可） —— */
-  --color-accent: hsl(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l));
+  --color-accent: hsl(var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l));
   --color-accent-strong: hsl(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
+    var(--theme-accent-h)
+    var(--theme-accent-s)
     48%
   ); /* hover/选中深色文字 */
-  --color-accent-subtle: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.12
+
+  --color-accent-subtle: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    12%
   ); /* 选中底色 */
-  --color-accent-hover: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.08
+
+  --color-accent-hover: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    8%
   ); /* hover 底色 */
-  --color-accent-hover-strong: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.18
+
+  --color-accent-hover-strong: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    18%
   );
 
   /* —— 中性色（文字 / 背景 / 边框） —— */
   --color-bg: #f7f7f3;
-  --color-surface: #ffffff;
+  --color-surface: #fff;
   --color-surface-alt: #f2f4f0; /* 次级背景：介于 bg 与 sunken 之间 */
   --color-surface-sunken: #eef0ec; /* 凹陷区/工具卡片头部 */
   --color-border: #dfe4dd;
@@ -59,6 +62,7 @@
   --color-text-muted: #6d7873;
   --color-text-tertiary: #909a94; /* 第三级文字（列表项默认色） */
   --color-text-faint: #b8c0ba; /* 更弱的次要文字/图标 */
+
   /* —— Markdown 代码与表格（脱离中性色的绿色倾向） —— */
   --color-code-inline-bg: #f4effc;
   --color-code-inline-text: #6941a5;
@@ -67,13 +71,13 @@
   --color-table-stripe-bg: #fafbfe;
 
   /* —— 毛玻璃令牌 —— */
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-bg: rgb(255 255 255 / 62%);
+  --glass-bg-strong: rgb(255 255 255 / 78%);
   --glass-blur: blur(24px) saturate(180%);
   --glass-blur-light: blur(16px) saturate(160%);
-  --glass-border: rgba(255, 255, 255, 0.55);
-  --glass-border-subtle: rgba(255, 255, 255, 0.35);
-  --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.12);
+  --glass-border: rgb(255 255 255 / 55%);
+  --glass-border-subtle: rgb(255 255 255 / 35%);
+  --glass-shadow: 0 8px 32px rgb(31 38 135 / 12%);
 
   /* —— 功能色 —— */
   --color-tool: #f4f2e9;
@@ -105,6 +109,7 @@
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+
   color: var(--color-text);
   background: var(--color-bg);
   font-family:
@@ -165,6 +170,7 @@ textarea:disabled {
   grid-template-rows: 56px minmax(0, 1fr) 28px;
   height: 100vh;
   overflow: hidden;
+
   /* 底层柔和渐变背景：由配色方案 --theme-grad-* 派生 */
   background: linear-gradient(
     135deg,
@@ -300,7 +306,6 @@ textarea:disabled {
   width: 280px;
   border-right: 1px solid var(--glass-border-subtle);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur-light);
   backdrop-filter: var(--glass-blur-light);
   box-shadow: var(--glass-shadow);
   pointer-events: none;
@@ -333,7 +338,6 @@ textarea:disabled {
   border-color: var(--glass-border-subtle);
   color: var(--color-text-faint);
   background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-shadow);
 }
@@ -501,8 +505,7 @@ textarea:disabled {
   z-index: 120;
   display: grid;
   place-items: center;
-  background: rgba(30, 40, 37, 0.18);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgb(30 40 37 / 18%);
   backdrop-filter: blur(8px);
 }
 
@@ -530,7 +533,6 @@ textarea:disabled {
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   box-shadow: var(--glass-shadow);
   pointer-events: auto;
@@ -577,6 +579,7 @@ textarea:disabled {
   justify-content: flex-end;
   gap: 10px;
 }
+
 .modal-actions-horizontal button {
   display: grid;
   gap: 3px;
@@ -685,25 +688,25 @@ summary:focus-visible {
   --theme-grad-4: #2b2032;
 
   /* ── 语义层：强调色 ── */
-  --color-accent: hsl(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l));
-  --color-accent-strong: hsl(var(--theme-accent-h), var(--theme-accent-s), 72%);
-  --color-accent-subtle: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.18
+  --color-accent: hsl(var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l));
+  --color-accent-strong: hsl(var(--theme-accent-h) var(--theme-accent-s) 72%);
+  --color-accent-subtle: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    18%
   );
-  --color-accent-hover: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.1
+  --color-accent-hover: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    10%
   );
-  --color-accent-hover-strong: hsla(
-    var(--theme-accent-h),
-    var(--theme-accent-s),
-    var(--theme-accent-l),
-    0.24
+  --color-accent-hover-strong: hsl(
+    var(--theme-accent-h)
+    var(--theme-accent-s)
+    var(--theme-accent-l) /
+    24%
   );
 
   /* ── 语义层：中性色 ── */
@@ -726,13 +729,13 @@ summary:focus-visible {
   --color-table-stripe-bg: #1d2130;
 
   /* ── 毛玻璃令牌（暗色半透明底） ── */
-  --glass-bg: rgba(26, 30, 37, 0.78);
-  --glass-bg-strong: rgba(26, 30, 37, 0.94);
+  --glass-bg: rgb(26 30 37 / 78%);
+  --glass-bg-strong: rgb(26 30 37 / 94%);
   --glass-blur: blur(24px) saturate(120%);
   --glass-blur-light: blur(16px) saturate(110%);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-subtle: rgba(255, 255, 255, 0.05);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --glass-border: rgb(255 255 255 / 8%);
+  --glass-border-subtle: rgb(255 255 255 / 5%);
+  --glass-shadow: 0 8px 32px rgb(0 0 0 / 40%);
 
   /* ── 功能色 ── */
   --color-tool: #2a2a22;
@@ -753,24 +756,24 @@ summary:focus-visible {
    后续可逐步将这些色值迁移到 :root 变量中以消除此区块。 */
 
 [data-theme='dark'] .message-list {
-  background: rgba(26, 30, 37, 0.88);
+  background: rgb(26 30 37 / 88%);
 }
 
 [data-theme='dark'] .scroll-to-bottom-btn {
   background: var(--color-surface);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
 }
 
 [data-theme='dark'] .scroll-to-bottom-btn:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
 }
 
 [data-theme='dark'] .tool-card-header {
-  background: rgba(26, 30, 37, 0.6);
+  background: rgb(26 30 37 / 60%);
 }
 
 [data-theme='dark'] .message.plan {
-  background: rgba(26, 30, 37, 0.65);
+  background: rgb(26 30 37 / 65%);
 }
 
 [data-theme='dark'] .plan-mode-banner {
@@ -779,48 +782,48 @@ summary:focus-visible {
 }
 
 [data-theme='dark'] .modal-backdrop {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgb(0 0 0 / 45%);
 }
 
 [data-theme='dark'] .composer-card {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 25%);
 }
 
 [data-theme='dark'] .composer-command-palette {
-  background: rgba(26, 30, 37, 0.96);
-  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
+  background: rgb(26 30 37 / 96%);
+  box-shadow: 0 -8px 28px rgb(0 0 0 / 40%);
 }
 
 [data-theme='dark'] .attach-menu {
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 30%);
 }
 
 [data-theme='dark'] .command-palette-dropdown {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
 [data-theme='dark'] .review-branch-menu {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
 }
 
 [data-theme='dark'] .review-diff-toggle {
-  box-shadow: 1px 0 0 rgba(50, 54, 64, 0.9);
+  box-shadow: 1px 0 0 rgb(50 54 64 / 90%);
 }
 
 [data-theme='dark'] .model-picker-popup {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
 }
 
 [data-theme='dark'] .segment-select-dropdown {
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 30%);
 }
 
 [data-theme='dark'] .questionnaire-item {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(255 255 255 / 6%);
 }
 
 [data-theme='dark'] .pane-toggle-button.active {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 35%);
 }
 
 [data-theme='dark'] .omp-path-setting-button {
@@ -839,7 +842,7 @@ summary:focus-visible {
 [data-theme='dark'] .tool-output-content::-webkit-scrollbar-thumb,
 [data-theme='dark'] .diff-content::-webkit-scrollbar-thumb,
 [data-theme='dark'] .composer textarea::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgb(255 255 255 / 15%);
 }
 
 [data-theme='dark'] .message-list:hover::-webkit-scrollbar-thumb,
