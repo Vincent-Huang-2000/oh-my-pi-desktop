@@ -110,7 +110,6 @@
   border-left-color: var(--color-error-border);
 }
 
-
 /* Agent 消息：无左边框，靠内容本身区分 */
 .message.agent {
   border-left-color: transparent;

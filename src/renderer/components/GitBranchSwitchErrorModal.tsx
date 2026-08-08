@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import './GitBranchSwitchErrorModal.css';
 /* eslint-disable react-refresh/only-export-components */
 
-
 const GIT_BRANCH_SWITCH_ERROR_MESSAGES: Record<GitBranchSwitchFailureReason, string> = {
   'unmerged-files':
     '当前分支存在尚未解决的文件冲突。请先解决冲突并完成提交，或中止当前合并操作后再切换。',

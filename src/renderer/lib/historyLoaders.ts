@@ -34,19 +34,17 @@ export const getHistoryLoadedPlans = (payload: unknown): HistoricalSessionPlan[]
   if (!payload || typeof payload !== 'object') return [];
   const plans = (payload as { plans?: unknown }).plans;
   if (!Array.isArray(plans)) return [];
-  return plans.filter(
-    (plan): plan is HistoricalSessionPlan => {
-      if (typeof plan !== 'object' || plan === null) return false;
-      // plan is deserialized JSON; validate shape before asserting HistoricalSessionPlan
-      const p = plan as Record<string, unknown>;
-      return (
-        typeof p.id === 'string' &&
-        typeof p.toolCallId === 'string' &&
-        typeof p.planFilePath === 'string' &&
-        typeof p.content === 'string'
-      );
-    },
-  );
+  return plans.filter((plan): plan is HistoricalSessionPlan => {
+    if (typeof plan !== 'object' || plan === null) return false;
+    // plan is deserialized JSON; validate shape before asserting HistoricalSessionPlan
+    const p = plan as Record<string, unknown>;
+    return (
+      typeof p.id === 'string' &&
+      typeof p.toolCallId === 'string' &&
+      typeof p.planFilePath === 'string' &&
+      typeof p.content === 'string'
+    );
+  });
 };
 
 export const insertHistoricalPlans = (messages: ChatMessage[], plans: HistoricalSessionPlan[]) => {

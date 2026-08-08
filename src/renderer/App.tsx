@@ -20,72 +20,29 @@ import { ChatWorkspace } from './components/ChatWorkspace';
 import { ContextPane } from './components/ContextPane';
 import { ElicitationModal } from './components/ElicitationModal';
 import {
-  GitBranchSwitchErrorModal,
-  resolveGitBranchSwitchFailure,
-  type GitBranchSwitchError,
+  GitBranchSwitchErrorModal
 } from './components/GitBranchSwitchErrorModal';
 import { PermissionModal } from './components/PermissionModal';
-import { QuestionnaireModal } from './components/QuestionnaireModal';
 import { ProjectPane } from './components/ProjectPane';
-import { SessionSearchModal, type SessionSearchItem } from './components/SessionSearchModal';
+import { QuestionnaireModal } from './components/QuestionnaireModal';
+import { SessionSearchModal } from './components/SessionSearchModal';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
-import type {
-  AcpConfigOption,
-  ChatMessage,
-  ElicitationRequest,
-  PermissionOption,
-  PermissionRequest,
-  QuestionnaireAnswer,
-  QuestionnaireRequest,
-} from './types';
-import {
-  getElicitationKind,
-  getLogLevel,
-  getPayloadAvailableCommands,
-  getPayloadConfigOptions,
-  getPayloadElicitationField,
-  getPayloadFullPlan,
-  getPayloadQuestionnaire,
-  getPayloadPermissionOptions,
-  getPayloadRequestId,
-  splitElicitationPlan,
-} from './utils';
-import { type PendingAttachment, classifyAttachment } from './lib/attachments';
-import {
-  DEFAULT_APPROVAL_PROFILE,
-  MAX_IMAGE_BYTES,
-  REVIEW_SOURCE_LABEL,
-  type DraftConfigValues,
-  type PaneSide,
-  type ReviewSource,
-} from './lib/constants';
-import { getElicitationResultText } from './lib/elicitationText';
-import {
-  applyActiveSessionPlan,
-  getActiveSessionPlan,
-  getHistoryLoadedEvents,
-  getHistoryLoadedPlans,
-  insertHistoricalPlans,
-} from './lib/historyLoaders';
-import { mergeAgentEventIntoMessages } from './lib/messageMerge';
-import {
-  type PendingSlashCommand,
-  parseSlashCommand,
-  resolveCommandPendingMeta,
-} from './lib/slashCommands';
-import { usePaneLayout } from './hooks/usePaneLayout';
-import { useToolGroups } from './hooks/useToolGroups';
+import { useAgentEvents } from './hooks/useAgentEvents';
 import { useAppCore } from './hooks/useAppCore';
+import { useApprovalFlow } from './hooks/useApprovalFlow';
+import { useConfigSync } from './hooks/useConfigSync';
 import { useGitReview } from './hooks/useGitReview';
+import { useMessageFlow } from './hooks/useMessageFlow';
+import { usePaneLayout } from './hooks/usePaneLayout';
 import { useProjectActions } from './hooks/useProjectActions';
 import { useSessionLifecycle } from './hooks/useSessionLifecycle';
-import { useMessageFlow } from './hooks/useMessageFlow';
-import { useAgentEvents } from './hooks/useAgentEvents';
-import { useApprovalFlow } from './hooks/useApprovalFlow';
-import { applyTheme, toggleTheme } from './theme';
-import { useConfigSync } from './hooks/useConfigSync';
+import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
+import { applyTheme, toggleTheme } from './theme';
+import type {
+  ElicitationRequest
+} from './types';
 
 const EMPTY_ELICITATION_REQUESTS: ElicitationRequest[] = [];
 

@@ -506,8 +506,7 @@ export const groupModelOptions = (
 ): GroupedModelOptions => {
   const groups = new Map<string, NonNullable<AcpConfigOption['options']>>();
   for (const option of options) {
-    const provider =
-      readProvider(option) ?? inferModelProvider(option.name);
+    const provider = readProvider(option) ?? inferModelProvider(option.name);
     const list = groups.get(provider) ?? [];
     list.push(option);
     groups.set(provider, list);

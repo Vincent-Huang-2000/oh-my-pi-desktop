@@ -691,7 +691,13 @@ type ToolGroupHeaderProps = {
   expanded: boolean;
   onToggle: () => void;
 };
-function ToolGroupHeader({ groupId: _groupId, count, hasError, expanded, onToggle }: ToolGroupHeaderProps) {
+function ToolGroupHeader({
+  groupId: _groupId,
+  count,
+  hasError,
+  expanded,
+  onToggle,
+}: ToolGroupHeaderProps) {
   return (
     <button
       type="button"
@@ -1180,7 +1186,6 @@ export function ChatWorkspace({
       }
     });
   };
-
 
   // 完整计划保留在消息流；右上角只派生轻量摘要与定位入口。
   const { planMessages, conversationMessages } = useMemo(

@@ -18,7 +18,6 @@ type QuestionnaireAnswer = {
   selections: string[];
 };
 
-
 type AgentEvent = {
   sessionId: string;
   type:

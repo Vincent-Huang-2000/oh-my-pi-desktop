@@ -25,30 +25,19 @@
   /* —— 强调色（由 --theme-accent-* HSL 派生，换肤改色相即可） —— */
   --color-accent: hsl(var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l));
   --color-accent-strong: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    48%
+    var(--theme-accent-h) var(--theme-accent-s) 48%
   ); /* hover/选中深色文字 */
 
   --color-accent-subtle: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    12%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 12%
   ); /* 选中底色 */
 
   --color-accent-hover: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    8%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 8%
   ); /* hover 底色 */
 
   --color-accent-hover-strong: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    18%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 18%
   );
 
   /* —— 中性色（文字 / 背景 / 边框） —— */
@@ -691,22 +680,13 @@ summary:focus-visible {
   --color-accent: hsl(var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l));
   --color-accent-strong: hsl(var(--theme-accent-h) var(--theme-accent-s) 72%);
   --color-accent-subtle: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    18%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 18%
   );
   --color-accent-hover: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    10%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 10%
   );
   --color-accent-hover-strong: hsl(
-    var(--theme-accent-h)
-    var(--theme-accent-s)
-    var(--theme-accent-l) /
-    24%
+    var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 24%
   );
 
   /* ── 语义层：中性色 ── */
