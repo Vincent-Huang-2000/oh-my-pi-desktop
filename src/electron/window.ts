@@ -19,8 +19,8 @@ export const createWindow = async ({ electronDirname, devServerUrl }: CreateWind
       preload: path.join(electronDirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
-    }
+      sandbox: false,
+    },
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -34,4 +34,3 @@ export const createWindow = async ({ electronDirname, devServerUrl }: CreateWind
     await win.loadFile(path.join(electronDirname, '../dist/index.html'));
   }
 };
-

@@ -11,11 +11,7 @@
  * 特点：所有函数为纯函数或仅依赖参数输入，不持有进程状态。
  */
 import type { AcpConfigOption, AgentEvent, StoredLog, ToolModelSnapshot } from './types.js';
-import type {
-  AcpProcessState,
-  PermissionOption,
-  SessionNotification
-} from './agentTypes.js';
+import type { AcpProcessState, PermissionOption, SessionNotification } from './agentTypes.js';
 
 // ── 基础工具 ──
 
@@ -41,15 +37,33 @@ export const getLogLevel = (eventType: AgentEvent['type']): StoredLog['level'] =
 
 // ── JSON‑RPC 判别 ──
 
-export const isJsonRpcRequest = (value: unknown): value is { jsonrpc: '2.0'; id: string | number | null; method: string; params?: unknown } => {
-  return isRecord(value) && value.jsonrpc === '2.0' && 'id' in value && typeof value.method === 'string';
+export const isJsonRpcRequest = (
+  value: unknown,
+): value is { jsonrpc: '2.0'; id: string | number | null; method: string; params?: unknown } => {
+  return (
+    isRecord(value) && value.jsonrpc === '2.0' && 'id' in value && typeof value.method === 'string'
+  );
 };
 
-export const isJsonRpcNotification = (value: unknown): value is { jsonrpc: '2.0'; method: string; params?: unknown } => {
-  return isRecord(value) && value.jsonrpc === '2.0' && !('id' in value) && typeof value.method === 'string';
+export const isJsonRpcNotification = (
+  value: unknown,
+): value is { jsonrpc: '2.0'; method: string; params?: unknown } => {
+  return (
+    isRecord(value) &&
+    value.jsonrpc === '2.0' &&
+    !('id' in value) &&
+    typeof value.method === 'string'
+  );
 };
 
-export const isJsonRpcResponse = (value: unknown): value is { jsonrpc: '2.0'; id: string | number | null; result?: unknown; error?: { code: number; message: string; data?: unknown } } => {
+export const isJsonRpcResponse = (
+  value: unknown,
+): value is {
+  jsonrpc: '2.0';
+  id: string | number | null;
+  result?: unknown;
+  error?: { code: number; message: string; data?: unknown };
+} => {
   return isRecord(value) && value.jsonrpc === '2.0' && 'id' in value && !('method' in value);
 };
 
@@ -99,14 +113,19 @@ export const getToolCallId = (update: Record<string, unknown>) => {
 
 // ── ACP session / model 快照 ──
 
-export const getAcpSessionIdForSnapshot = (process: AcpProcessState, params: SessionNotification) => {
+export const getAcpSessionIdForSnapshot = (
+  process: AcpProcessState,
+  params: SessionNotification,
+) => {
   if (typeof params.sessionId === 'string') {
     return params.sessionId;
   }
   return process.acpSessionId ?? process.restoredAcpSessionId ?? '';
 };
 
-export const getCurrentModelSnapshot = (configOptions: AcpConfigOption[]): ToolModelSnapshot | undefined => {
+export const getCurrentModelSnapshot = (
+  configOptions: AcpConfigOption[],
+): ToolModelSnapshot | undefined => {
   const modelOpt = configOptions.find((option) => option.id === 'model');
   if (!modelOpt || typeof modelOpt.currentValue !== 'string') {
     return undefined;
@@ -159,8 +178,8 @@ export const normalizePermissionOptions = (value: unknown): PermissionOption[] =
         optionId: item.optionId,
         name: item.name,
         kind: item.kind,
-        description: typeof item.description === 'string' ? item.description : undefined
-      }
+        description: typeof item.description === 'string' ? item.description : undefined,
+      },
     ];
   });
 };
@@ -173,21 +192,30 @@ export const normalizeConfigOptions = (value: unknown): AcpConfigOption[] => {
   }
 
   return value.flatMap((item) => {
-    if (!isRecord(item) || typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.type !== 'string') {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== 'string' ||
+      typeof item.name !== 'string' ||
+      typeof item.type !== 'string'
+    ) {
       return [];
     }
 
     const options = Array.isArray(item.options)
       ? item.options.flatMap((option) => {
-          if (!isRecord(option) || typeof option.value !== 'string' || typeof option.name !== 'string') {
+          if (
+            !isRecord(option) ||
+            typeof option.value !== 'string' ||
+            typeof option.name !== 'string'
+          ) {
             return [];
           }
           return [
             {
               value: option.value,
               name: option.name,
-              description: typeof option.description === 'string' ? option.description : undefined
-            }
+              description: typeof option.description === 'string' ? option.description : undefined,
+            },
           ];
         })
       : undefined;
@@ -199,9 +227,11 @@ export const normalizeConfigOptions = (value: unknown): AcpConfigOption[] => {
         category: typeof item.category === 'string' ? item.category : undefined,
         type: item.type,
         currentValue:
-          typeof item.currentValue === 'string' || typeof item.currentValue === 'boolean' ? item.currentValue : undefined,
-        options
-      }
+          typeof item.currentValue === 'string' || typeof item.currentValue === 'boolean'
+            ? item.currentValue
+            : undefined,
+        options,
+      },
     ];
   });
 };

@@ -153,10 +153,15 @@ interface Window {
     ensureDefaultWorkspace: () => Promise<StoredProject>;
     touchProjectLastOpened: (workspacePath: string) => Promise<StoredProject | null>;
     setProjectPinned: (workspacePath: string, pinned: boolean) => Promise<StoredProject | null>;
-    setProjectDisplayName: (workspacePath: string, displayName: string) => Promise<StoredProject | null>;
+    setProjectDisplayName: (
+      workspacePath: string,
+      displayName: string,
+    ) => Promise<StoredProject | null>;
     removeProject: (workspacePath: string) => Promise<StoredProject | null>;
     revealInExplorer: (workspacePath: string) => Promise<{ ok: boolean; message?: string }>;
-    checkOmp: (workspacePath?: string) => Promise<{ installed: boolean; status: string; message: string }>;
+    checkOmp: (
+      workspacePath?: string,
+    ) => Promise<{ installed: boolean; status: string; message: string }>;
     getOmpPath: () => Promise<string>;
     selectOmpPath: () => Promise<{ ok: boolean; path?: string; message?: string }>;
     // 保存侧栏布局（宽度与折叠状态），启动时随 getState 恢复。
@@ -166,67 +171,76 @@ interface Window {
     createSession: (
       projectPath: string,
       title: string,
-      approvalProfile: ApprovalProfile
+      approvalProfile: ApprovalProfile,
     ) => Promise<StoredSession>;
-    startAgent: (sessionId: string, workspacePath: string) => Promise<{ ok: boolean; message: string }>;
+    startAgent: (
+      sessionId: string,
+      workspacePath: string,
+    ) => Promise<{ ok: boolean; message: string }>;
     sendAgentMessage: (
       sessionId: string,
       workspacePath: string,
-      content: AgentPromptContent
+      content: AgentPromptContent,
     ) => Promise<{ ok: boolean; message?: string }>;
     getAgentConfig: (
       sessionId: string,
-      workspacePath: string
+      workspacePath: string,
     ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
     setAgentConfigOption: (
       sessionId: string,
       workspacePath: string,
       configId: string,
-      value: string | boolean
+      value: string | boolean,
     ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
     updateSessionApprovalProfile: (
       sessionId: string,
       workspacePath: string,
-      approvalProfile: ApprovalProfile
+      approvalProfile: ApprovalProfile,
     ) => Promise<{ ok: boolean; session?: StoredSession; message?: string }>;
     cancelAgentTurn: (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
-    permissionResponse: (requestId: string, allow: boolean) => Promise<{ ok: boolean; message?: string }>;
-    permissionOptionResponse: (requestId: string, optionId: string) => Promise<{ ok: boolean; message?: string }>;
+    permissionResponse: (
+      requestId: string,
+      allow: boolean,
+    ) => Promise<{ ok: boolean; message?: string }>;
+    permissionOptionResponse: (
+      requestId: string,
+      optionId: string,
+    ) => Promise<{ ok: boolean; message?: string }>;
     elicitationResponse: (
       requestId: string,
       action: 'accept' | 'decline' | 'cancel',
-      content?: Record<string, unknown>
+      content?: Record<string, unknown>,
     ) => Promise<{ ok: boolean; message?: string }>;
     questionnaireResponse: (
       requestId: string,
       action: 'submit' | 'deny',
-      answers?: QuestionnaireAnswer[]
+      answers?: QuestionnaireAnswer[],
     ) => Promise<QuestionnaireResponseResult>;
     // 以 omp session/list 为准重建当前 workspace 的会话列表，返回重建后的完整 DesktopState。
     syncSessions: (
       workspacePath: string,
-      keepLocalId?: string
+      keepLocalId?: string,
     ) => Promise<{ ok: boolean; state?: DesktopState; message?: string }>;
     loadSession: (
       localSessionId: string,
       workspacePath: string,
-      acpSessionId: string
+      acpSessionId: string,
     ) => Promise<{ ok: boolean; sessionId?: string; message?: string }>;
     resumeSession: (
       localSessionId: string,
       workspacePath: string,
-      acpSessionId: string
+      acpSessionId: string,
     ) => Promise<{ ok: boolean; sessionId?: string; message?: string }>;
     refreshSessionConfig: (
       localSessionId: string,
       workspacePath: string,
-      acpSessionId: string
+      acpSessionId: string,
     ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
     forkSession: (
       localSessionId: string,
       workspacePath: string,
       acpSessionId: string,
-      title: string
+      title: string,
     ) => Promise<{ ok: boolean; sessionId?: string; message?: string }>;
     closeSession: (localSessionId: string) => Promise<{ ok: boolean; message?: string }>;
     stopSessionProcess: (localSessionId: string) => Promise<{ ok: boolean }>;
@@ -238,11 +252,11 @@ interface Window {
     }>;
     switchGitBranch: (
       workspacePath: string,
-      branchName: string
+      branchName: string,
     ) => Promise<{ ok: boolean; reason: GitBranchSwitchFailureReason | null; message: string }>;
     getDiff: (
       workspacePath: string,
-      source?: DiffSource
+      source?: DiffSource,
     ) => Promise<{ ok: boolean; diff: string; message: string }>;
     onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
   };

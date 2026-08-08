@@ -13,8 +13,8 @@
  * ============================================================ */
 
 .hljs {
-  color: #1e2825;          /* 兜底文字色（= --color-text），被 styles.css 的 pre code 覆盖也无妨 */
-  background: transparent;  /* 背景由 .code-block-wrapper pre 提供 */
+  color: #1e2825; /* 兜底文字色（= --color-text），被 styles.css 的 pre code 覆盖也无妨 */
+  background: transparent; /* 背景由 .code-block-wrapper pre 提供 */
 }
 
 /* 注释：柔和灰绿 */

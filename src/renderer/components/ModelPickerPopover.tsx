@@ -4,7 +4,6 @@ import type { AcpConfigOption } from '../types';
 import { fuzzyMatch, groupModelOptions, type GroupedModelOptions } from '../utils';
 import './ModelPickerPopover.css';
 
-
 type ModelOption = NonNullable<AcpConfigOption['options']>[number];
 
 type ModelPickerPopoverProps = {
@@ -37,7 +36,7 @@ export function ModelPickerPopover({
   const currentValueProvider = useMemo(() => {
     if (!options.length) return null;
     const groups = groupModelOptions(options);
-    const group = groups.find(g => g.models.some(m => m.value === value));
+    const group = groups.find((g) => g.models.some((m) => m.value === value));
     return group?.provider ?? null;
   }, [options, value]);
 
@@ -58,10 +57,12 @@ export function ModelPickerPopover({
   const filteredGroups = useMemo<GroupedModelOptions>(() => {
     const trimmed = query.trim();
     if (!trimmed) return groupModelOptions(options);
-    return groupModelOptions(options).map((group) => ({
-      ...group,
-      models: group.models.filter((model) => fuzzyMatch(model.name, trimmed)),
-    })).filter((group) => group.models.length > 0);
+    return groupModelOptions(options)
+      .map((group) => ({
+        ...group,
+        models: group.models.filter((model) => fuzzyMatch(model.name, trimmed)),
+      }))
+      .filter((group) => group.models.length > 0);
   }, [options, query]);
 
   // 搜索时自动展开所有有匹配的组，并重置键盘焦点到第一个结果。
@@ -206,16 +207,34 @@ export function ModelPickerPopover({
 
   if (options.length === 0) {
     return (
-      <div ref={popoverRef} className="model-picker-popover" onKeyDown={handleKeyDown} tabIndex={-1}>
+      <div
+        ref={popoverRef}
+        className="model-picker-popover"
+        onKeyDown={handleKeyDown}
+        tabIndex={-1}
+      >
         <div className="model-picker-empty">{emptyLabel}</div>
       </div>
     );
   }
 
   return (
-    <div ref={popoverRef} className={`model-picker-popover${showDetail ? '' : ' no-detail'}`} onKeyDown={handleKeyDown} tabIndex={-1}>
+    <div
+      ref={popoverRef}
+      className={`model-picker-popover${showDetail ? '' : ' no-detail'}`}
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
       <div className="model-picker-search">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
           <circle cx="11" cy="11" r="8" />
           <path d="m21 21-4.35-4.35" />
         </svg>
@@ -235,10 +254,7 @@ export function ModelPickerPopover({
               <div key={group.provider} className="model-picker-group">
                 <button
                   type="button"
-                  className={[
-                    'model-picker-group-header',
-                    isExpanded ? 'expanded' : '',
-                  ].join(' ')}
+                  className={['model-picker-group-header', isExpanded ? 'expanded' : ''].join(' ')}
                   onClick={() => toggleProvider(group.provider)}
                 >
                   <svg
@@ -256,67 +272,79 @@ export function ModelPickerPopover({
                   <span className="model-picker-group-label">{group.provider}</span>
                   <span className="model-picker-group-count">{group.models.length}</span>
                 </button>
-                {isExpanded && group.models.map((model, modelIndex) => {
-                  const isActive = providerIndex === activeProviderIndex && modelIndex === activeModelIndex;
-                  const isSelected = model.value === value;
-                  return (
-                    <button
-                      key={model.value}
-                      ref={(el) => { itemRefs.current[model.value] = el; }}
-                      type="button"
-                      className={[
-                        'model-picker-item',
-                        isActive ? 'active' : '',
-                        isSelected ? 'selected' : '',
-                      ].join(' ')}
-                      onClick={() => handleSelect(model.value)}
-                      onMouseEnter={() => {
-                        setActiveProviderIndex(providerIndex);
-                        setActiveModelIndex(modelIndex);
-                      }}
-                    >
-                      <span className="model-picker-item-name">{model.name}</span>
-                      {isSelected && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                  );
-                })}
+                {isExpanded &&
+                  group.models.map((model, modelIndex) => {
+                    const isActive =
+                      providerIndex === activeProviderIndex && modelIndex === activeModelIndex;
+                    const isSelected = model.value === value;
+                    return (
+                      <button
+                        key={model.value}
+                        ref={(el) => {
+                          itemRefs.current[model.value] = el;
+                        }}
+                        type="button"
+                        className={[
+                          'model-picker-item',
+                          isActive ? 'active' : '',
+                          isSelected ? 'selected' : '',
+                        ].join(' ')}
+                        onClick={() => handleSelect(model.value)}
+                        onMouseEnter={() => {
+                          setActiveProviderIndex(providerIndex);
+                          setActiveModelIndex(modelIndex);
+                        }}
+                      >
+                        <span className="model-picker-item-name">{model.name}</span>
+                        {isSelected && (
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            aria-hidden="true"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             );
           })}
-          {filteredGroups.length === 0 && (
-            <div className="model-picker-empty">无匹配模型</div>
-          )}
+          {filteredGroups.length === 0 && <div className="model-picker-empty">无匹配模型</div>}
         </div>
         {showDetail && (
-        <div className="model-picker-detail">
-          {selectedModel ? (
-            <>
-              <div className="model-picker-detail-name">{selectedModel.name}</div>
-              {selectedModel.description ? (
-                <div className="model-picker-detail-desc">{selectedModel.description}</div>
-              ) : (
-                <div className="model-picker-detail-desc model-picker-detail-placeholder">暂无描述</div>
-              )}
-              {selectedModel.value === value ? (
-                <span className="model-picker-current-badge">当前使用</span>
-              ) : (
-                <button
-                  type="button"
-                  className="model-picker-switch-button"
-                  onClick={() => handleSelect(selectedModel.value)}
-                >
-                  切换
-                </button>
-              )}
-            </>
-          ) : (
-            <div className="model-picker-empty">选择模型查看详情</div>
-          )}
-        </div>
+          <div className="model-picker-detail">
+            {selectedModel ? (
+              <>
+                <div className="model-picker-detail-name">{selectedModel.name}</div>
+                {selectedModel.description ? (
+                  <div className="model-picker-detail-desc">{selectedModel.description}</div>
+                ) : (
+                  <div className="model-picker-detail-desc model-picker-detail-placeholder">
+                    暂无描述
+                  </div>
+                )}
+                {selectedModel.value === value ? (
+                  <span className="model-picker-current-badge">当前使用</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="model-picker-switch-button"
+                    onClick={() => handleSelect(selectedModel.value)}
+                  >
+                    切换
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="model-picker-empty">选择模型查看详情</div>
+            )}
+          </div>
         )}
       </div>
     </div>

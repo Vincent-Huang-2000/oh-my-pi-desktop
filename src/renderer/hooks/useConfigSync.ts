@@ -29,7 +29,7 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
       app.selectedSession.id,
       app.selectedProject.path,
       'model',
-      modelId
+      modelId,
     );
     if (result.ok) {
       app.setAcpConfigOptions(result.configOptions ?? []);
@@ -52,7 +52,7 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
       app.selectedSession.id,
       app.selectedProject.path,
       'mode',
-      modeId
+      modeId,
     );
     if (result.ok) {
       app.setAcpConfigOptions(result.configOptions ?? []);
@@ -75,7 +75,7 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
       app.selectedSession.id,
       app.selectedProject.path,
       'thinking',
-      thinkingId
+      thinkingId,
     );
     if (result.ok) {
       app.setAcpConfigOptions(result.configOptions ?? []);
@@ -100,11 +100,15 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
     if (existingProfile === approvalProfile && !app.approvalRestoreFailed) {
       return;
     }
-    const willInterrupt = app.isAgentBusy || Boolean(app.permissionRequest) || Boolean(app.elicitationRequest) || Boolean(app.questionnaireRequest);
+    const willInterrupt =
+      app.isAgentBusy ||
+      Boolean(app.permissionRequest) ||
+      Boolean(app.elicitationRequest) ||
+      Boolean(app.questionnaireRequest);
     const confirmed = window.confirm(
       willInterrupt
         ? '切换审批档位会取消当前回合，未完成的操作可能中断，并重启当前会话的 agent 运行环境。是否继续？'
-        : '切换审批档位会重启当前会话的 agent 运行环境。是否继续？'
+        : '切换审批档位会重启当前会话的 agent 运行环境。是否继续？',
     );
     if (!confirmed) {
       return;
@@ -115,14 +119,16 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
     app.setIsAgentBusy(false);
     app.setAgentStatus('正在切换审批档位');
     app.setApprovalProfileNotice('');
-    const result = await window.ohMyPiDesktop.updateSessionApprovalProfile(
-      app.selectedSession.id,
-      app.selectedProject.path,
-      approvalProfile
-    ).catch((error: unknown) => {
-      console.error('updateSessionApprovalProfile failed:', error);
-      return { ok: false, session: undefined, message: '审批档位切换失败，请重试' };
-    });
+    const result = await window.ohMyPiDesktop
+      .updateSessionApprovalProfile(
+        app.selectedSession.id,
+        app.selectedProject.path,
+        approvalProfile,
+      )
+      .catch((error: unknown) => {
+        console.error('updateSessionApprovalProfile failed:', error);
+        return { ok: false, session: undefined, message: '审批档位切换失败，请重试' };
+      });
     // IPC 完成后再清一次，覆盖取消与终止窗口内可能刚到达的旧 permission 事件。
     app.clearApprovalStateForSession(app.selectedSession.id, { alsoClearActive: true });
 
@@ -131,11 +137,11 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
       app.setDesktopState((current) => ({
         ...current,
         recentSessions: current.recentSessions.map((session) =>
-          session.id === updatedSession.id ? updatedSession : session
-        )
+          session.id === updatedSession.id ? updatedSession : session,
+        ),
       }));
       app.updateSelectedSession((current) =>
-        current?.id === updatedSession.id ? updatedSession : current
+        current?.id === updatedSession.id ? updatedSession : current,
       );
     }
     if (result.ok) {

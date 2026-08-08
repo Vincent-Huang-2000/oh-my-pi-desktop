@@ -91,7 +91,8 @@ const desktop = {
   // 打开文件选择对话框选择 omp 可执行文件，保存设置并验证。
   selectOmpPath: () => ipcRenderer.invoke('desktop:select-omp-path'),
   // 保存侧栏布局（宽度与折叠状态）到 settings.paneLayout。
-  setPaneLayout: (layout: PaneLayoutSettings) => ipcRenderer.invoke('desktop:set-pane-layout', layout),
+  setPaneLayout: (layout: PaneLayoutSettings) =>
+    ipcRenderer.invoke('desktop:set-pane-layout', layout),
   // 保存当前主题 ID 到全局设置。
   setThemeId: (themeId: string) => ipcRenderer.invoke('desktop:set-theme', themeId),
   createSession: (projectPath: string, title: string, approvalProfile: ApprovalProfile) =>
@@ -102,19 +103,32 @@ const desktop = {
     ipcRenderer.invoke('desktop:send-agent-message', sessionId, workspacePath, content),
   getAgentConfig: (sessionId: string, workspacePath: string) =>
     ipcRenderer.invoke('desktop:get-agent-config', sessionId, workspacePath),
-  setAgentConfigOption: (sessionId: string, workspacePath: string, configId: string, value: string | boolean) =>
-    ipcRenderer.invoke('desktop:set-agent-config-option', sessionId, workspacePath, configId, value),
+  setAgentConfigOption: (
+    sessionId: string,
+    workspacePath: string,
+    configId: string,
+    value: string | boolean,
+  ) =>
+    ipcRenderer.invoke(
+      'desktop:set-agent-config-option',
+      sessionId,
+      workspacePath,
+      configId,
+      value,
+    ),
   updateSessionApprovalProfile: (
     sessionId: string,
     workspacePath: string,
-    approvalProfile: ApprovalProfile
-  ) => ipcRenderer.invoke(
-    'desktop:update-session-approval-profile',
-    sessionId,
-    workspacePath,
-    approvalProfile
-  ),
-  cancelAgentTurn: (sessionId: string) => ipcRenderer.invoke('desktop:cancel-agent-turn', sessionId),
+    approvalProfile: ApprovalProfile,
+  ) =>
+    ipcRenderer.invoke(
+      'desktop:update-session-approval-profile',
+      sessionId,
+      workspacePath,
+      approvalProfile,
+    ),
+  cancelAgentTurn: (sessionId: string) =>
+    ipcRenderer.invoke('desktop:cancel-agent-turn', sessionId),
   permissionResponse: (requestId: string, allow: boolean) =>
     ipcRenderer.invoke('desktop:permission-response', requestId, allow),
   permissionOptionResponse: (requestId: string, optionId: string) =>
@@ -123,12 +137,12 @@ const desktop = {
   elicitationResponse: (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',
-    content?: Record<string, unknown>
+    content?: Record<string, unknown>,
   ) => ipcRenderer.invoke('desktop:elicitation-response', requestId, action, content),
   questionnaireResponse: (
     requestId: string,
     action: 'submit' | 'deny',
-    answers?: QuestionnaireAnswer[]
+    answers?: QuestionnaireAnswer[],
   ) => ipcRenderer.invoke('desktop:questionnaire-response', requestId, action, answers),
   // 以 omp session/list 为准重建当前 workspace 的会话列表（去重 + 清理幽灵），keepLocalId 保活动会话。
   syncSessions: (workspacePath: string, keepLocalId?: string) =>
@@ -138,11 +152,29 @@ const desktop = {
   resumeSession: (localSessionId: string, workspacePath: string, acpSessionId: string) =>
     ipcRenderer.invoke('desktop:resume-session', localSessionId, workspacePath, acpSessionId),
   refreshSessionConfig: (localSessionId: string, workspacePath: string, acpSessionId: string) =>
-    ipcRenderer.invoke('desktop:refresh-session-config', localSessionId, workspacePath, acpSessionId),
-  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) =>
-    ipcRenderer.invoke('desktop:fork-session', localSessionId, workspacePath, sourceAcpSessionId, title),
-  closeSession: (localSessionId: string) => ipcRenderer.invoke('desktop:close-session', localSessionId),
-  stopSessionProcess: (localSessionId: string) => ipcRenderer.invoke('desktop:stop-session-process', localSessionId),
+    ipcRenderer.invoke(
+      'desktop:refresh-session-config',
+      localSessionId,
+      workspacePath,
+      acpSessionId,
+    ),
+  forkSession: (
+    localSessionId: string,
+    workspacePath: string,
+    sourceAcpSessionId: string,
+    title: string,
+  ) =>
+    ipcRenderer.invoke(
+      'desktop:fork-session',
+      localSessionId,
+      workspacePath,
+      sourceAcpSessionId,
+      title,
+    ),
+  closeSession: (localSessionId: string) =>
+    ipcRenderer.invoke('desktop:close-session', localSessionId),
+  stopSessionProcess: (localSessionId: string) =>
+    ipcRenderer.invoke('desktop:stop-session-process', localSessionId),
   getGitBranches: (workspacePath: string) =>
     ipcRenderer.invoke('desktop:get-git-branches', workspacePath),
   switchGitBranch: (workspacePath: string, branchName: string) =>
@@ -153,7 +185,7 @@ const desktop = {
     const listener = (_event: IpcRendererEvent, payload: AgentEvent) => callback(payload);
     ipcRenderer.on('agent:event', listener);
     return () => ipcRenderer.removeListener('agent:event', listener);
-  }
+  },
 };
 
 contextBridge.exposeInMainWorld('ohMyPiDesktop', desktop);

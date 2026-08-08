@@ -22,7 +22,7 @@ import { ElicitationModal } from './components/ElicitationModal';
 import {
   GitBranchSwitchErrorModal,
   resolveGitBranchSwitchFailure,
-  type GitBranchSwitchError
+  type GitBranchSwitchError,
 } from './components/GitBranchSwitchErrorModal';
 import { PermissionModal } from './components/PermissionModal';
 import { QuestionnaireModal } from './components/QuestionnaireModal';
@@ -30,7 +30,15 @@ import { ProjectPane } from './components/ProjectPane';
 import { SessionSearchModal, type SessionSearchItem } from './components/SessionSearchModal';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
-import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption, PermissionRequest, QuestionnaireAnswer, QuestionnaireRequest } from './types';
+import type {
+  AcpConfigOption,
+  ChatMessage,
+  ElicitationRequest,
+  PermissionOption,
+  PermissionRequest,
+  QuestionnaireAnswer,
+  QuestionnaireRequest,
+} from './types';
 import {
   getElicitationKind,
   getLogLevel,
@@ -41,14 +49,31 @@ import {
   getPayloadQuestionnaire,
   getPayloadPermissionOptions,
   getPayloadRequestId,
-  splitElicitationPlan
+  splitElicitationPlan,
 } from './utils';
 import { type PendingAttachment, classifyAttachment } from './lib/attachments';
-import { DEFAULT_APPROVAL_PROFILE, MAX_IMAGE_BYTES, REVIEW_SOURCE_LABEL, type DraftConfigValues, type PaneSide, type ReviewSource } from './lib/constants';
+import {
+  DEFAULT_APPROVAL_PROFILE,
+  MAX_IMAGE_BYTES,
+  REVIEW_SOURCE_LABEL,
+  type DraftConfigValues,
+  type PaneSide,
+  type ReviewSource,
+} from './lib/constants';
 import { getElicitationResultText } from './lib/elicitationText';
-import { applyActiveSessionPlan, getActiveSessionPlan, getHistoryLoadedEvents, getHistoryLoadedPlans, insertHistoricalPlans } from './lib/historyLoaders';
+import {
+  applyActiveSessionPlan,
+  getActiveSessionPlan,
+  getHistoryLoadedEvents,
+  getHistoryLoadedPlans,
+  insertHistoricalPlans,
+} from './lib/historyLoaders';
 import { mergeAgentEventIntoMessages } from './lib/messageMerge';
-import { type PendingSlashCommand, parseSlashCommand, resolveCommandPendingMeta } from './lib/slashCommands';
+import {
+  type PendingSlashCommand,
+  parseSlashCommand,
+  resolveCommandPendingMeta,
+} from './lib/slashCommands';
 import { usePaneLayout } from './hooks/usePaneLayout';
 import { useToolGroups } from './hooks/useToolGroups';
 import { useAppCore } from './hooks/useAppCore';
@@ -64,12 +89,10 @@ import './styles.css';
 
 const EMPTY_ELICITATION_REQUESTS: ElicitationRequest[] = [];
 
-
 export default function App() {
   const app = useAppCore();
   const paneLayout = usePaneLayout();
   const toolGroups = useToolGroups(app.selectedSession, app.messageCache);
-
 
   const gitReview = useGitReview(app);
 
@@ -85,8 +108,6 @@ export default function App() {
   useEffect(() => {
     applyTheme(app.themeId);
   }, [app.themeId]);
-
-
 
   return (
     <main className={paneLayout.appShellClassName} style={paneLayout.layoutStyle}>
@@ -104,13 +125,24 @@ export default function App() {
           onNewSession={() => void sessionLifecycle.handleNewSession()}
           onNewProjectSession={(project) => void sessionLifecycle.handleNewSession(project)}
           onOpenSessionSearch={() => app.setSessionSearchOpen(true)}
-          onSyncSessions={() => app.selectedProject && void sessionLifecycle.syncProjectSessions(app.selectedProject.path)}
-          onSelectProjectSession={(project, session) => void sessionLifecycle.handleSelectProjectSession(project, session)}
-          onToggleProjectPinned={(project) => void projectActions.handleToggleProjectPinned(project)}
+          onSyncSessions={() =>
+            app.selectedProject &&
+            void sessionLifecycle.syncProjectSessions(app.selectedProject.path)
+          }
+          onSelectProjectSession={(project, session) =>
+            void sessionLifecycle.handleSelectProjectSession(project, session)
+          }
+          onToggleProjectPinned={(project) =>
+            void projectActions.handleToggleProjectPinned(project)
+          }
           onRevealProject={(project) => void projectActions.handleRevealProject(project)}
-          onRenameProject={(project, name) => void projectActions.handleRenameProject(project, name)}
+          onRenameProject={(project, name) =>
+            void projectActions.handleRenameProject(project, name)
+          }
           onRemoveProject={(project) => void projectActions.handleRemoveProject(project)}
-          onForkSession={(project, session) => void sessionLifecycle.handleForkSession(project, session)}
+          onForkSession={(project, session) =>
+            void sessionLifecycle.handleForkSession(project, session)
+          }
           onCloseSession={(project, session) => void sessionLifecycle.handleCloseSession(session)}
         />
       )}
@@ -123,9 +155,23 @@ export default function App() {
           title="展开左侧项目栏"
         >
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+            <rect
+              x="2"
+              y="2.5"
+              width="12"
+              height="11"
+              rx="1.5"
+              stroke="currentColor"
+              strokeWidth="1.4"
+            />
             <path d="M6 3v10" stroke="currentColor" strokeWidth="1.4" />
-            <path d="M9 6l2 2-2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M9 6l2 2-2 2"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
       )}
@@ -159,7 +205,10 @@ export default function App() {
           collapsedToolGroups={toolGroups.collapsedToolGroups}
           isHistoryLoading={app.loadingHistorySessionId === app.selectedSession?.id}
           historyScrollResetToken={app.historyScrollResetToken}
-          elicitationRequests={app.elicitationBySession.current[app.selectedSession?.id ?? ''] ?? EMPTY_ELICITATION_REQUESTS}
+          elicitationRequests={
+            app.elicitationBySession.current[app.selectedSession?.id ?? ''] ??
+            EMPTY_ELICITATION_REQUESTS
+          }
           modelConfig={app.modelConfig}
           modeConfig={app.modeConfig}
           thinkingConfig={app.thinkingConfig}
@@ -180,7 +229,9 @@ export default function App() {
           onPaste={messageFlow.handlePaste}
           onSubmit={(event) => void messageFlow.handleSubmit(event)}
           onCancel={() => void messageFlow.handleCancelTurn()}
-          onElicitationRespond={(requestId, action, content) => void approvalFlow.handleElicitation(requestId, action, content)}
+          onElicitationRespond={(requestId, action, content) =>
+            void approvalFlow.handleElicitation(requestId, action, content)
+          }
           onSetToolGroupCollapsed={toolGroups.handleSetToolGroupCollapsed}
         />
 
@@ -206,7 +257,11 @@ export default function App() {
             role="separator"
             aria-label="调整右侧上下文栏宽度"
             aria-orientation="vertical"
-            title={paneLayout.collapsePreviewSide === 'right' ? '松开将折叠' : '拖拽调整右侧上下文栏宽度，双击折叠'}
+            title={
+              paneLayout.collapsePreviewSide === 'right'
+                ? '松开将折叠'
+                : '拖拽调整右侧上下文栏宽度，双击折叠'
+            }
             onMouseDown={(event) => paneLayout.startPaneResize('right', event)}
             onDoubleClick={paneLayout.collapseRightPane}
           />
@@ -218,7 +273,11 @@ export default function App() {
           role="separator"
           aria-label="调整左侧项目栏宽度"
           aria-orientation="vertical"
-          title={paneLayout.collapsePreviewSide === 'left' ? '松开将折叠' : '拖拽调整左侧项目栏宽度，双击折叠'}
+          title={
+            paneLayout.collapsePreviewSide === 'left'
+              ? '松开将折叠'
+              : '拖拽调整左侧项目栏宽度，双击折叠'
+          }
           onMouseDown={(event) => paneLayout.startPaneResize('left', event)}
           onDoubleClick={paneLayout.collapseLeftPane}
         />
@@ -309,22 +368,32 @@ export default function App() {
           items={app.sessionSearchItems}
           currentProjectPath={app.selectedProject?.path}
           onClose={() => app.setSessionSearchOpen(false)}
-          onSelect={(project, session) => void sessionLifecycle.handleSelectProjectSession(project, session)}
+          onSelect={(project, session) =>
+            void sessionLifecycle.handleSelectProjectSession(project, session)
+          }
         />
       )}
 
       {app.gitBranchSwitchError && (
-        <GitBranchSwitchErrorModal error={app.gitBranchSwitchError} onClose={gitReview.closeGitBranchSwitchError} />
+        <GitBranchSwitchErrorModal
+          error={app.gitBranchSwitchError}
+          onClose={gitReview.closeGitBranchSwitchError}
+        />
       )}
 
       {app.activeApprovalKind === 'permission' && app.permissionRequest && (
-        <PermissionModal request={app.permissionRequest} onRespond={(optionId) => void approvalFlow.handlePermission(optionId)} />
+        <PermissionModal
+          request={app.permissionRequest}
+          onRespond={(optionId) => void approvalFlow.handlePermission(optionId)}
+        />
       )}
 
       {app.activeApprovalKind === 'elicitation' && app.elicitationRequest && (
         <ElicitationModal
           request={app.elicitationRequest}
-          onRespond={(action, content) => void approvalFlow.handleElicitation(app.elicitationRequest!.requestId, action, content)}
+          onRespond={(action, content) =>
+            void approvalFlow.handleElicitation(app.elicitationRequest!.requestId, action, content)
+          }
         />
       )}
 
@@ -334,10 +403,11 @@ export default function App() {
           request={app.questionnaireRequest}
           requests={app.questionnaireBySession.current[app.selectedSession?.id ?? ''] ?? []}
           onSelect={app.setQuestionnaireRequest}
-          onRespond={(action, answers) => approvalFlow.handleQuestionnaire(app.questionnaireRequest!.requestId, action, answers)}
+          onRespond={(action, answers) =>
+            approvalFlow.handleQuestionnaire(app.questionnaireRequest!.requestId, action, answers)
+          }
         />
       )}
-
     </main>
   );
 }

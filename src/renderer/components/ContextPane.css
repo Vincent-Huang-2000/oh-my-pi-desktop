@@ -304,7 +304,7 @@
 }
 
 .review-diff-file-header::before {
-  content: "";
+  content: '';
   width: 0;
   height: 0;
   border-top: 4px solid transparent;
@@ -362,7 +362,7 @@
 }
 
 .review-diff-file-stat {
-  font-family: Consolas, "SFMono-Regular", monospace;
+  font-family: Consolas, 'SFMono-Regular', monospace;
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;
@@ -382,7 +382,7 @@
   overflow-y: auto;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface-alt);
-  font-family: Consolas, "SFMono-Regular", monospace;
+  font-family: Consolas, 'SFMono-Regular', monospace;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -525,7 +525,7 @@
   border-radius: 7px;
   color: var(--color-text);
   background: var(--color-surface-alt);
-  font-family: Consolas, "SFMono-Regular", monospace;
+  font-family: Consolas, 'SFMono-Regular', monospace;
   font-size: 12px;
   line-height: 1.5;
   white-space: pre;

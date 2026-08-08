@@ -120,7 +120,11 @@
   background: var(--color-accent);
   color: var(--color-accent-strong);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    opacity 0.15s;
 }
 
 .composer-icon-button:hover:not(:disabled) {
@@ -266,7 +270,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
-  font-family: "Cascadia Code", "Consolas", ui-monospace, monospace;
+  font-family: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
 }
 
 .command-palette-desc {

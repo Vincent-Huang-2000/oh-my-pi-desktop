@@ -76,7 +76,7 @@
   overflow: hidden;
   margin: 0;
   color: var(--color-text);
-  font-family: Consolas, "Cascadia Mono", monospace;
+  font-family: Consolas, 'Cascadia Mono', monospace;
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;

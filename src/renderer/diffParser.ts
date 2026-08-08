@@ -134,7 +134,8 @@ export const parseUnifiedDiff = (diffText: string): ParsedDiffFile[] => {
 
     if (line.startsWith('+++ ')) {
       currentFile.newPath = stripGitPathPrefix(line.slice(4).trim());
-      currentFile.displayPath = currentFile.newPath !== EMPTY_PATH ? currentFile.newPath : currentFile.oldPath;
+      currentFile.displayPath =
+        currentFile.newPath !== EMPTY_PATH ? currentFile.newPath : currentFile.oldPath;
       currentFile.status = getStatus(currentFile);
       continue;
     }

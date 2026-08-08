@@ -20,8 +20,7 @@ export type HistoricalSessionPlan = {
 };
 
 export type ActiveSessionPlan =
-  | { active: false }
-  | { active: true; planFilePath: string; content: string | null };
+  { active: false } | { active: true; planFilePath: string; content: string | null };
 
 export const getHistoryLoadedEvents = (payload: unknown): AgentEvent[] => {
   if (!payload || typeof payload !== 'object') {
@@ -35,20 +34,18 @@ export const getHistoryLoadedPlans = (payload: unknown): HistoricalSessionPlan[]
   if (!payload || typeof payload !== 'object') return [];
   const plans = (payload as { plans?: unknown }).plans;
   if (!Array.isArray(plans)) return [];
-  return plans.filter((plan): plan is HistoricalSessionPlan => (
-    typeof plan === 'object' &&
-    plan !== null &&
-    typeof plan.id === 'string' &&
-    typeof plan.toolCallId === 'string' &&
-    typeof plan.planFilePath === 'string' &&
-    typeof plan.content === 'string'
-  ));
+  return plans.filter(
+    (plan): plan is HistoricalSessionPlan =>
+      typeof plan === 'object' &&
+      plan !== null &&
+      typeof plan.id === 'string' &&
+      typeof plan.toolCallId === 'string' &&
+      typeof plan.planFilePath === 'string' &&
+      typeof plan.content === 'string',
+  );
 };
 
-export const insertHistoricalPlans = (
-  messages: ChatMessage[],
-  plans: HistoricalSessionPlan[]
-) => {
+export const insertHistoricalPlans = (messages: ChatMessage[], plans: HistoricalSessionPlan[]) => {
   const next = [...messages];
   for (const plan of plans) {
     if (next.some((message) => message.id === plan.id)) continue;
@@ -58,7 +55,7 @@ export const insertHistoricalPlans = (
       text: plan.content,
       planId: plan.id,
       planContentType: 'markdown',
-      planFilePath: plan.planFilePath
+      planFilePath: plan.planFilePath,
     };
     const toolIndex = next.findIndex((message) => message.toolCallId === plan.toolCallId);
     if (toolIndex >= 0) {
@@ -84,7 +81,7 @@ export const getActiveSessionPlan = (payload: unknown): ActiveSessionPlan | null
   return {
     active: true,
     planFilePath: plan.planFilePath,
-    content: plan.content
+    content: plan.content,
   };
 };
 
@@ -92,7 +89,7 @@ export const applyActiveSessionPlan = (messages: ChatMessage[], plan: ActiveSess
   const withoutPreviousActive = messages.filter((message) => !message.planActive);
   if (!plan.active) return withoutPreviousActive;
   const withoutDuplicate = withoutPreviousActive.filter(
-    (message) => !message.planPending && message.planFilePath !== plan.planFilePath
+    (message) => !message.planPending && message.planFilePath !== plan.planFilePath,
   );
   return [
     ...withoutDuplicate,
@@ -105,6 +102,6 @@ export const applyActiveSessionPlan = (messages: ChatMessage[], plan: ActiveSess
       planActive: true,
       planFilePath: plan.planFilePath,
       // 活跃方案来自 session `_meta`，故意不设置 planPreviewRequestId。
-    }
+    },
   ];
 };

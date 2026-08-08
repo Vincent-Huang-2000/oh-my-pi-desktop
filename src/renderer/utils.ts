@@ -1,4 +1,13 @@
-import type { AcpConfigOption, ChatMessage, ElicitationField, ElicitationRequest, PlanEntry, QuestionnaireQuestion, ToolCallDiffBlock, ToolCallLocation } from './types';
+import type {
+  AcpConfigOption,
+  ChatMessage,
+  ElicitationField,
+  ElicitationRequest,
+  PlanEntry,
+  QuestionnaireQuestion,
+  ToolCallDiffBlock,
+  ToolCallLocation,
+} from './types';
 
 export const formatTime = (value?: string) => {
   if (!value) {
@@ -45,21 +54,27 @@ export const getPayloadPermissionOptions = (payload: unknown) => {
     return [];
   }
 
-  return record.options.filter((option) => {
-    if (!option || typeof option !== 'object') {
-      return false;
-    }
-    const item = option as Record<string, unknown>;
-    return typeof item.optionId === 'string' && typeof item.name === 'string' && typeof item.kind === 'string';
-  }).map((option) => {
-    const item = option as Record<string, unknown>;
-    return {
-      optionId: String(item.optionId),
-      name: String(item.name),
-      kind: String(item.kind),
-      description: typeof item.description === 'string' ? item.description : undefined
-    };
-  });
+  return record.options
+    .filter((option) => {
+      if (!option || typeof option !== 'object') {
+        return false;
+      }
+      const item = option as Record<string, unknown>;
+      return (
+        typeof item.optionId === 'string' &&
+        typeof item.name === 'string' &&
+        typeof item.kind === 'string'
+      );
+    })
+    .map((option) => {
+      const item = option as Record<string, unknown>;
+      return {
+        optionId: String(item.optionId),
+        name: String(item.name),
+        kind: String(item.kind),
+        description: typeof item.description === 'string' ? item.description : undefined,
+      };
+    });
 };
 
 // 从 elicitation_request 事件 payload 提取表单字段信息。
@@ -103,12 +118,11 @@ export const getPayloadElicitationField = (payload: unknown): ElicitationField =
       }
     });
   }
-  const description =
-    typeof field.description === 'string' ? field.description : undefined;
+  const description = typeof field.description === 'string' ? field.description : undefined;
   return {
     type: type as ElicitationField['type'],
     options: options.length > 0 ? options : undefined,
-    description
+    description,
   };
 };
 
@@ -133,7 +147,7 @@ export const formatElicitationOptionLabel = (option: string) => {
     // plan 模式审批三选项（omp ACP enum 原始英文值 → 中文按钮）
     'Approve and execute': '批准并执行',
     'Refine plan': '继续修改方案',
-    'Reject': '拒绝'
+    Reject: '拒绝',
   };
   const label = labels[raw] ?? raw;
   return recommended ? `${label}（推荐）` : label;
@@ -151,23 +165,34 @@ export const getPayloadQuestionnaire = (payload: unknown): QuestionnaireQuestion
   return questions.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
     const question = item as Record<string, unknown>;
-    if (typeof question.question !== 'string' || typeof question.multiSelect !== 'boolean' || !Array.isArray(question.options)) {
+    if (
+      typeof question.question !== 'string' ||
+      typeof question.multiSelect !== 'boolean' ||
+      !Array.isArray(question.options)
+    ) {
       return [];
     }
     const options = question.options.flatMap((option) => {
       if (!option || typeof option !== 'object') return [];
       const value = option as Record<string, unknown>;
       return typeof value.label === 'string'
-        ? [{ label: value.label, ...(typeof value.description === 'string' ? { description: value.description } : {}) }]
+        ? [
+            {
+              label: value.label,
+              ...(typeof value.description === 'string' ? { description: value.description } : {}),
+            },
+          ]
         : [];
     });
     return options.length > 0
-      ? [{
-          question: question.question,
-          ...(typeof question.header === 'string' ? { header: question.header } : {}),
-          options,
-          multiSelect: question.multiSelect
-        }]
+      ? [
+          {
+            question: question.question,
+            ...(typeof question.header === 'string' ? { header: question.header } : {}),
+            options,
+            multiSelect: question.multiSelect,
+          },
+        ]
       : [];
   });
 };
@@ -183,7 +208,7 @@ export const splitElicitationPlan = (message: string) => {
   const planStart = heading.index + Math.max(headingOffset, 0);
   return {
     question: message.slice(0, planStart).trim(),
-    plan: message.slice(planStart).trim()
+    plan: message.slice(planStart).trim(),
   };
 };
 
@@ -213,7 +238,7 @@ export const getPayloadAvailableCommands = (payload: unknown): AcpAvailableComma
       }
       return {
         name: obj.name,
-        description: typeof obj.description === 'string' ? obj.description : ''
+        description: typeof obj.description === 'string' ? obj.description : '',
       } satisfies AcpAvailableCommand;
     })
     .filter((command): command is AcpAvailableCommand => command !== null);
@@ -277,7 +302,7 @@ export const getPayloadToolCall = (payload: unknown) => {
     locations: undefined,
     diffs: undefined,
     output: undefined,
-    toolModel: undefined
+    toolModel: undefined,
   };
   if (!payload || typeof payload !== 'object') return def;
   const record = payload as Record<string, unknown>;
@@ -296,31 +321,50 @@ export const getPayloadToolCall = (payload: unknown) => {
   def.kind = typeof u.kind === 'string' ? u.kind : undefined;
   def.status = typeof u.status === 'string' ? u.status : undefined;
   if (Array.isArray(u.locations)) {
-    def.locations = u.locations.filter(
-      (loc): loc is Record<string, unknown> =>
-        typeof loc === 'object' && loc !== null && typeof (loc as Record<string, unknown>).path === 'string'
-    ).map((loc) => {
-      const l = loc as Record<string, unknown>;
-      const line = l.line;
-      return { path: String(l.path), line: typeof line === 'number' || line === null ? line : undefined };
-    });
+    def.locations = u.locations
+      .filter(
+        (loc): loc is Record<string, unknown> =>
+          typeof loc === 'object' &&
+          loc !== null &&
+          typeof (loc as Record<string, unknown>).path === 'string',
+      )
+      .map((loc) => {
+        const l = loc as Record<string, unknown>;
+        const line = l.line;
+        return {
+          path: String(l.path),
+          line: typeof line === 'number' || line === null ? line : undefined,
+        };
+      });
   }
   if (Array.isArray(u.content)) {
-    def.diffs = u.content.filter(
-      (item): item is Record<string, unknown> => typeof item === 'object' && item !== null && (item as Record<string, unknown>).type === 'diff'
-    ).map((item) => ({
-      type: 'diff' as const,
-      path: typeof item.path === 'string' ? item.path : undefined,
-      oldText: typeof item.oldText === 'string' ? item.oldText : undefined,
-      newText: typeof item.newText === 'string' ? item.newText : undefined
-    }));
+    def.diffs = u.content
+      .filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === 'object' &&
+          item !== null &&
+          (item as Record<string, unknown>).type === 'diff',
+      )
+      .map((item) => ({
+        type: 'diff' as const,
+        path: typeof item.path === 'string' ? item.path : undefined,
+        oldText: typeof item.oldText === 'string' ? item.oldText : undefined,
+        newText: typeof item.newText === 'string' ? item.newText : undefined,
+      }));
     // 提取非 diff 的流式文本块（ACP { type:'content', content:{ type:'text', text } }），
     // 命令输出 / 读取结果等中间产物拼接成可见文本。
     const texts = u.content
-      .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null && (item as Record<string, unknown>).type === 'content')
+      .filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === 'object' &&
+          item !== null &&
+          (item as Record<string, unknown>).type === 'content',
+      )
       .map((item) => {
         const inner = item.content;
-        return inner && typeof inner === 'object' && typeof (inner as Record<string, unknown>).text === 'string'
+        return inner &&
+          typeof inner === 'object' &&
+          typeof (inner as Record<string, unknown>).text === 'string'
           ? String((inner as Record<string, unknown>).text)
           : '';
       })
@@ -332,18 +376,28 @@ export const getPayloadToolCall = (payload: unknown) => {
 
 const normalizePlanEntries = (entries: unknown): PlanEntry[] => {
   if (!Array.isArray(entries)) return [];
-  return entries.filter(
-    (entry): entry is Record<string, unknown> =>
-      typeof entry === 'object' && entry !== null && typeof (entry as Record<string, unknown>).content === 'string'
-  ).map((entry) => {
-    const rawPriority = typeof entry.priority === 'string' ? entry.priority : '';
-    const rawStatus = typeof entry.status === 'string' ? entry.status : '';
-    return {
-      content: String(entry.content),
-      priority: (rawPriority === 'high' || rawPriority === 'medium' || rawPriority === 'low') ? rawPriority : 'medium',
-      status: (rawStatus === 'pending' || rawStatus === 'in_progress' || rawStatus === 'completed') ? rawStatus : 'pending',
-    };
-  });
+  return entries
+    .filter(
+      (entry): entry is Record<string, unknown> =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        typeof (entry as Record<string, unknown>).content === 'string',
+    )
+    .map((entry) => {
+      const rawPriority = typeof entry.priority === 'string' ? entry.priority : '';
+      const rawStatus = typeof entry.status === 'string' ? entry.status : '';
+      return {
+        content: String(entry.content),
+        priority:
+          rawPriority === 'high' || rawPriority === 'medium' || rawPriority === 'low'
+            ? rawPriority
+            : 'medium',
+        status:
+          rawStatus === 'pending' || rawStatus === 'in_progress' || rawStatus === 'completed'
+            ? rawStatus
+            : 'pending',
+      };
+    });
 };
 
 export type PayloadPlanChange =
@@ -363,7 +417,11 @@ export const getPayloadPlanChange = (payload: unknown): PayloadPlanChange | null
   if (!update || typeof update !== 'object') return null;
   const record = update as Record<string, unknown>;
   if (record.sessionUpdate === 'plan') {
-    return { action: 'replace', contentType: 'items', entries: normalizePlanEntries(record.entries) };
+    return {
+      action: 'replace',
+      contentType: 'items',
+      entries: normalizePlanEntries(record.entries),
+    };
   }
   if (record.sessionUpdate === 'plan_removed') {
     return typeof record.id === 'string' ? { action: 'remove', planId: record.id } : null;
@@ -402,7 +460,6 @@ export const getPayloadPlanChange = (payload: unknown): PayloadPlanChange | null
   return null;
 };
 
-
 // 从 AcpConfigOption 单个 option 中提取可选的 provider 字段。
 // omp 尚未在 option 上声明 provider 字段前先留口,识别到任意 provider 字符串都返回。
 const readProvider = (option: { description?: string } | undefined): string | null => {
@@ -417,7 +474,12 @@ const readProvider = (option: { description?: string } | undefined): string | nu
 export const inferModelProvider = (name: string): string => {
   const lower = name.toLowerCase();
   if (lower.includes('claude')) return 'Anthropic';
-  if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3') || lower.includes('o4')) {
+  if (
+    lower.includes('gpt') ||
+    lower.includes('o1') ||
+    lower.includes('o3') ||
+    lower.includes('o4')
+  ) {
     return 'OpenAI';
   }
   if (lower.includes('gemini') || lower.includes('gemma')) return 'Google';
@@ -433,12 +495,18 @@ export const inferModelProvider = (name: string): string => {
 
 // 按 provider 对模型分组,组内保持原顺序。provider 优先取 option 自带的,
 // 缺失时回退到 inferModelProvider(name)。
-export type GroupedModelOptions = Array<{ provider: string; models: NonNullable<AcpConfigOption['options']> }>;
+export type GroupedModelOptions = Array<{
+  provider: string;
+  models: NonNullable<AcpConfigOption['options']>;
+}>;
 
-export const groupModelOptions = (options: NonNullable<AcpConfigOption['options']>): GroupedModelOptions => {
+export const groupModelOptions = (
+  options: NonNullable<AcpConfigOption['options']>,
+): GroupedModelOptions => {
   const groups = new Map<string, NonNullable<AcpConfigOption['options']>>();
   for (const option of options) {
-    const provider = readProvider(option as { description?: string }) ?? inferModelProvider(option.name);
+    const provider =
+      readProvider(option as { description?: string }) ?? inferModelProvider(option.name);
     const list = groups.get(provider) ?? [];
     list.push(option);
     groups.set(provider, list);

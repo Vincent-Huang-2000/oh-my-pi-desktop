@@ -18,7 +18,7 @@ import {
   getMessageRole,
   getPayloadMessageId,
   getPayloadPlanChange,
-  getPayloadToolCall
+  getPayloadToolCall,
 } from '../utils';
 
 // ACP 没有单独的「开始创建计划」事件；通过计划工具标题识别其执行阶段，
@@ -35,7 +35,7 @@ const isPlanToolCall = (title: string) => {
 export const mergeAgentEventIntoMessages = (
   current: ChatMessage[],
   event: AgentEvent,
-  currentModel?: ChatMessage['toolModel']
+  currentModel?: ChatMessage['toolModel'],
 ): ChatMessage[] => {
   const messageId = getPayloadMessageId(event.payload);
   const role = getMessageRole(event.type);
@@ -48,7 +48,7 @@ export const mergeAgentEventIntoMessages = (
       return current.map((message) =>
         message.id === messageId && message.role === role
           ? { ...message, text: `${message.text}${event.message}` }
-          : message
+          : message,
       );
     }
     return [...current, { id: messageId, role, text: event.message }];
@@ -58,7 +58,8 @@ export const mergeAgentEventIntoMessages = (
   if (event.type === 'tool_call') {
     const toolData = getPayloadToolCall(event.payload);
     const appendPlanPending = (messages: ChatMessage[]) => {
-      const canStartPlan = !toolData.status || toolData.status === 'pending' || toolData.status === 'in_progress';
+      const canStartPlan =
+        !toolData.status || toolData.status === 'pending' || toolData.status === 'in_progress';
       if (
         !canStartPlan ||
         !isPlanToolCall(toolData.title || event.message) ||
@@ -72,12 +73,12 @@ export const mergeAgentEventIntoMessages = (
           id: `plan-pending-${toolData.toolCallId || Date.now()}`,
           role: 'plan' as const,
           text: 'Agent 正在整理任务步骤，完成后将在这里展示完整计划。',
-          planPending: true
-        }
+          planPending: true,
+        },
       ];
     };
     const existing = current.find(
-      (message) => message.toolCallId && message.toolCallId === toolData.toolCallId
+      (message) => message.toolCallId && message.toolCallId === toolData.toolCallId,
     );
     if (existing) {
       const updated = current.map((message) =>
@@ -90,9 +91,9 @@ export const mergeAgentEventIntoMessages = (
               toolLocations: toolData.locations ?? message.toolLocations,
               toolDiffs: toolData.diffs ?? message.toolDiffs,
               toolOutput: toolData.output ?? message.toolOutput,
-              toolModel: toolData.toolModel ?? message.toolModel
+              toolModel: toolData.toolModel ?? message.toolModel,
             }
-          : message
+          : message,
       );
       return appendPlanPending(updated);
     }
@@ -114,8 +115,8 @@ export const mergeAgentEventIntoMessages = (
         toolLocations: toolData.locations,
         toolDiffs: toolData.diffs,
         toolOutput: toolData.output,
-        toolModel
-      }
+        toolModel,
+      },
     ]);
   }
 
@@ -125,7 +126,9 @@ export const mergeAgentEventIntoMessages = (
     const change = getPayloadPlanChange(event.payload);
     if (!change) return current;
     if (change.action === 'remove') {
-      return current.filter((message) => message.role !== 'plan' || message.planId !== change.planId);
+      return current.filter(
+        (message) => message.role !== 'plan' || message.planId !== change.planId,
+      );
     }
     const withoutReplacedPlan = current.filter((message) => {
       if (message.role !== 'plan') return true;
@@ -141,8 +144,8 @@ export const mergeAgentEventIntoMessages = (
         text: change.text ?? event.message,
         planId: change.planId,
         planContentType: change.contentType,
-        planEntries: change.contentType === 'items' ? change.entries : undefined
-      }
+        planEntries: change.contentType === 'items' ? change.entries : undefined,
+      },
     ];
   }
 
@@ -150,19 +153,23 @@ export const mergeAgentEventIntoMessages = (
      同时收敛没有收到 tool_call_update 终态的工具，避免 ACP 取消、进程退出或协议丢包后卡片永久转圈。 */
   if (event.type === 'done' || event.type === 'error') {
     const withoutPendingPlan = current.filter((message) => !message.planPending);
-    const payload = event.payload && typeof event.payload === 'object'
-      ? event.payload as Record<string, unknown>
-      : undefined;
+    const payload =
+      event.payload && typeof event.payload === 'object'
+        ? (event.payload as Record<string, unknown>)
+        : undefined;
     const stopReason = typeof payload?.stopReason === 'string' ? payload.stopReason : '';
-    const unresolvedToolResult = event.type === 'error'
-      ? `工具调用因回合错误而中止：${event.message}`
-      : stopReason === 'cancelled'
-        ? '工具调用已随当前回合取消。'
-        : '回合已结束，但未收到工具调用的完成状态。';
+    const unresolvedToolResult =
+      event.type === 'error'
+        ? `工具调用因回合错误而中止：${event.message}`
+        : stopReason === 'cancelled'
+          ? '工具调用已随当前回合取消。'
+          : '回合已结束，但未收到工具调用的完成状态。';
     const settledMessages = withoutPendingPlan.map((message) => {
       if (
         message.role !== 'tool' ||
-        (message.toolStatus !== undefined && message.toolStatus !== 'pending' && message.toolStatus !== 'in_progress')
+        (message.toolStatus !== undefined &&
+          message.toolStatus !== 'pending' &&
+          message.toolStatus !== 'in_progress')
       ) {
         return message;
       }
@@ -171,7 +178,7 @@ export const mergeAgentEventIntoMessages = (
         toolStatus: 'failed' as const,
         toolOutput: message.toolOutput
           ? `${message.toolOutput}\n\n${unresolvedToolResult}`
-          : unresolvedToolResult
+          : unresolvedToolResult,
       };
     });
     // 正常 end_turn 和 cancelled 都静默完成：前者状态栏已有"完成"，后者已有 "已请求取消当前回合" 即时反馈。
@@ -179,7 +186,7 @@ export const mergeAgentEventIntoMessages = (
     if (event.type === 'error') {
       return [
         ...settledMessages,
-        { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, role, text: event.message }
+        { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, role, text: event.message },
       ];
     }
     return settledMessages;
@@ -190,7 +197,7 @@ export const mergeAgentEventIntoMessages = (
     {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       role,
-      text: event.message
-    }
+      text: event.message,
+    },
   ];
 };

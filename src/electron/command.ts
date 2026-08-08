@@ -35,4 +35,3 @@ export const runCommand = (command: string, args: string[], cwd?: string, timeou
       finish({ ok: code === 0, stdout, stderr, code });
     });
   });
-

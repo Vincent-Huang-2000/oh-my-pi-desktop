@@ -1,5 +1,15 @@
 /* ACP ToolKind 映射：用于图标着色和分类展示 */
-export type ToolKind = 'read' | 'edit' | 'delete' | 'move' | 'search' | 'execute' | 'think' | 'fetch' | 'switch_mode' | 'other';
+export type ToolKind =
+  | 'read'
+  | 'edit'
+  | 'delete'
+  | 'move'
+  | 'search'
+  | 'execute'
+  | 'think'
+  | 'fetch'
+  | 'switch_mode'
+  | 'other';
 
 /* ACP ToolCallStatus：工具调用生命周期 */
 export type ToolCallStatus = 'pending' | 'in_progress' | 'completed' | 'failed';

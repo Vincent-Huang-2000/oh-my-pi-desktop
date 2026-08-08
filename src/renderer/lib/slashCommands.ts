@@ -31,15 +31,13 @@ const COMMAND_PENDING_META: Record<string, { icon: string; label: string }> = {
   plan: { icon: '□', label: '正在切换 Plan 模式…' },
   'plan-review': { icon: '□', label: '正在打开最近的计划评审…' },
   resume: { icon: '↻', label: '正在同步历史会话…' },
-  mcp: { icon: '▦', label: '正在管理 MCP 服务…' }
+  mcp: { icon: '▦', label: '正在管理 MCP 服务…' },
 };
 const COMMAND_PENDING_DEFAULT = { icon: '▶', label: '正在执行本地命令…' };
 
 // 解析 `/name args` 形式的输入，返回 { name, args }；非 slash 输入返回 null。
 // 解析失败的空字符串命令不视为有效命令，避免把普通消息里的 "/" 当成命令。
-export const parseSlashCommand = (
-  text: string
-): { name: string; args: string } | null => {
+export const parseSlashCommand = (text: string): { name: string; args: string } | null => {
   const match = text.match(/^\/([A-Za-z][A-Za-z0-9_-]*)(?:\s+([\s\S]*))?$/);
   if (!match) {
     return null;

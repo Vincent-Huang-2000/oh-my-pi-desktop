@@ -15,7 +15,7 @@ import type {
   AcpConfigOption,
   AgentEvent,
   ApprovalProfile,
-  StoredSession
+  StoredSession,
 } from './types.js';
 
 // ── 常量 ──
@@ -231,54 +231,70 @@ export type AgentService = {
   startAgent: (
     sessionId: string,
     workspacePath: string,
-    approvalProfile?: ApprovalProfile
+    approvalProfile?: ApprovalProfile,
   ) => Promise<{ ok: boolean; message: string }>;
   // 发送消息支持富内容：纯文本或 文本+图片块。
   // 图片以 dataURL 形式传入，由 AgentService 解出 mime + base64 写入 ACP `image` content block。
   sendAgentMessage: (
     sessionId: string,
     workspacePath: string,
-    content: AgentPromptContent
+    content: AgentPromptContent,
   ) => Promise<{ ok: boolean; message?: string }>;
   getSessionConfig: (
     sessionId: string,
-    workspacePath: string
+    workspacePath: string,
   ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
   // session 级 config：value 可以是字符串（select）或布尔（boolean config option）。
   setSessionConfigOption: (
     sessionId: string,
     workspacePath: string,
     configId: string,
-    value: string | boolean
+    value: string | boolean,
   ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
   updateApprovalProfile: (
     sessionId: string,
     workspacePath: string,
-    approvalProfile: ApprovalProfile
+    approvalProfile: ApprovalProfile,
   ) => Promise<{ ok: boolean; session?: StoredSession; message?: string }>;
   cancelTurn: (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
-  respondPermissionOption: (requestId: string, optionId: string) => { ok: boolean; message?: string };
+  respondPermissionOption: (
+    requestId: string,
+    optionId: string,
+  ) => { ok: boolean; message?: string };
   respondPermission: (requestId: string, allow: boolean) => { ok: boolean; message?: string };
   respondElicitation: (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',
-    content?: Record<string, unknown>
+    content?: Record<string, unknown>,
   ) => { ok: boolean; message?: string };
   respondQuestionnaire: (
     requestId: string,
     action: 'submit' | 'deny',
-    answers?: QuestionnaireAnswer[]
+    answers?: QuestionnaireAnswer[],
   ) => QuestionnaireResponseResult;
   // 会话生命周期：列表 / 加载 / 恢复 / Fork / 关闭，全部对应 ACP 原生方法。
   listSessions: (workspacePath: string, cursor?: string) => Promise<ListSessionsResult>;
-  loadSession: (localSessionId: string, workspacePath: string, acpSessionId: string) => Promise<SessionActionResult>;
-  resumeSession: (localSessionId: string, workspacePath: string, acpSessionId: string) => Promise<SessionActionResult>;
+  loadSession: (
+    localSessionId: string,
+    workspacePath: string,
+    acpSessionId: string,
+  ) => Promise<SessionActionResult>;
+  resumeSession: (
+    localSessionId: string,
+    workspacePath: string,
+    acpSessionId: string,
+  ) => Promise<SessionActionResult>;
   refreshSessionConfig: (
     localSessionId: string,
     workspacePath: string,
-    acpSessionId: string
+    acpSessionId: string,
   ) => Promise<{ ok: boolean; configOptions?: AcpConfigOption[]; message?: string }>;
-  forkSession: (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => Promise<SessionActionResult>;
+  forkSession: (
+    localSessionId: string,
+    workspacePath: string,
+    sourceAcpSessionId: string,
+    title: string,
+  ) => Promise<SessionActionResult>;
   closeSession: (localSessionId: string) => SessionActionResult;
   // 彻底杀掉指定 session 的子进程（丢弃 session 时调用）。
   stopSessionProcess: (localSessionId: string) => void;

@@ -34,7 +34,7 @@ export const getPlanMessage = (update: Record<string, unknown>) => {
   const statusMap: Record<string, string> = {
     pending: '待处理',
     in_progress: '进行中',
-    completed: '已完成'
+    completed: '已完成',
   };
 
   return entries
@@ -43,7 +43,8 @@ export const getPlanMessage = (update: Record<string, unknown>) => {
         return `${index + 1}. 未知任务`;
       }
       const content = typeof entry.content === 'string' ? entry.content : '未知任务';
-      const status = typeof entry.status === 'string' ? statusMap[entry.status] ?? entry.status : '未知状态';
+      const status =
+        typeof entry.status === 'string' ? (statusMap[entry.status] ?? entry.status) : '未知状态';
       return `${index + 1}. [${status}] ${content}`;
     })
     .join('\n');
@@ -74,7 +75,8 @@ export const findSessionLocalDir = async (process: AcpProcessState) => {
     addLog(sessionId, 'info', `[plan-preview] acpSessionId 缺失，无法定位方案文件`);
     return null;
   }
-  const agentDir = globalThis.process.env.PI_CODING_AGENT_DIR?.trim() || path.join(homedir(), '.omp', 'agent');
+  const agentDir =
+    globalThis.process.env.PI_CODING_AGENT_DIR?.trim() || path.join(homedir(), '.omp', 'agent');
   const sessionsRoot = path.join(agentDir, 'sessions');
   try {
     const projects = await readdir(sessionsRoot, { withFileTypes: true });
@@ -82,12 +84,18 @@ export const findSessionLocalDir = async (process: AcpProcessState) => {
       if (!project.isDirectory()) continue;
       const projectRoot = path.join(sessionsRoot, project.name);
       const sessions = await readdir(projectRoot, { withFileTypes: true });
-      const session = sessions.find((entry) => entry.isDirectory() && entry.name.endsWith(`_${acpSessionId}`));
+      const session = sessions.find(
+        (entry) => entry.isDirectory() && entry.name.endsWith(`_${acpSessionId}`),
+      );
       if (!session) continue;
       return path.join(projectRoot, session.name, 'local');
     }
     // 遍历完所有项目目录都没找到以 _<acpSessionId> 结尾的 session 目录。
-    addLog(sessionId, 'info', `[plan-preview] 未找到 session 目录（应 endsWith _${acpSessionId}），已扫描根：${sessionsRoot}`);
+    addLog(
+      sessionId,
+      'info',
+      `[plan-preview] 未找到 session 目录（应 endsWith _${acpSessionId}），已扫描根：${sessionsRoot}`,
+    );
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     addLog(sessionId, 'info', `[plan-preview] 定位 session 目录抛异常：${reason}`);
@@ -114,7 +122,7 @@ export const getAcpActivePlan = (response: unknown): AcpActivePlan | null => {
     version: 1,
     active: true,
     planFilePath: planMode.planFilePath,
-    content: planMode.content
+    content: planMode.content,
   };
 };
 
@@ -122,18 +130,25 @@ export const readPlanFile = async (
   process: AcpProcessState,
   localDir: string,
   filePath: string,
-  logPrefix: 'plan-preview' | 'plan-history'
+  logPrefix: 'plan-preview' | 'plan-history',
 ) => {
   try {
     const fileStat = await stat(filePath);
     if (!fileStat.isFile() || fileStat.size > MAX_PLAN_PREVIEW_BYTES) {
       if (fileStat.size > MAX_PLAN_PREVIEW_BYTES) {
-        addLog(process.localSessionId, 'info', `[${logPrefix}] 方案文件超 ${(MAX_PLAN_PREVIEW_BYTES / 1024 / 1024).toFixed(0)}MB 上限：${fileStat.size} 字节，${filePath}`);
+        addLog(
+          process.localSessionId,
+          'info',
+          `[${logPrefix}] 方案文件超 ${(MAX_PLAN_PREVIEW_BYTES / 1024 / 1024).toFixed(0)}MB 上限：${fileStat.size} 字节，${filePath}`,
+        );
       }
       return null;
     }
     // realpath 同时防止历史 payload 通过符号链接逃逸到当前 ACP session 的 local 目录外。
-    const [resolvedLocalDir, resolvedFilePath] = await Promise.all([realpath(localDir), realpath(filePath)]);
+    const [resolvedLocalDir, resolvedFilePath] = await Promise.all([
+      realpath(localDir),
+      realpath(filePath),
+    ]);
     const relativePath = path.relative(resolvedLocalDir, resolvedFilePath);
     if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
       return null;
@@ -163,7 +178,9 @@ export const readFullPlanForApproval = async (process: AcpProcessState) => {
   if (!localDir) return null;
   try {
     const localEntries = await readdir(localDir, { withFileTypes: true });
-    const planFiles = localEntries.filter((entry) => entry.isFile() && entry.name.endsWith('-plan.md'));
+    const planFiles = localEntries.filter(
+      (entry) => entry.isFile() && entry.name.endsWith('-plan.md'),
+    );
     if (planFiles.length === 0) {
       // 无 *-plan.md 文件——可能不是 plan 审批（如普通工具审批），静默返回。
       return null;
@@ -179,12 +196,20 @@ export const readFullPlanForApproval = async (process: AcpProcessState) => {
       }
     }
     if (!latest) {
-      addLog(process.localSessionId, 'info', `[plan-preview] local 下 *-plan.md 均非常规文件：${localDir}`);
+      addLog(
+        process.localSessionId,
+        'info',
+        `[plan-preview] local 下 *-plan.md 均非常规文件：${localDir}`,
+      );
       return null;
     }
     const content = await readPlanFile(process, localDir, latest.path, 'plan-preview');
     if (content) {
-      addLog(process.localSessionId, 'info', `[plan-preview] 命中磁盘完整方案：${latest.path}（${latest.size} 字节）`);
+      addLog(
+        process.localSessionId,
+        'info',
+        `[plan-preview] 命中磁盘完整方案：${latest.path}（${latest.size} 字节）`,
+      );
     }
     return content;
   } catch (error) {
@@ -196,7 +221,7 @@ export const readFullPlanForApproval = async (process: AcpProcessState) => {
 
 export const readHistoricalSessionPlans = async (
   process: AcpProcessState,
-  replayEvents: AgentEvent[]
+  replayEvents: AgentEvent[],
 ): Promise<HistoricalSessionPlan[]> => {
   const applyToolCallIds = new Set<string>();
   const referencedPlans = new Map<string, { toolCallId: string; planFilePath: string }>();
@@ -204,7 +229,11 @@ export const readHistoricalSessionPlans = async (
     if (event.type !== 'tool_call' || !isRecord(event.payload)) continue;
     const update = isRecord(event.payload.update) ? event.payload.update : undefined;
     if (!update || typeof update.toolCallId !== 'string') continue;
-    if (update.title === 'resolve' && isRecord(update.rawInput) && update.rawInput.action === 'apply') {
+    if (
+      update.title === 'resolve' &&
+      isRecord(update.rawInput) &&
+      update.rawInput.action === 'apply'
+    ) {
       applyToolCallIds.add(update.toolCallId);
     }
     const rawOutput = isRecord(update.rawOutput) ? update.rawOutput : undefined;
@@ -228,19 +257,27 @@ export const readHistoricalSessionPlans = async (
   for (const reference of referencedPlans.values()) {
     const filePath = resolveHistoricalPlanPath(localDir, reference.planFilePath);
     if (!filePath) {
-      addLog(process.localSessionId, 'info', `[plan-history] 拒绝不安全或非 plan 路径：${reference.planFilePath}`);
+      addLog(
+        process.localSessionId,
+        'info',
+        `[plan-history] 拒绝不安全或非 plan 路径：${reference.planFilePath}`,
+      );
       continue;
     }
     const content = await readPlanFile(process, localDir, filePath, 'plan-history');
     if (!content) {
-      addLog(process.localSessionId, 'info', `[plan-history] 历史方案文件不存在或不可读：${reference.planFilePath}`);
+      addLog(
+        process.localSessionId,
+        'info',
+        `[plan-history] 历史方案文件不存在或不可读：${reference.planFilePath}`,
+      );
       continue;
     }
     plans.push({
       id: `history-plan-${reference.toolCallId}`,
       toolCallId: reference.toolCallId,
       planFilePath: reference.planFilePath,
-      content
+      content,
     });
   }
   return plans;

@@ -49,7 +49,7 @@ import {
   setSetting,
   touchProjectLastOpened,
   upsertProject,
-  upsertSession
+  upsertSession,
 } from './state.js';
 import type { AgentPromptContent, AgentService } from './agentService.js';
 import type { ApprovalProfile, PaneLayoutSettings } from './types.js';
@@ -65,27 +65,33 @@ type GitBranchSwitchFailureReason =
   | 'unknown';
 
 /** 将 Git 原始英文诊断转换成稳定的错误类型和面向用户的中文处理建议。 */
-const classifyGitBranchSwitchFailure = (diagnostic: string): {
+const classifyGitBranchSwitchFailure = (
+  diagnostic: string,
+): {
   reason: GitBranchSwitchFailureReason;
   message: string;
 } => {
   const normalized = diagnostic.toLowerCase();
-  if (normalized.includes('resolve your current index first') || normalized.includes('needs merge')) {
+  if (
+    normalized.includes('resolve your current index first') ||
+    normalized.includes('needs merge')
+  ) {
     return {
       reason: 'unmerged-files',
-      message: '当前分支存在尚未解决的文件冲突。请先解决冲突并完成提交，或中止当前合并操作后再切换。'
+      message:
+        '当前分支存在尚未解决的文件冲突。请先解决冲突并完成提交，或中止当前合并操作后再切换。',
     };
   }
   if (normalized.includes('local changes to the following files would be overwritten')) {
     return {
       reason: 'local-changes',
-      message: '当前修改会被目标分支覆盖。请先提交、暂存到 stash 或放弃这些修改，然后重新切换。'
+      message: '当前修改会被目标分支覆盖。请先提交、暂存到 stash 或放弃这些修改，然后重新切换。',
     };
   }
   if (normalized.includes('untracked working tree files would be overwritten')) {
     return {
       reason: 'untracked-files',
-      message: '当前未跟踪文件与目标分支中的文件冲突。请先移动、删除或提交这些文件，然后重新切换。'
+      message: '当前未跟踪文件与目标分支中的文件冲突。请先移动、删除或提交这些文件，然后重新切换。',
     };
   }
   if (
@@ -95,18 +101,18 @@ const classifyGitBranchSwitchFailure = (diagnostic: string): {
   ) {
     return {
       reason: 'git-operation-in-progress',
-      message: '当前仓库正在执行合并、变基或拣选操作。请先完成或中止该操作，然后重新切换分支。'
+      message: '当前仓库正在执行合并、变基或拣选操作。请先完成或中止该操作，然后重新切换分支。',
     };
   }
   if (normalized.includes('invalid reference') || normalized.includes('did not match any file')) {
     return {
       reason: 'branch-not-found',
-      message: '目标分支不存在或已被删除。请刷新分支列表后重新选择。'
+      message: '目标分支不存在或已被删除。请刷新分支列表后重新选择。',
     };
   }
   return {
     reason: 'unknown',
-    message: '分支切换失败。请检查当前仓库状态后重试。'
+    message: '分支切换失败。请检查当前仓库状态后重试。',
   };
 };
 
@@ -117,7 +123,9 @@ const normalizeDiffPath = (filePath: string) => filePath.replace(/\\/g, '/');
 const isInsideWorkspace = (workspacePath: string, filePath: string) => {
   const workspaceRoot = path.resolve(workspacePath);
   const resolvedFilePath = path.resolve(filePath);
-  return resolvedFilePath === workspaceRoot || resolvedFilePath.startsWith(`${workspaceRoot}${path.sep}`);
+  return (
+    resolvedFilePath === workspaceRoot || resolvedFilePath.startsWith(`${workspaceRoot}${path.sep}`)
+  );
 };
 
 /** 按 git diff 需要的行粒度拆分文本，并去掉文件末尾换行带来的空行。 */
@@ -156,16 +164,18 @@ const createUntrackedFileDiff = async (workspacePath: string, relativePath: stri
     return header.join('\n');
   }
 
-  return [
-    ...header,
-    `@@ -0,0 +1,${lines.length} @@`,
-    ...lines.map((line) => `+${line}`),
-  ].join('\n');
+  return [...header, `@@ -0,0 +1,${lines.length} @@`, ...lines.map((line) => `+${line}`)].join(
+    '\n',
+  );
 };
 
 /** 收集当前 workspace 下所有未跟踪文件，并拼接成可被 diff 解析器消费的文本。 */
 const getUntrackedFilesDiff = async (workspacePath: string) => {
-  const result = await runCommand('git', ['ls-files', '--others', '--exclude-standard', '-z'], workspacePath);
+  const result = await runCommand(
+    'git',
+    ['ls-files', '--others', '--exclude-standard', '-z'],
+    workspacePath,
+  );
   if (!result.ok) {
     return { ok: false, diff: '', message: (result.stderr || '').trim() };
   }
@@ -187,13 +197,12 @@ const getUntrackedFilesDiff = async (workspacePath: string) => {
 };
 
 export const registerDesktopIpcHandlers = (agentService: AgentService) => {
-
   // 同一 workspace 下，对持久化会话列表有删除语义的操作（sync-sessions 的 reconcile
   // 和 fork-session 的 upsert）必须互斥。队列按 workspacePath 分桶，不同项目可并发。
   const workspaceSessionOperationTails = new Map<string, Promise<void>>();
   const runWorkspaceSessionOperation = async <T>(
     workspacePath: string,
-    operation: () => Promise<T>
+    operation: () => Promise<T>,
   ): Promise<T> => {
     const previous = workspaceSessionOperationTails.get(workspacePath) ?? Promise.resolve();
     let releaseCurrent: () => void = () => {};
@@ -217,20 +226,22 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   ipcMain.handle('desktop:ensure-default-workspace', () => ensureDefaultWorkspace());
   // 仅更新 lastOpenedAt，不重排项目顺序；用于点击 session 进入执行目录时记录最近操作时间。
   ipcMain.handle('desktop:touch-project-last-opened', (_event, workspacePath: string) =>
-    touchProjectLastOpened(workspacePath)
+    touchProjectLastOpened(workspacePath),
   );
   // 切换项目置顶标记。pinned=true 时渲染层把它固定到项目列表顶部。
   ipcMain.handle('desktop:set-project-pinned', (_event, workspacePath: string, pinned: boolean) =>
-    setProjectPinned(workspacePath, pinned)
+    setProjectPinned(workspacePath, pinned),
   );
   // 设置项目自定义显示名；空字符串/与目录名相同则清除，回退到目录名。
-  ipcMain.handle('desktop:set-project-display-name', (_event, workspacePath: string, displayName: string) =>
-    setProjectDisplayName(workspacePath, displayName)
+  ipcMain.handle(
+    'desktop:set-project-display-name',
+    (_event, workspacePath: string, displayName: string) =>
+      setProjectDisplayName(workspacePath, displayName),
   );
   // 从 recentProjects 移除项目（只删项目本身，会话行/磁盘 omp 会话不动）。
   // 若该项目的 agent 子进程在跑，由渲染层另行 stopSessionProcess 清理。
   ipcMain.handle('desktop:remove-project', (_event, workspacePath: string) =>
-    removeProject(workspacePath)
+    removeProject(workspacePath),
   );
   // 在系统资源管理器中打开项目目录：对目录路径调用 shell.openPath，三大平台都
   // 会以默认应用（即资源管理器/Finder/文件管理器）打开该目录，比 showItemInFolder
@@ -243,7 +254,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   ipcMain.handle('desktop:select-workspace', async () => {
     const result = await dialog.showOpenDialog({
       title: '选择项目目录',
-      properties: ['openDirectory']
+      properties: ['openDirectory'],
     });
 
     if (result.canceled || !result.filePaths[0]) {
@@ -264,7 +275,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       return {
         installed: true,
         status: 'ready',
-        message: (versionResult.stdout || versionResult.stderr).trim() || 'omp 已安装'
+        message: (versionResult.stdout || versionResult.stderr).trim() || 'omp 已安装',
       };
     }
 
@@ -272,7 +283,12 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     return {
       installed: acpResult.ok,
       status: acpResult.ok ? 'ready' : 'missing',
-      message: (acpResult.stdout || acpResult.stderr || versionResult.stderr || '未检测到 omp').trim()
+      message: (
+        acpResult.stdout ||
+        acpResult.stderr ||
+        versionResult.stderr ||
+        '未检测到 omp'
+      ).trim(),
     };
   });
 
@@ -284,11 +300,14 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
   // 保存侧栏布局（宽度与折叠状态）。仅做形状校验，宽度钳制由渲染层在写入/读取时负责。
   ipcMain.handle('desktop:set-pane-layout', (_event, layout: PaneLayoutSettings) => {
     if (
-      !layout || typeof layout !== 'object'
-      || typeof layout.leftWidth !== 'number' || !Number.isFinite(layout.leftWidth)
-      || typeof layout.rightWidth !== 'number' || !Number.isFinite(layout.rightWidth)
-      || typeof layout.leftCollapsed !== 'boolean'
-      || typeof layout.rightCollapsed !== 'boolean'
+      !layout ||
+      typeof layout !== 'object' ||
+      typeof layout.leftWidth !== 'number' ||
+      !Number.isFinite(layout.leftWidth) ||
+      typeof layout.rightWidth !== 'number' ||
+      !Number.isFinite(layout.rightWidth) ||
+      typeof layout.leftCollapsed !== 'boolean' ||
+      typeof layout.rightCollapsed !== 'boolean'
     ) {
       return { ok: false, message: '侧栏布局数据格式不正确' };
     }
@@ -296,7 +315,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       leftWidth: layout.leftWidth,
       rightWidth: layout.rightWidth,
       leftCollapsed: layout.leftCollapsed,
-      rightCollapsed: layout.rightCollapsed
+      rightCollapsed: layout.rightCollapsed,
     });
     return { ok: true };
   });
@@ -315,7 +334,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     const result = await dialog.showOpenDialog({
       title: '选择 omp 可执行文件',
       properties: ['openFile'],
-      buttonLabel: '选择'
+      buttonLabel: '选择',
     });
 
     if (result.canceled || !result.filePaths[0]) {
@@ -330,7 +349,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
         return {
           ok: false,
           path: getSetting('ompExecutablePath') || '',
-          message: (versionResult.stderr || acpResult.stderr || '该文件无法作为 omp 执行').trim()
+          message: (versionResult.stderr || acpResult.stderr || '该文件无法作为 omp 执行').trim(),
         };
       }
     }
@@ -341,7 +360,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     return {
       ok: true,
       path: selectedPath,
-      message: (versionResult.stdout || versionResult.stderr || 'omp 已设置').trim()
+      message: (versionResult.stdout || versionResult.stderr || 'omp 已设置').trim(),
     };
   });
 
@@ -356,9 +375,9 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
         undefined,
         undefined,
         false,
-        normalizeApprovalProfile(approvalProfile)
+        normalizeApprovalProfile(approvalProfile),
       );
-    }
+    },
   );
 
   ipcMain.handle('desktop:start-agent', (_event, sessionId: string, workspacePath: string) => {
@@ -366,7 +385,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     return agentService.startAgent(
       sessionId,
       workspacePath,
-      normalizeApprovalProfile(session?.approvalProfile)
+      normalizeApprovalProfile(session?.approvalProfile),
     );
   });
 
@@ -375,7 +394,7 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     'desktop:send-agent-message',
     (_event, sessionId: string, workspacePath: string, content: AgentPromptContent) => {
       return agentService.sendAgentMessage(sessionId, workspacePath, content);
-    }
+    },
   );
 
   ipcMain.handle('desktop:get-agent-config', (_event, sessionId: string, workspacePath: string) => {
@@ -384,9 +403,15 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
 
   ipcMain.handle(
     'desktop:set-agent-config-option',
-    (_event, sessionId: string, workspacePath: string, configId: string, value: string | boolean) => {
+    (
+      _event,
+      sessionId: string,
+      workspacePath: string,
+      configId: string,
+      value: string | boolean,
+    ) => {
       return agentService.setSessionConfigOption(sessionId, workspacePath, configId, value);
-    }
+    },
   );
 
   ipcMain.handle(
@@ -395,9 +420,9 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       return agentService.updateApprovalProfile(
         sessionId,
         workspacePath,
-        normalizeApprovalProfile(approvalProfile)
+        normalizeApprovalProfile(approvalProfile),
       );
-    }
+    },
   );
 
   ipcMain.handle('desktop:cancel-agent-turn', (_event, sessionId: string) => {
@@ -408,9 +433,12 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     return agentService.respondPermission(requestId, allow);
   });
 
-  ipcMain.handle('desktop:permission-option-response', (_event, requestId: string, optionId: string) => {
-    return agentService.respondPermissionOption(requestId, optionId);
-  });
+  ipcMain.handle(
+    'desktop:permission-option-response',
+    (_event, requestId: string, optionId: string) => {
+      return agentService.respondPermissionOption(requestId, optionId);
+    },
+  );
 
   // ACP elicitation/create 响应：用户提交表单（accept + content）/ 拒绝 / 取消。
   ipcMain.handle(
@@ -419,10 +447,10 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       _event,
       requestId: string,
       action: 'accept' | 'decline' | 'cancel',
-      content?: Record<string, unknown>
+      content?: Record<string, unknown>,
     ) => {
       return agentService.respondElicitation(requestId, action, content);
-    }
+    },
   );
 
   // Plan 模式兼容问卷：提交选项会隐式批准原 eval，拒绝则回传 Deny。
@@ -432,8 +460,8 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       _event,
       requestId: string,
       action: 'submit' | 'deny',
-      answers?: Array<{ questionIndex: number; selections: string[] }>
-    ) => agentService.respondQuestionnaire(requestId, action, answers)
+      answers?: Array<{ questionIndex: number; selections: string[] }>,
+    ) => agentService.respondQuestionnaire(requestId, action, answers),
   );
 
   // ACP 会话生命周期
@@ -471,30 +499,36 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     'desktop:load-session',
     (_event, localSessionId: string, workspacePath: string, acpSessionId: string) => {
       return agentService.loadSession(localSessionId, workspacePath, acpSessionId);
-    }
+    },
   );
 
   ipcMain.handle(
     'desktop:resume-session',
     (_event, localSessionId: string, workspacePath: string, acpSessionId: string) => {
       return agentService.resumeSession(localSessionId, workspacePath, acpSessionId);
-    }
+    },
   );
 
   ipcMain.handle(
     'desktop:refresh-session-config',
     (_event, localSessionId: string, workspacePath: string, acpSessionId: string) => {
       return agentService.refreshSessionConfig(localSessionId, workspacePath, acpSessionId);
-    }
+    },
   );
 
   ipcMain.handle(
     'desktop:fork-session',
-    (_event, localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => {
+    (
+      _event,
+      localSessionId: string,
+      workspacePath: string,
+      sourceAcpSessionId: string,
+      title: string,
+    ) => {
       return runWorkspaceSessionOperation(workspacePath, () =>
-        agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId, title)
+        agentService.forkSession(localSessionId, workspacePath, sourceAcpSessionId, title),
       );
-    }
+    },
   );
 
   ipcMain.handle('desktop:close-session', (_event, localSessionId: string) => {
@@ -511,74 +545,96 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     const result = await runCommand(
       'git',
       ['for-each-ref', '--format=%(refname:short)\t%(HEAD)', 'refs/heads'],
-      workspacePath
+      workspacePath,
     );
     if (!result.ok) {
-      return { ok: false, branches: [], currentBranch: '', message: result.stderr.trim() || '读取 Git 分支失败' };
+      return {
+        ok: false,
+        branches: [],
+        currentBranch: '',
+        message: result.stderr.trim() || '读取 Git 分支失败',
+      };
     }
 
-    const entries = result.stdout.split(/\r?\n/).filter(Boolean).map((line) => {
-      const [name, head = ''] = line.split('\t');
-      return { name, current: head.trim() === '*' };
-    });
+    const entries = result.stdout
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .map((line) => {
+        const [name, head = ''] = line.split('\t');
+        return { name, current: head.trim() === '*' };
+      });
     return {
       ok: true,
       branches: entries.map((entry) => entry.name),
       currentBranch: entries.find((entry) => entry.current)?.name ?? '',
-      message: ''
+      message: '',
     };
   });
 
-  ipcMain.handle('desktop:switch-git-branch', async (_event, workspacePath: string, branchName: string) => {
-    const result = await runCommand('git', ['switch', branchName], workspacePath);
-    if (!result.ok) {
-      const diagnostic = (result.stderr || result.stdout).trim();
-      const failure = classifyGitBranchSwitchFailure(diagnostic);
-      // 原始 Git 输出只保留在主进程日志中用于排查，不直接暴露给前端用户。
-      console.error('[git] switch branch failed', {
+  ipcMain.handle(
+    'desktop:switch-git-branch',
+    async (_event, workspacePath: string, branchName: string) => {
+      const result = await runCommand('git', ['switch', branchName], workspacePath);
+      if (!result.ok) {
+        const diagnostic = (result.stderr || result.stdout).trim();
+        const failure = classifyGitBranchSwitchFailure(diagnostic);
+        // 原始 Git 输出只保留在主进程日志中用于排查，不直接暴露给前端用户。
+        console.error('[git] switch branch failed', {
+          workspacePath,
+          branchName,
+          reason: failure.reason,
+          diagnostic,
+        });
+        return { ok: false, ...failure };
+      }
+      return {
+        ok: true,
+        reason: null,
+        message: '',
+      };
+    },
+  );
+
+  ipcMain.handle(
+    'desktop:get-diff',
+    async (_event, workspacePath: string, source?: 'unstaged' | 'staged') => {
+      const repositoryCheck = await runCommand(
+        'git',
+        ['rev-parse', '--is-inside-work-tree'],
         workspacePath,
-        branchName,
-        reason: failure.reason,
-        diagnostic
-      });
-      return { ok: false, ...failure };
-    }
-    return {
-      ok: true,
-      reason: null,
-      message: ''
-    };
-  });
+      );
+      if (!repositoryCheck.ok || repositoryCheck.stdout.trim() !== 'true') {
+        return {
+          ok: false,
+          diff: '',
+          message: '当前项目尚未初始化 Git 仓库',
+        };
+      }
 
-  ipcMain.handle('desktop:get-diff', async (_event, workspacePath: string, source?: 'unstaged' | 'staged') => {
-    const repositoryCheck = await runCommand('git', ['rev-parse', '--is-inside-work-tree'], workspacePath);
-    if (!repositoryCheck.ok || repositoryCheck.stdout.trim() !== 'true') {
+      // 让审查面板拿到更接近 VS Code 的可读 diff：中文路径不转义，并识别重命名。
+      const args =
+        source === 'staged'
+          ? ['-c', 'core.quotepath=false', 'diff', '--cached', '--no-color', '--find-renames']
+          : ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames'];
+      const result = await runCommand('git', args, workspacePath);
+      if (!result.ok) {
+        return {
+          ok: false,
+          diff: '',
+          message: result.stderr.trim() || '读取 Git 改动失败',
+        };
+      }
+
+      const untracked =
+        source === 'staged'
+          ? { ok: true, diff: '', message: '' }
+          : await getUntrackedFilesDiff(workspacePath);
+      const diff = [result.stdout.trim(), untracked.diff.trim()].filter(Boolean).join('\n');
       return {
-        ok: false,
-        diff: '',
-        message: '当前项目尚未初始化 Git 仓库'
+        ok: result.ok && untracked.ok,
+        diff,
+        message: (result.stderr || untracked.message || '').trim(),
       };
-    }
-
-    // 让审查面板拿到更接近 VS Code 的可读 diff：中文路径不转义，并识别重命名。
-    const args = source === 'staged'
-      ? ['-c', 'core.quotepath=false', 'diff', '--cached', '--no-color', '--find-renames']
-      : ['-c', 'core.quotepath=false', 'diff', '--no-color', '--find-renames'];
-    const result = await runCommand('git', args, workspacePath);
-    if (!result.ok) {
-      return {
-        ok: false,
-        diff: '',
-        message: result.stderr.trim() || '读取 Git 改动失败'
-      };
-    }
-
-    const untracked = source === 'staged' ? { ok: true, diff: '', message: '' } : await getUntrackedFilesDiff(workspacePath);
-    const diff = [result.stdout.trim(), untracked.diff.trim()].filter(Boolean).join('\n');
-    return {
-      ok: result.ok && untracked.ok,
-      diff,
-      message: (result.stderr || untracked.message || '').trim()
-    };
-  });
+    },
+  );
 };

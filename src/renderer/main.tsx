@@ -6,5 +6,5 @@ import './highlight-themes/omp-light.css';
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
-  </StrictMode>
+  </StrictMode>,
 );

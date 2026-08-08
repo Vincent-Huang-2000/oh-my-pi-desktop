@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type { QuestionnaireAnswer, QuestionnaireRequest } from '../types';
 import './QuestionnaireModal.css';
 
-
 type QuestionnaireModalProps = {
   request: QuestionnaireRequest;
   requests: QuestionnaireRequest[];
@@ -11,12 +10,17 @@ type QuestionnaireModalProps = {
 };
 
 // Plan 兼容问卷：选项提交即隐式批准对应 eval，不再向用户暴露底层 Approve/Deny。
-export function QuestionnaireModal({ request, requests, onSelect, onRespond }: QuestionnaireModalProps) {
+export function QuestionnaireModal({
+  request,
+  requests,
+  onSelect,
+  onRespond,
+}: QuestionnaireModalProps) {
   const [answers, setAnswers] = useState<Record<number, string[]>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isComplete = useMemo(
     () => request.questions.every((_question, index) => (answers[index]?.length ?? 0) > 0),
-    [answers, request.questions]
+    [answers, request.questions],
   );
 
   const setSingleAnswer = (questionIndex: number, label: string) => {
@@ -30,7 +34,7 @@ export function QuestionnaireModal({ request, requests, onSelect, onRespond }: Q
         ...current,
         [questionIndex]: selected.includes(label)
           ? selected.filter((item) => item !== label)
-          : [...selected, label]
+          : [...selected, label],
       };
     });
   };
@@ -38,19 +42,25 @@ export function QuestionnaireModal({ request, requests, onSelect, onRespond }: Q
   const submit = async (action: 'submit' | 'deny') => {
     if (isSubmitting || (action === 'submit' && !isComplete)) return;
     setIsSubmitting(true);
-    const payload = action === 'submit'
-      ? request.questions.map((_question, questionIndex) => ({
-          questionIndex,
-          selections: answers[questionIndex] ?? []
-        }))
-      : undefined;
+    const payload =
+      action === 'submit'
+        ? request.questions.map((_question, questionIndex) => ({
+            questionIndex,
+            selections: answers[questionIndex] ?? [],
+          }))
+        : undefined;
     const accepted = await onRespond(action, payload);
     if (!accepted) setIsSubmitting(false);
   };
 
   return (
     <div className="approval-float-layer" role="presentation">
-      <section className="approval-modal questionnaire-modal" role="dialog" aria-modal="true" aria-labelledby="questionnaire-title">
+      <section
+        className="approval-modal questionnaire-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="questionnaire-title"
+      >
         <header className="questionnaire-modal-header">
           <div>
             <span className="questionnaire-kicker">PLAN 需求确认</span>
@@ -80,7 +90,11 @@ export function QuestionnaireModal({ request, requests, onSelect, onRespond }: Q
           {request.questions.map((question, questionIndex) => {
             const selected = answers[questionIndex] ?? [];
             return (
-              <fieldset className="questionnaire-item" key={`${questionIndex}-${question.question}`} disabled={isSubmitting}>
+              <fieldset
+                className="questionnaire-item"
+                key={`${questionIndex}-${question.question}`}
+                disabled={isSubmitting}
+              >
                 <legend>
                   {question.header && <span className="questionnaire-chip">{question.header}</span>}
                   <span>{question.question}</span>
@@ -90,14 +104,19 @@ export function QuestionnaireModal({ request, requests, onSelect, onRespond }: Q
                   {question.options.map((option) => {
                     const checked = selected.includes(option.label);
                     return (
-                      <label className={`questionnaire-option${checked ? ' selected' : ''}`} key={option.label}>
+                      <label
+                        className={`questionnaire-option${checked ? ' selected' : ''}`}
+                        key={option.label}
+                      >
                         <input
                           type={question.multiSelect ? 'checkbox' : 'radio'}
                           name={`questionnaire-${request.requestId}-${questionIndex}`}
                           checked={checked}
-                          onChange={() => question.multiSelect
-                            ? toggleMultiAnswer(questionIndex, option.label)
-                            : setSingleAnswer(questionIndex, option.label)}
+                          onChange={() =>
+                            question.multiSelect
+                              ? toggleMultiAnswer(questionIndex, option.label)
+                              : setSingleAnswer(questionIndex, option.label)
+                          }
                         />
                         <span className="questionnaire-option-mark" aria-hidden="true" />
                         <span>
@@ -114,10 +133,22 @@ export function QuestionnaireModal({ request, requests, onSelect, onRespond }: Q
         </div>
 
         <footer className="questionnaire-actions">
-          <button type="button" disabled={isSubmitting || !isComplete} className="primary-action" onClick={() => void submit('submit')}>
+          <button
+            type="button"
+            disabled={isSubmitting || !isComplete}
+            className="primary-action"
+            onClick={() => void submit('submit')}
+          >
             {isSubmitting ? '正在提交选择…' : '提交选择'}
           </button>
-          <button type="button" disabled={isSubmitting} className="danger-action" onClick={() => void submit('deny')}>拒绝</button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            className="danger-action"
+            onClick={() => void submit('deny')}
+          >
+            拒绝
+          </button>
         </footer>
       </section>
     </div>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import './SessionSearchModal.css';
 
-
 export type SessionSearchItem = {
   project: StoredProject;
   session: StoredSession;
@@ -16,13 +15,13 @@ const searchScopeOptions: Array<{ value: SearchScope; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'current-project', label: '当前项目' },
   { value: 'session-info', label: '会话信息' },
-  { value: 'prompt', label: '用户 Prompt' }
+  { value: 'prompt', label: '用户 Prompt' },
 ];
 
 const searchSortOptions: Array<{ value: SearchSort; label: string }> = [
   { value: 'relevance', label: '相关度优先' },
   { value: 'updated-desc', label: '最近更新' },
-  { value: 'title-asc', label: '标题 A-Z' }
+  { value: 'title-asc', label: '标题 A-Z' },
 ];
 
 type SessionSearchModalProps = {
@@ -70,8 +69,10 @@ const getSessionInfoText = (item: SessionSearchItem) => {
     item.session.title,
     projectName,
     item.project.name,
-    item.project.path
-  ].filter(Boolean).join(' ');
+    item.project.path,
+  ]
+    .filter(Boolean)
+    .join(' ');
 };
 
 const getSearchText = (item: SessionSearchItem, scope: SearchScope) => {
@@ -160,7 +161,12 @@ const rankSessionSearchItems = (items: SearchPreparedItem[], query: string) => {
     return items;
   }
 
-  const results: Array<{ item: SearchPreparedItem; score: number; literal: boolean; index: number }> = [];
+  const results: Array<{
+    item: SearchPreparedItem;
+    score: number;
+    literal: boolean;
+    index: number;
+  }> = [];
   items.forEach((item, index) => {
     const textLower = item.searchText.toLowerCase();
     let score = 0;
@@ -187,29 +193,38 @@ const rankSessionSearchItems = (items: SearchPreparedItem[], query: string) => {
     if (a.literal) {
       return getUpdatedAtTime(b.item) - getUpdatedAtTime(a.item) || a.index - b.index;
     }
-    return a.score - b.score || getUpdatedAtTime(b.item) - getUpdatedAtTime(a.item) || a.index - b.index;
+    return (
+      a.score - b.score || getUpdatedAtTime(b.item) - getUpdatedAtTime(a.item) || a.index - b.index
+    );
   });
 
   return results.map((result) => result.item);
 };
 
-export function SessionSearchModal({ items, currentProjectPath, onClose, onSelect }: SessionSearchModalProps) {
+export function SessionSearchModal({
+  items,
+  currentProjectPath,
+  onClose,
+  onSelect,
+}: SessionSearchModalProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useState('');
   const [scope, setScope] = useState<SearchScope>('all');
   const [sort, setSort] = useState<SearchSort>('relevance');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const filteredItems = useMemo(() => {
-    const scopeItems = scope === 'current-project' && currentProjectPath
-      ? items.filter((item) => item.project.path === currentProjectPath)
-      : items;
+    const scopeItems =
+      scope === 'current-project' && currentProjectPath
+        ? items.filter((item) => item.project.path === currentProjectPath)
+        : items;
     const prepared = scopeItems.map<SearchPreparedItem>((item) => ({
       ...item,
-      searchText: getSearchText(item, scope)
+      searchText: getSearchText(item, scope),
     }));
-    const sorted = sort === 'relevance'
-      ? sortSessionSearchItems(prepared, 'updated-desc')
-      : sortSessionSearchItems(prepared, sort);
+    const sorted =
+      sort === 'relevance'
+        ? sortSessionSearchItems(prepared, 'updated-desc')
+        : sortSessionSearchItems(prepared, sort);
     if (sort === 'relevance') {
       return rankSessionSearchItems(sorted, query);
     }
@@ -250,11 +265,7 @@ export function SessionSearchModal({ items, currentProjectPath, onClose, onSelec
   };
 
   return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <section
         className="session-search-modal"
         role="dialog"
@@ -285,7 +296,9 @@ export function SessionSearchModal({ items, currentProjectPath, onClose, onSelec
           onKeyDown={(event) => {
             if (event.key === 'ArrowDown') {
               event.preventDefault();
-              setSelectedIndex((current) => Math.min(current + 1, Math.max(0, filteredItems.length - 1)));
+              setSelectedIndex((current) =>
+                Math.min(current + 1, Math.max(0, filteredItems.length - 1)),
+              );
             } else if (event.key === 'ArrowUp') {
               event.preventDefault();
               setSelectedIndex((current) => Math.max(0, current - 1));
@@ -335,16 +348,22 @@ export function SessionSearchModal({ items, currentProjectPath, onClose, onSelec
               const meta = [
                 projectName,
                 formatSessionTime(item.session.updatedAt),
-                item.session.acpSessionId ? `#${item.session.acpSessionId.slice(0, 8)}` : item.session.id
-              ].filter(Boolean).join(' · ');
+                item.session.acpSessionId
+                  ? `#${item.session.acpSessionId.slice(0, 8)}`
+                  : item.session.id,
+              ]
+                .filter(Boolean)
+                .join(' · ');
               return (
                 <button
                   key={`${item.project.path}:${item.session.id}`}
                   className={[
                     'session-search-result',
                     index === selectedIndex ? 'selected' : '',
-                    item.isActive ? 'active' : ''
-                  ].filter(Boolean).join(' ')}
+                    item.isActive ? 'active' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   type="button"
                   role="option"
                   aria-selected={index === selectedIndex}

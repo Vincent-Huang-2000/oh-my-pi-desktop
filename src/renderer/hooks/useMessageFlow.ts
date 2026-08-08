@@ -15,7 +15,11 @@
 import type { ClipboardEvent, FormEvent } from 'react';
 import type { ChatMessage } from '../types';
 import { classifyAttachment, type PendingAttachment } from '../lib/attachments';
-import { DEFAULT_APPROVAL_PROFILE, MAX_IMAGE_BYTES, type DraftConfigValues } from '../lib/constants';
+import {
+  DEFAULT_APPROVAL_PROFILE,
+  MAX_IMAGE_BYTES,
+  type DraftConfigValues,
+} from '../lib/constants';
 import { parseSlashCommand, resolveCommandPendingMeta } from '../lib/slashCommands';
 import { useAppCore } from './useAppCore';
 
@@ -27,12 +31,12 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
   const applyDraftConfigValues = async (
     session: StoredSession,
     workspacePath: string,
-    values: DraftConfigValues
+    values: DraftConfigValues,
   ) => {
     const entries: Array<['model' | 'mode' | 'thinking', string | undefined]> = [
       ['model', values.model],
       ['mode', values.mode],
-      ['thinking', values.thinking]
+      ['thinking', values.thinking],
     ];
     for (const [configId, value] of entries) {
       if (!value) {
@@ -42,7 +46,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
         session.id,
         workspacePath,
         configId,
-        value
+        value,
       );
       if (result.ok) {
         app.setAcpConfigOptions(result.configOptions ?? []);
@@ -53,8 +57,10 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
   };
 
   const isPlanModeSelected = () => {
-    const modeValue = typeof app.modeConfig?.currentValue === 'string' ? app.modeConfig.currentValue : '';
-    const modeName = app.modeConfig?.options?.find((option) => option.value === modeValue)?.name ?? '';
+    const modeValue =
+      typeof app.modeConfig?.currentValue === 'string' ? app.modeConfig.currentValue : '';
+    const modeName =
+      app.modeConfig?.options?.find((option) => option.value === modeValue)?.name ?? '';
     const normalized = `${modeValue} ${modeName}`.toLowerCase();
     // 兼容不同 omp 版本的 mode value/name：常见值为 plan，中文环境可能显示“计划”。
     return normalized.includes('plan') || normalized.includes('计划');
@@ -87,7 +93,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
       session = await window.ohMyPiDesktop.createSession(
         app.selectedProject.path,
         text.trim().slice(0, 42) || '新的 agent 会话',
-        app.draftApprovalProfile
+        app.draftApprovalProfile,
       );
       app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
     }
@@ -113,7 +119,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
         args: parsed.args,
         sentAt: new Date().toISOString(),
         icon: meta.icon,
-        label: meta.label
+        label: meta.label,
       };
       app.bumpPendingSlashCommand();
     }
@@ -121,7 +127,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
       const userMessage: ChatMessage = {
         id: `${Date.now()}-user`,
         role: 'user',
-        text: text.trim()
+        text: text.trim(),
       };
       if (!showPlanPending) {
         return [...current, userMessage];
@@ -133,14 +139,22 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
           id: `plan-pending-${Date.now()}-${Math.random().toString(16).slice(2)}`,
           role: 'plan',
           text: '正在整理任务步骤，稍后会替换为正式计划。',
-          planPending: true
-        }
+          planPending: true,
+        },
       ];
     });
-    const result = await window.ohMyPiDesktop.sendAgentMessage(session.id, app.selectedProject.path, {
-      text: text.trim(),
-      attachments: attachments.map((att) => ({ dataUrl: att.dataUrl, fileName: att.fileName, kind: att.kind }))
-    });
+    const result = await window.ohMyPiDesktop.sendAgentMessage(
+      session.id,
+      app.selectedProject.path,
+      {
+        text: text.trim(),
+        attachments: attachments.map((att) => ({
+          dataUrl: att.dataUrl,
+          fileName: att.fileName,
+          kind: att.kind,
+        })),
+      },
+    );
     if (!result.ok) {
       app.setIsAgentBusy(false);
       app.setAgentStatus(result.message ?? '错误');
@@ -172,10 +186,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
         app.setAgentStatus('附件超过 8MB，未添加');
         return;
       }
-      app.setPendingAttachments((current) => [
-        ...current,
-        { dataUrl, fileName: file.name, kind }
-      ]);
+      app.setPendingAttachments((current) => [...current, { dataUrl, fileName: file.name, kind }]);
     };
     reader.readAsDataURL(file);
   };

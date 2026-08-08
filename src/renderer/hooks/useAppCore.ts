@@ -12,9 +12,19 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSearchItem } from '../components/SessionSearchModal';
-import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionRequest, QuestionnaireRequest } from '../types';
+import type {
+  AcpConfigOption,
+  ChatMessage,
+  ElicitationRequest,
+  PermissionRequest,
+  QuestionnaireRequest,
+} from '../types';
 import type { PendingAttachment } from '../lib/attachments';
-import { DEFAULT_APPROVAL_PROFILE, type DraftConfigValues, type ReviewSource } from '../lib/constants';
+import {
+  DEFAULT_APPROVAL_PROFILE,
+  type DraftConfigValues,
+  type ReviewSource,
+} from '../lib/constants';
 import type { PendingSlashCommand } from '../lib/slashCommands';
 import type { GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
 import { DEFAULT_THEME_ID, getTheme } from '../theme';
@@ -25,7 +35,7 @@ export function useAppCore() {
     recentSessions: [],
     logs: [],
     configCacheByProjectPath: {},
-    toolModelSnapshotsBySession: {}
+    toolModelSnapshotsBySession: {},
   });
   const [selectedProject, setSelectedProject] = useState<StoredProject | null>(null);
   const [selectedSession, setSelectedSession] = useState<StoredSession | null>(null);
@@ -72,7 +82,9 @@ export function useAppCore() {
     selectedSessionRef.current = session;
     setSelectedSession(session);
   };
-  const updateSelectedSession = (updater: (current: StoredSession | null) => StoredSession | null) => {
+  const updateSelectedSession = (
+    updater: (current: StoredSession | null) => StoredSession | null,
+  ) => {
     setSelectedSession((current) => {
       const next = updater(current);
       selectedSessionRef.current = next;
@@ -95,9 +107,8 @@ export function useAppCore() {
   // 草稿会话尚未创建真实 ACP session，用户在顶栏的选择先暂存，首次发送前再应用。
   const [draftConfigValues, setDraftConfigValues] = useState<DraftConfigValues>({});
   // 草稿会话尚无本地 sessionId，审批档位先随当前空白会话暂存，首次发送时一并持久化。
-  const [draftApprovalProfile, setDraftApprovalProfile] = useState<ApprovalProfile>(
-    DEFAULT_APPROVAL_PROFILE
-  );
+  const [draftApprovalProfile, setDraftApprovalProfile] =
+    useState<ApprovalProfile>(DEFAULT_APPROVAL_PROFILE);
   // 当前激活的主题 ID；未持久化时使用默认浅色主题。
   const [themeId, setLocalThemeId] = useState(DEFAULT_THEME_ID);
 
@@ -118,22 +129,25 @@ export function useAppCore() {
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
   // 当前展示的 elicitation 弹窗（omp 第2层审批门控），与权限弹窗独立。
   const [elicitationRequest, setElicitationRequest] = useState<ElicitationRequest | null>(null);
-  const [questionnaireRequest, setQuestionnaireRequest] = useState<QuestionnaireRequest | null>(null);
+  const [questionnaireRequest, setQuestionnaireRequest] = useState<QuestionnaireRequest | null>(
+    null,
+  );
   // 三类审批共用同一右下角浮层位置；并发到达时按优先级互斥展示，
   // 避免完全重叠导致被遮挡的浮层无法点击。问卷最具体优先，permission 次之，
   // elicitation 最后。未入选的仍在各自队列中，当前浮层处理完后自动弹下一个。
-  const activeApprovalKind: 'questionnaire' | 'permission' | 'elicitation' | null = questionnaireRequest
-    ? 'questionnaire'
-    : permissionRequest
-      ? 'permission'
-      : elicitationRequest
-        ? 'elicitation'
-        : null;
+  const activeApprovalKind: 'questionnaire' | 'permission' | 'elicitation' | null =
+    questionnaireRequest
+      ? 'questionnaire'
+      : permissionRequest
+        ? 'permission'
+        : elicitationRequest
+          ? 'elicitation'
+          : null;
   // 只要主进程终止了某个 session 的 agent 进程，该 session 下三类待处理请求都会失效。
   // 统一清理三个队列，避免各生命周期路径手写时漏掉其中一类并恢复出失效弹窗。
   const clearApprovalStateForSession = (
     sessionId: string | undefined,
-    { alsoClearActive = false }: { alsoClearActive?: boolean } = {}
+    { alsoClearActive = false }: { alsoClearActive?: boolean } = {},
   ) => {
     if (!sessionId) {
       return;
@@ -155,7 +169,9 @@ export function useAppCore() {
   const [gitBranches, setGitBranches] = useState<string[]>([]);
   const [currentGitBranch, setCurrentGitBranch] = useState('');
   const [gitBranchNotice, setGitBranchNotice] = useState('');
-  const [gitBranchSwitchError, setGitBranchSwitchError] = useState<GitBranchSwitchError | null>(null);
+  const [gitBranchSwitchError, setGitBranchSwitchError] = useState<GitBranchSwitchError | null>(
+    null,
+  );
   const [switchingGitBranch, setSwitchingGitBranch] = useState(false);
   const branchRefreshIdRef = useRef(0);
   // 当前会话的上下文用量（v16.1.13 usage_update 事件）；按 sessionId 分桶，切会话时还原。
@@ -178,7 +194,9 @@ export function useAppCore() {
     if (!selectedProject) {
       return [];
     }
-    const rows = desktopState.recentSessions.filter((session) => session.projectPath === selectedProject.path);
+    const rows = desktopState.recentSessions.filter(
+      (session) => session.projectPath === selectedProject.path,
+    );
     // 把当前活动会话（可能是尚未同步进列表的新建/草稿）并入顶部，避免活动会话不在列表中。
     // 用 id 或 acpSessionId 判重，防止历史污染迁移期出现同一 omp 会话的双份行。
     if (
@@ -187,7 +205,7 @@ export function useAppCore() {
       !rows.some(
         (session) =>
           session.id === selectedSession.id ||
-          (!!selectedSession.acpSessionId && session.acpSessionId === selectedSession.acpSessionId)
+          (!!selectedSession.acpSessionId && session.acpSessionId === selectedSession.acpSessionId),
       )
     ) {
       return [selectedSession, ...rows];
@@ -211,7 +229,7 @@ export function useAppCore() {
       !rows.some(
         (session) =>
           session.id === selectedSession.id ||
-          (!!selectedSession.acpSessionId && session.acpSessionId === selectedSession.acpSessionId)
+          (!!selectedSession.acpSessionId && session.acpSessionId === selectedSession.acpSessionId),
       )
     ) {
       rows.unshift(selectedSession);
@@ -223,19 +241,20 @@ export function useAppCore() {
         return [];
       }
       // 与 omp 的 session picker 保持方向一致：搜索用户 prompt，不把 assistant 回复和工具输出纳入搜索。
-      const cachedMessages = selectedSession?.id === session.id
-        ? messages
-        : messageCache.current[session.id] ?? [];
+      const cachedMessages =
+        selectedSession?.id === session.id ? messages : (messageCache.current[session.id] ?? []);
       const promptText = cachedMessages
         .filter((message) => message.role === 'user')
         .map((message) => message.text)
         .join(' ');
-      return [{
-        project,
-        session,
-        promptText,
-        isActive: selectedSession?.id === session.id
-      }];
+      return [
+        {
+          project,
+          session,
+          promptText,
+          isActive: selectedSession?.id === session.id,
+        },
+      ];
     });
   }, [desktopState.recentSessions, displayedProjects, messages, selectedProject, selectedSession]);
 
@@ -270,9 +289,10 @@ export function useAppCore() {
   );
 
   const displayedConfigOptions = useMemo(() => {
-    const draftConfigOptions = cachedProjectConfigOptions.length > 0
-      ? cachedProjectConfigOptions
-      : latestCachedConfigOptions;
+    const draftConfigOptions =
+      cachedProjectConfigOptions.length > 0
+        ? cachedProjectConfigOptions
+        : latestCachedConfigOptions;
     const source = selectedSession ? acpConfigOptions : draftConfigOptions;
     if (selectedSession) {
       return source;
@@ -291,15 +311,15 @@ export function useAppCore() {
 
   const modelConfig = useMemo(
     () => displayedConfigOptions.find((option) => option.id === 'model'),
-    [displayedConfigOptions]
+    [displayedConfigOptions],
   );
   const modeConfig = useMemo(
     () => displayedConfigOptions.find((option) => option.id === 'mode'),
-    [displayedConfigOptions]
+    [displayedConfigOptions],
   );
   const thinkingConfig = useMemo(
     () => displayedConfigOptions.find((option) => option.id === 'thinking'),
-    [displayedConfigOptions]
+    [displayedConfigOptions],
   );
   const currentApprovalProfile = selectedSession?.approvalProfile ?? draftApprovalProfile;
 
@@ -318,19 +338,26 @@ export function useAppCore() {
     // 按 lastOpenedAt 降序取最近操作过的项目作为「上次执行目录」，
     // 而非依赖 recentProjects 数组顺序（touchProjectLastOpened 不重排数组）。
     const lastOpenedProject =
-      [...state.recentProjects].sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))[0] ?? null;
-    const currentProjectPath = preferredProjectPath ?? selectedProject?.path ?? lastOpenedProject?.path;
+      [...state.recentProjects].sort((a, b) => b.lastOpenedAt.localeCompare(a.lastOpenedAt))[0] ??
+      null;
+    const currentProjectPath =
+      preferredProjectPath ?? selectedProject?.path ?? lastOpenedProject?.path;
     const currentProject =
-      state.recentProjects.find((project) => project.path === currentProjectPath) ?? lastOpenedProject;
+      state.recentProjects.find((project) => project.path === currentProjectPath) ??
+      lastOpenedProject;
     setDesktopState(state);
-    selectProject(preferredProjectPath
-      ? currentProject ?? selectedProjectRef.current ?? null
-      : selectedProjectRef.current ?? currentProject ?? null);
+    selectProject(
+      preferredProjectPath
+        ? (currentProject ?? selectedProjectRef.current ?? null)
+        : (selectedProjectRef.current ?? currentProject ?? null),
+    );
     // 方案 A（延迟创建会话）：进入执行目录后保持 selectedSession = null，
     // 中间栏显示新会话界面，用户首次发消息时才真正 createSession。
     // 因此这里不再自动选历史 session；用户点击左栏 session 才会选中。
     if (currentProjectPath) {
-      updateSelectedSession((current) => (current && current.projectPath === currentProjectPath ? current : null));
+      updateSelectedSession((current) =>
+        current && current.projectPath === currentProjectPath ? current : null,
+      );
     }
   };
 

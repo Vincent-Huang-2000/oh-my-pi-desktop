@@ -55,4 +55,3 @@ app.on('before-quit', () => {
   agentService.stopAll();
   flushPendingLogs();
 });
-

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AcpConfigOption } from '../types';
 import './SegmentSelect.css';
 
-
 type Option = NonNullable<AcpConfigOption['options']>[number];
 
 type SegmentSelectProps = {
@@ -146,7 +145,13 @@ export function SegmentSelect({
         </svg>
       </button>
       {open && (
-        <div ref={menuRef} className="segment-select-menu" role="listbox" onKeyDown={handleKeyDown} tabIndex={-1}>
+        <div
+          ref={menuRef}
+          className="segment-select-menu"
+          role="listbox"
+          onKeyDown={handleKeyDown}
+          tabIndex={-1}
+        >
           {options.length === 0 ? (
             <div className="segment-select-empty">{emptyLabel}</div>
           ) : (
@@ -156,17 +161,31 @@ export function SegmentSelect({
               return (
                 <button
                   key={opt.value}
-                  ref={(el) => { itemRefs.current[opt.value] = el; }}
+                  ref={(el) => {
+                    itemRefs.current[opt.value] = el;
+                  }}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  className={['segment-select-item', isActive ? 'active' : '', isSelected ? 'selected' : ''].join(' ')}
+                  className={[
+                    'segment-select-item',
+                    isActive ? 'active' : '',
+                    isSelected ? 'selected' : '',
+                  ].join(' ')}
                   onClick={() => handleSelect(opt.value)}
                   onMouseEnter={() => setActiveIndex(index)}
                 >
                   <span className="segment-select-item-name">{opt.name}</span>
                   {isSelected && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      aria-hidden="true"
+                    >
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
                   )}

@@ -22,7 +22,14 @@
  *   渲染端不需重复构建 120 条日志数组来触发整棵 App 重渲染。
  */
 import { useEffect } from 'react';
-import type { AcpConfigOption, ChatMessage, ElicitationRequest, PermissionOption, PermissionRequest, QuestionnaireRequest } from '../types';
+import type {
+  AcpConfigOption,
+  ChatMessage,
+  ElicitationRequest,
+  PermissionOption,
+  PermissionRequest,
+  QuestionnaireRequest,
+} from '../types';
 import {
   getElicitationKind,
   getPayloadAvailableCommands,
@@ -34,7 +41,13 @@ import {
   getPayloadRequestId,
   splitElicitationPlan,
 } from '../utils';
-import { applyActiveSessionPlan, getActiveSessionPlan, getHistoryLoadedEvents, getHistoryLoadedPlans, insertHistoricalPlans } from '../lib/historyLoaders';
+import {
+  applyActiveSessionPlan,
+  getActiveSessionPlan,
+  getHistoryLoadedEvents,
+  getHistoryLoadedPlans,
+  insertHistoricalPlans,
+} from '../lib/historyLoaders';
 import { mergeAgentEventIntoMessages } from '../lib/messageMerge';
 import { type ReviewSource } from '../lib/constants';
 import { useAppCore } from './useAppCore';
@@ -51,7 +64,6 @@ export function useAgentEvents(
 ): void {
   useEffect(() => {
     return window.ohMyPiDesktop.onAgentEvent((event) => {
-
       // app.messages 与 app.permissionRequest 必须按 sessionId 分桶：
       // 1) 当前 session 的事件：直接更新当前 state；
       // 2) 其它 session 的事件：只更新对应缓存（app.messageCache / app.permissionBySession），
@@ -60,7 +72,7 @@ export function useAgentEvents(
         const req: PermissionRequest = {
           requestId: getPayloadRequestId(event.payload),
           message: event.message,
-          options: getPayloadPermissionOptions(event.payload) as PermissionOption[]
+          options: getPayloadPermissionOptions(event.payload) as PermissionOption[],
         };
         const currentQueue = app.permissionBySession.current[event.sessionId] ?? [];
         const nextQueue = currentQueue.some((item) => item.requestId === req.requestId)
@@ -72,7 +84,7 @@ export function useAgentEvents(
           app.setPermissionRequest((current) => current ?? nextQueue[0] ?? null);
           const visibleRequest = nextQueue[0] ?? req;
           const isPermissionRequest = visibleRequest.options.some(
-            (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject')
+            (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject'),
           );
           app.setAgentStatus(isPermissionRequest ? '等待审批' : '等待选择');
         }
@@ -83,7 +95,7 @@ export function useAgentEvents(
       if (event.type === 'questionnaire_request') {
         const req: QuestionnaireRequest = {
           requestId: getPayloadRequestId(event.payload),
-          questions: getPayloadQuestionnaire(event.payload)
+          questions: getPayloadQuestionnaire(event.payload),
         };
         if (!req.requestId || req.questions.length === 0) {
           return;
@@ -97,24 +109,32 @@ export function useAgentEvents(
           app.setQuestionnaireRequest((current) => current ?? nextQueue[0] ?? null);
           app.setAgentStatus('等待选择');
         }
-        const recordText = req.questions.map((question, index) => [
-          `${index + 1}. ${question.header ? `[${question.header}] ` : ''}${question.question}`,
-          ...question.options.map((option) => `   - ${option.label}${option.description ? `：${option.description}` : ''}`)
-        ].join('\n')).join('\n');
-        const appendRecord = (current: ChatMessage[]) => current.some(
-          (message) => message.elicitationRequestId === req.requestId
-        ) ? current : [
-          ...current,
-          {
-            id: `questionnaire-${req.requestId}`,
-            role: 'elicitation' as const,
-            text: recordText,
-            elicitationRequestId: req.requestId,
-            elicitationKind: 'questionnaire' as const,
-            elicitationStatus: 'pending' as const,
-            createdAt: new Date().toISOString()
-          }
-        ];
+        const recordText = req.questions
+          .map((question, index) =>
+            [
+              `${index + 1}. ${question.header ? `[${question.header}] ` : ''}${question.question}`,
+              ...question.options.map(
+                (option) =>
+                  `   - ${option.label}${option.description ? `：${option.description}` : ''}`,
+              ),
+            ].join('\n'),
+          )
+          .join('\n');
+        const appendRecord = (current: ChatMessage[]) =>
+          current.some((message) => message.elicitationRequestId === req.requestId)
+            ? current
+            : [
+                ...current,
+                {
+                  id: `questionnaire-${req.requestId}`,
+                  role: 'elicitation' as const,
+                  text: recordText,
+                  elicitationRequestId: req.requestId,
+                  elicitationKind: 'questionnaire' as const,
+                  elicitationStatus: 'pending' as const,
+                  createdAt: new Date().toISOString(),
+                },
+              ];
         if (app.selectedSessionRef.current?.id === event.sessionId) {
           app.setMessages((current) => {
             const next = appendRecord(current);
@@ -122,7 +142,9 @@ export function useAgentEvents(
             return next;
           });
         } else {
-          app.messageCache.current[event.sessionId] = appendRecord(app.messageCache.current[event.sessionId] ?? []);
+          app.messageCache.current[event.sessionId] = appendRecord(
+            app.messageCache.current[event.sessionId] ?? [],
+          );
         }
         return;
       }
@@ -140,7 +162,7 @@ export function useAgentEvents(
           field: getPayloadElicitationField(event.payload),
           kind: getElicitationKind(event.message),
           // 消息流已有对应的方案预览卡时，弹窗只显示简短提示。
-          hasPlanPreview: !!planContent
+          hasPlanPreview: !!planContent,
         };
         const currentQueue = app.elicitationBySession.current[event.sessionId] ?? [];
         const nextQueue = currentQueue.some((item) => item.requestId === req.requestId)
@@ -157,25 +179,33 @@ export function useAgentEvents(
             return current;
           }
           // 新的实时 plan 审批会替代 `_meta` 恢复卡；后续交互只关联这次有效 requestId。
-          const baseMessages = planContent ? current.filter((message) => !message.planActive) : current;
+          const baseMessages = planContent
+            ? current.filter((message) => !message.planActive)
+            : current;
           let next = baseMessages;
-          const pendingIndex = baseMessages.findIndex((message) => message.role === 'plan' && message.planPending);
+          const pendingIndex = baseMessages.findIndex(
+            (message) => message.role === 'plan' && message.planPending,
+          );
           if (planContent) {
             const preview: ChatMessage = {
-              id: pendingIndex >= 0 ? baseMessages[pendingIndex].id : `plan-preview-${req.requestId}`,
+              id:
+                pendingIndex >= 0 ? baseMessages[pendingIndex].id : `plan-preview-${req.requestId}`,
               role: 'plan',
               text: planContent,
               planContentType: 'markdown',
               planPreview: true,
               planPreviewRequestId: req.requestId,
-              planPreviewDegraded: planDegraded || undefined
+              planPreviewDegraded: planDegraded || undefined,
             };
-            next = pendingIndex >= 0
-              ? baseMessages.map((message, index) => index === pendingIndex ? preview : message)
-              : [...baseMessages, preview];
+            next =
+              pendingIndex >= 0
+                ? baseMessages.map((message, index) => (index === pendingIndex ? preview : message))
+                : [...baseMessages, preview];
           } else if (pendingIndex >= 0) {
             next = baseMessages.map((message, index) =>
-              index === pendingIndex ? { ...message, planPreviewRequestId: req.requestId } : message
+              index === pendingIndex
+                ? { ...message, planPreviewRequestId: req.requestId }
+                : message,
             );
           }
           return [
@@ -185,10 +215,10 @@ export function useAgentEvents(
               role: 'elicitation' as const,
               text: elicitationPlan.question || event.message,
               elicitationRequestId: req.requestId,
-              elicitationKind: req.kind === 'question' ? 'question' as const : undefined,
+              elicitationKind: req.kind === 'question' ? ('question' as const) : undefined,
               elicitationStatus: 'pending' as const,
-              createdAt: new Date().toISOString()
-            }
+              createdAt: new Date().toISOString(),
+            },
           ];
         };
         if (app.selectedSessionRef.current?.id === event.sessionId) {
@@ -198,7 +228,9 @@ export function useAgentEvents(
             return next;
           });
         } else {
-          app.messageCache.current[event.sessionId] = appendRecord(app.messageCache.current[event.sessionId] ?? []);
+          app.messageCache.current[event.sessionId] = appendRecord(
+            app.messageCache.current[event.sessionId] ?? [],
+          );
         }
         return;
       }
@@ -212,7 +244,7 @@ export function useAgentEvents(
         }
         const updatePreview = (current: ChatMessage[]) => {
           const previewIndex = current.findIndex(
-            (message) => message.role === 'plan' && message.planPreviewRequestId === requestId
+            (message) => message.role === 'plan' && message.planPreviewRequestId === requestId,
           );
           const preview: ChatMessage = {
             id: previewIndex >= 0 ? current[previewIndex].id : `plan-preview-${requestId}`,
@@ -220,10 +252,10 @@ export function useAgentEvents(
             text: fullPlan,
             planContentType: 'markdown',
             planPreview: true,
-            planPreviewRequestId: requestId
+            planPreviewRequestId: requestId,
           };
           return previewIndex >= 0
-            ? current.map((message, index) => index === previewIndex ? preview : message)
+            ? current.map((message, index) => (index === previewIndex ? preview : message))
             : [...current, preview];
         };
         if (app.selectedSessionRef.current?.id === event.sessionId) {
@@ -233,7 +265,9 @@ export function useAgentEvents(
             return next;
           });
         } else {
-          app.messageCache.current[event.sessionId] = updatePreview(app.messageCache.current[event.sessionId] ?? []);
+          app.messageCache.current[event.sessionId] = updatePreview(
+            app.messageCache.current[event.sessionId] ?? [],
+          );
         }
         return;
       }
@@ -253,7 +287,9 @@ export function useAgentEvents(
         const commands = getPayloadAvailableCommands(event.payload);
         if (commands.length > 0) {
           app.setDesktopState((current) => {
-            const eventSession = current.recentSessions.find((session) => session.id === event.sessionId);
+            const eventSession = current.recentSessions.find(
+              (session) => session.id === event.sessionId,
+            );
             const projectPath = eventSession?.projectPath ?? app.selectedProjectRef.current?.path;
             if (!projectPath) {
               return current;
@@ -266,9 +302,9 @@ export function useAgentEvents(
                 [projectPath]: {
                   configOptions: existing?.configOptions ?? [],
                   availableCommands: commands,
-                  updatedAt: new Date().toISOString()
-                }
-              }
+                  updatedAt: new Date().toISOString(),
+                },
+              },
             };
           });
         }
@@ -290,7 +326,9 @@ export function useAgentEvents(
         }
         if (configOptions.length > 0) {
           app.setDesktopState((current) => {
-            const eventSession = current.recentSessions.find((session) => session.id === event.sessionId);
+            const eventSession = current.recentSessions.find(
+              (session) => session.id === event.sessionId,
+            );
             const projectPath = eventSession?.projectPath ?? app.selectedProjectRef.current?.path;
             if (!projectPath) {
               return current;
@@ -301,10 +339,11 @@ export function useAgentEvents(
                 ...current.configCacheByProjectPath,
                 [projectPath]: {
                   configOptions,
-                  availableCommands: current.configCacheByProjectPath[projectPath]?.availableCommands ?? [],
-                  updatedAt: new Date().toISOString()
-                }
-              }
+                  availableCommands:
+                    current.configCacheByProjectPath[projectPath]?.availableCommands ?? [],
+                  updatedAt: new Date().toISOString(),
+                },
+              },
             };
           });
         }
@@ -330,7 +369,7 @@ export function useAgentEvents(
             // 只有用户发消息时才应置顶——那条路径由主进程 upsertSession 默认行为处理。
             recentSessions: exists
               ? current.recentSessions.map((item) => (item.id === session.id ? session : item))
-              : [session, ...current.recentSessions]
+              : [session, ...current.recentSessions],
           };
         });
         app.updateSelectedSession((current) => (current?.id === session.id ? session : current));
@@ -341,9 +380,12 @@ export function useAgentEvents(
         const historyEvents = getHistoryLoadedEvents(event.payload);
         const historyMessages = historyEvents.reduce(
           (current, historyEvent) => mergeAgentEventIntoMessages(current, historyEvent),
-          [] as ChatMessage[]
+          [] as ChatMessage[],
         );
-        const nextMessages = insertHistoricalPlans(historyMessages, getHistoryLoadedPlans(event.payload));
+        const nextMessages = insertHistoricalPlans(
+          historyMessages,
+          getHistoryLoadedPlans(event.payload),
+        );
         app.messageCache.current[event.sessionId] = nextMessages;
         toolGroups.collapseAllToolGroupsForSession(event.sessionId, nextMessages);
         app.setLoadingHistorySessionId((current) => (current === event.sessionId ? null : current));
@@ -379,22 +421,30 @@ export function useAgentEvents(
         return;
       }
 
-      const questionnaireRequestId = event.payload && typeof event.payload === 'object'
-        ? (event.payload as Record<string, unknown>).questionnaireRequestId
-        : undefined;
-      if (typeof questionnaireRequestId === 'string' && (event.type === 'status_update' || event.type === 'error')) {
-        cacheMessages((current) => current.map((message) =>
-          message.elicitationRequestId === questionnaireRequestId
-            ? {
-                ...message,
-                elicitationStatus: event.type === 'error' ? 'failed' : 'accepted',
-                elicitationResult: event.type === 'error'
-                  ? `问卷答案续发失败：${event.message}`
-                  : event.message
-              }
-            : message
-        ));
-        if (event.type === 'status_update' && app.selectedSessionRef.current?.id === event.sessionId) {
+      const questionnaireRequestId =
+        event.payload && typeof event.payload === 'object'
+          ? (event.payload as Record<string, unknown>).questionnaireRequestId
+          : undefined;
+      if (
+        typeof questionnaireRequestId === 'string' &&
+        (event.type === 'status_update' || event.type === 'error')
+      ) {
+        cacheMessages((current) =>
+          current.map((message) =>
+            message.elicitationRequestId === questionnaireRequestId
+              ? {
+                  ...message,
+                  elicitationStatus: event.type === 'error' ? 'failed' : 'accepted',
+                  elicitationResult:
+                    event.type === 'error' ? `问卷答案续发失败：${event.message}` : event.message,
+                }
+              : message,
+          ),
+        );
+        if (
+          event.type === 'status_update' &&
+          app.selectedSessionRef.current?.id === event.sessionId
+        ) {
           app.setIsAgentBusy(true);
         }
       }
@@ -420,11 +470,17 @@ export function useAgentEvents(
       } else if (event.type === 'error' && app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('错误');
         app.setIsAgentBusy(false);
-      } else if (event.type === 'tool_call' && app.selectedSessionRef.current?.id === event.sessionId) {
+      } else if (
+        event.type === 'tool_call' &&
+        app.selectedSessionRef.current?.id === event.sessionId
+      ) {
         app.setAgentStatus('调用工具');
       } else if (event.type === 'plan' && app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('生成计划');
-      } else if (event.type === 'status_update' && app.selectedSessionRef.current?.id === event.sessionId) {
+      } else if (
+        event.type === 'status_update' &&
+        app.selectedSessionRef.current?.id === event.sessionId
+      ) {
         app.setAgentStatus(event.message);
       } else if (app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('运行中');
@@ -445,7 +501,7 @@ export function useAgentEvents(
         }
       }
       cacheMessages((current) =>
-        mergeAgentEventIntoMessages(current, event, app.modelBySessionRef.current[event.sessionId])
+        mergeAgentEventIntoMessages(current, event, app.modelBySessionRef.current[event.sessionId]),
       );
     });
   }, [refreshDiff, refreshGitBranches]);

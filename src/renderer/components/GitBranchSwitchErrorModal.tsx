@@ -1,13 +1,16 @@
 import { useEffect, useRef } from 'react';
 import './GitBranchSwitchErrorModal.css';
 
-
 const GIT_BRANCH_SWITCH_ERROR_MESSAGES: Record<GitBranchSwitchFailureReason, string> = {
-  'unmerged-files': '当前分支存在尚未解决的文件冲突。请先解决冲突并完成提交，或中止当前合并操作后再切换。',
-  'local-changes': '当前修改会被目标分支覆盖。请先提交、暂存到 stash 或放弃这些修改，然后重新切换。',
-  'untracked-files': '当前未跟踪文件与目标分支中的文件冲突。请先移动、删除或提交这些文件，然后重新切换。',
+  'unmerged-files':
+    '当前分支存在尚未解决的文件冲突。请先解决冲突并完成提交，或中止当前合并操作后再切换。',
+  'local-changes':
+    '当前修改会被目标分支覆盖。请先提交、暂存到 stash 或放弃这些修改，然后重新切换。',
+  'untracked-files':
+    '当前未跟踪文件与目标分支中的文件冲突。请先移动、删除或提交这些文件，然后重新切换。',
   'branch-not-found': '目标分支不存在或已被删除。请刷新分支列表后重新选择。',
-  'git-operation-in-progress': '当前仓库正在执行合并、变基或拣选操作。请先完成或中止该操作，然后重新切换分支。',
+  'git-operation-in-progress':
+    '当前仓库正在执行合并、变基或拣选操作。请先完成或中止该操作，然后重新切换分支。',
   unknown: '分支切换失败。请检查当前仓库状态后重试。',
 };
 
@@ -16,12 +19,15 @@ const GIT_BRANCH_SWITCH_ERROR_MESSAGES: Record<GitBranchSwitchFailureReason, str
  */
 export function resolveGitBranchSwitchFailure(
   reason: GitBranchSwitchFailureReason | null | undefined,
-  legacyDiagnostic = ''
+  legacyDiagnostic = '',
 ): Pick<GitBranchSwitchError, 'reason' | 'message'> {
   let resolvedReason = reason ?? 'unknown';
   if (!reason) {
     const normalized = legacyDiagnostic.toLowerCase();
-    if (normalized.includes('resolve your current index first') || normalized.includes('needs merge')) {
+    if (
+      normalized.includes('resolve your current index first') ||
+      normalized.includes('needs merge')
+    ) {
       resolvedReason = 'unmerged-files';
     } else if (normalized.includes('local changes to the following files would be overwritten')) {
       resolvedReason = 'local-changes';
@@ -33,7 +39,10 @@ export function resolveGitBranchSwitchFailure(
       normalized.includes('merge_head exists')
     ) {
       resolvedReason = 'git-operation-in-progress';
-    } else if (normalized.includes('invalid reference') || normalized.includes('did not match any file')) {
+    } else if (
+      normalized.includes('invalid reference') ||
+      normalized.includes('did not match any file')
+    ) {
       resolvedReason = 'branch-not-found';
     }
   }
@@ -81,8 +90,18 @@ export function GitBranchSwitchErrorModal({ error, onClose }: GitBranchSwitchErr
       >
         <div className="git-branch-error-icon" aria-hidden="true">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-            <path d="M12 8v5M12 17h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            <path d="M10.3 4.2 3.2 17a2 2 0 0 0 1.75 3h14.1a2 2 0 0 0 1.75-3L13.7 4.2a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+            <path
+              d="M12 8v5M12 17h.01"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <path
+              d="M10.3 4.2 3.2 17a2 2 0 0 0 1.75 3h14.1a2 2 0 0 0 1.75-3L13.7 4.2a2 2 0 0 0-3.4 0Z"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
         <div className="git-branch-error-content">
@@ -99,7 +118,12 @@ export function GitBranchSwitchErrorModal({ error, onClose }: GitBranchSwitchErr
             </div>
           </dl>
           <div className="git-branch-error-actions">
-            <button ref={closeButtonRef} className="git-branch-error-confirm" type="button" onClick={onClose}>
+            <button
+              ref={closeButtonRef}
+              className="git-branch-error-confirm"
+              type="button"
+              onClick={onClose}
+            >
               留在当前分支
             </button>
           </div>

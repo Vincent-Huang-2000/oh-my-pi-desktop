@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import './ProjectPane.css';
 
-
 // 通用 SVG 图标（Feather 风格，统一 14x14 / 16x16 viewBox）
 const IconPlus = () => (
   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -30,7 +29,17 @@ const IconStar = () => (
 );
 
 const IconRefreshCw = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <polyline points="23 4 23 10 17 10" />
     <polyline points="1 20 1 14 7 14" />
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
@@ -38,14 +47,30 @@ const IconRefreshCw = () => (
 );
 
 const IconFolder = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
   </svg>
 );
 
 const IconChevronRight = () => (
   <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path
+      d="M6 4l4 4-4 4"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </svg>
 );
 
@@ -99,7 +124,6 @@ const formatSessionTime = (value: string) => {
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} 天`;
 };
-
 
 // 会话列表分页：默认只展示最新 5 条，展开每次新增 8 条，折叠回到 5 条。
 const INITIAL_SESSION_VISIBLE = 5;
@@ -292,7 +316,10 @@ function ProjectGroupItem({
   }, [isRenaming]);
 
   return (
-    <section className={isExpanded ? 'project-group expanded' : 'project-group'} data-project-path={project.path}>
+    <section
+      className={isExpanded ? 'project-group expanded' : 'project-group'}
+      data-project-path={project.path}
+    >
       <div className={isSelected ? 'project-header active' : 'project-header'}>
         {/* 点击目录名仅展开/折叠，不切换执行目录；只有点击 session 才进入执行目录。
             高亮的 session 不因点击目录名而改变。
@@ -321,16 +348,18 @@ function ProjectGroupItem({
             className={isSelected ? 'project-title active' : 'project-title'}
             type="button"
             onClick={() => onToggleExpanded(project.path)}
-            aria-label={isExpanded ? `折叠 ${getProjectDisplayName(project)}` : `展开 ${getProjectDisplayName(project)}`}
+            aria-label={
+              isExpanded
+                ? `折叠 ${getProjectDisplayName(project)}`
+                : `展开 ${getProjectDisplayName(project)}`
+            }
           >
-            <span className="project-chevron-icon" aria-hidden="true"><IconChevronRight /></span>
+            <span className="project-chevron-icon" aria-hidden="true">
+              <IconChevronRight />
+            </span>
             <span className="project-name">{getProjectDisplayName(project)}</span>
             {project.pinned && (
-              <span
-                className="project-pin-indicator"
-                aria-label="已置顶"
-                title="已置顶"
-              >
+              <span className="project-pin-indicator" aria-label="已置顶" title="已置顶">
                 <IconStar />
               </span>
             )}
@@ -481,24 +510,27 @@ export function ProjectPane({
   onRenameProject,
   onRemoveProject,
   onForkSession,
-  onCloseSession
+  onCloseSession,
 }: ProjectPaneProps) {
   // 当前展开 ⋯ 菜单的项目 path；同时只允许一个菜单处于打开状态。
   const [openMenuForPath, setOpenMenuForPath] = useState<string | null>(null);
   // 当前展开 ⋯ 菜单的 session id；与项目菜单互斥（同时只开一个）。
   const [openSessionMenuId, setOpenSessionMenuId] = useState<string | null>(null);
   const projectList = projects ?? desktopState.recentProjects;
-  const paneClassName = variant === 'preview' ? 'project-pane project-pane-preview' : 'project-pane';
+  const paneClassName =
+    variant === 'preview' ? 'project-pane project-pane-preview' : 'project-pane';
   const paneRef = useRef<HTMLElement | null>(null);
   // 滚动条位置稳定化：折叠/展开项目时补偿 scrollTop，保持被点击项目在视口中的位置不变。
   const projectListRef = useRef<HTMLDivElement | null>(null);
-  const pendingScrollAdjustRef = useRef<{ projectPath: string; headerViewportTop: number } | null>(null);
+  const pendingScrollAdjustRef = useRef<{ projectPath: string; headerViewportTop: number } | null>(
+    null,
+  );
   // 包装 toggleProjectExpanded：操作前记录被点击项目标题在视口中的 Y 坐标，
   // 然后通过 useLayoutEffect 在 DOM 更新后（浏览器 paint 前）调整 scrollTop 补偿高度变化。
   const handleToggleExpanded = (projectPath: string) => {
     if (projectListRef.current) {
       const groupEl = projectListRef.current.querySelector(
-        `[data-project-path="${CSS.escape(projectPath)}"]`
+        `[data-project-path="${CSS.escape(projectPath)}"]`,
       ) as HTMLElement | null;
       if (groupEl) {
         const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
@@ -515,7 +547,7 @@ export function ProjectPane({
     if (!pending || !projectListRef.current) return;
     pendingScrollAdjustRef.current = null;
     const groupEl = projectListRef.current.querySelector(
-      `[data-project-path="${CSS.escape(pending.projectPath)}"]`
+      `[data-project-path="${CSS.escape(pending.projectPath)}"]`,
     ) as HTMLElement | null;
     if (!groupEl) return;
     const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
@@ -566,10 +598,7 @@ export function ProjectPane({
   };
 
   return (
-    <aside
-      ref={paneRef}
-      className={paneClassName}
-    >
+    <aside ref={paneRef} className={paneClassName}>
       {variant === 'preview' && (
         <button
           className="preview-close-button"
@@ -591,9 +620,23 @@ export function ProjectPane({
             title="折叠左侧项目栏"
           >
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <rect x="2" y="2.5" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
+              <rect
+                x="2"
+                y="2.5"
+                width="12"
+                height="11"
+                rx="1.5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+              />
               <path d="M6 3v10" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M11 6L9 8l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              <path
+                d="M11 6L9 8l2 2"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
           </button>
         ) : (
@@ -610,7 +653,12 @@ export function ProjectPane({
             {/* 搜索入口仅打开居中窗口，暂不在左栏内做过滤。 */}
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <circle cx="7" cy="7" r="4.25" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M10.2 10.2L13 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path
+                d="M10.2 10.2L13 13"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
           <button
@@ -623,7 +671,12 @@ export function ProjectPane({
           >
             {/* 加号图标：与同步、折叠按钮风格保持一致 */}
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-              <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path
+                d="M8 3v10M3 8h10"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
             </svg>
           </button>
           <button
@@ -650,7 +703,9 @@ export function ProjectPane({
             onClick={onSelectWorkspace}
             title="选择一个本地目录作为项目"
           >
-            <span className="empty-projects-icon" aria-hidden="true"><IconFolder /></span>
+            <span className="empty-projects-icon" aria-hidden="true">
+              <IconFolder />
+            </span>
             <span className="empty-projects-title">还没有项目</span>
             <span className="empty-projects-hint">点击选择项目目录</span>
           </button>
@@ -661,7 +716,9 @@ export function ProjectPane({
               const isExpanded = expandedProjectPaths.includes(project.path);
               const projectSessions = isSelected
                 ? sessionsForProject
-                : desktopState.recentSessions.filter((session) => session.projectPath === project.path);
+                : desktopState.recentSessions.filter(
+                    (session) => session.projectPath === project.path,
+                  );
 
               return (
                 <ProjectGroupItem

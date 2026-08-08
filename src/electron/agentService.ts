@@ -33,7 +33,7 @@ import {
   updateProjectCommandsCache,
   updateProjectConfigCache,
   updateSessionApprovalProfile,
-  upsertSession
+  upsertSession,
 } from './state.js';
 import type { AgentEvent, ApprovalProfile, AcpAvailableCommand } from './types.js';
 import { CLIENT_VERSION } from './agentTypes.js';
@@ -52,7 +52,7 @@ import type {
   QuestionnaireAnswer,
   QuestionnaireResponseResult,
   SessionActionResult,
-  SessionNotification
+  SessionNotification,
 } from './agentTypes.js';
 import { APPROVAL_SWITCH_CANCEL_TIMEOUT_MS } from './agentTypes.js';
 import {
@@ -113,7 +113,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
   const waitForTurnToSettle = async (
     process: AcpProcessState,
-    timeoutMs = APPROVAL_SWITCH_CANCEL_TIMEOUT_MS
+    timeoutMs = APPROVAL_SWITCH_CANCEL_TIMEOUT_MS,
   ) => {
     const startedAt = Date.now();
     while (process.turnActive && Date.now() - startedAt < timeoutMs) {
@@ -184,7 +184,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       sessionId: process.localSessionId,
       type: 'config_update',
       message: 'ACP 配置已更新',
-      payload: { configOptions: normalized }
+      payload: { configOptions: normalized },
     });
   };
 
@@ -198,19 +198,21 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     }
 
     process.configOptions = process.configOptions.map((option) =>
-      option.id === 'mode' ? { ...option, currentValue: modeId } : option
+      option.id === 'mode' ? { ...option, currentValue: modeId } : option,
     );
     emitEvent({
       sessionId: process.localSessionId,
       type: 'config_update',
       message: 'ACP 模式已更新',
-      payload: { configOptions: process.configOptions }
+      payload: { configOptions: process.configOptions },
     });
   };
 
   const updateStoredSessionInfo = (process: AcpProcessState, update: Record<string, unknown>) => {
     const title =
-      typeof update.title === 'string' && update.title.trim() ? update.title.trim() : process.localSessionTitle;
+      typeof update.title === 'string' && update.title.trim()
+        ? update.title.trim()
+        : process.localSessionTitle;
     const updatedAt = typeof update.updatedAt === 'string' ? update.updatedAt : undefined;
     process.localSessionTitle = title;
     const session = upsertSession(
@@ -220,13 +222,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       process.acpSessionId,
       updatedAt,
       undefined,
-      process.approvalProfile
+      process.approvalProfile,
     );
     emitEvent({
       sessionId: process.localSessionId,
       type: 'session_update',
       message: 'session 信息已更新',
-      payload: { session }
+      payload: { session },
     });
   };
 
@@ -242,8 +244,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return [
         {
           name: item.name,
-          description: typeof item.description === 'string' ? item.description : ''
-        }
+          description: typeof item.description === 'string' ? item.description : '',
+        },
       ];
     });
   };
@@ -257,12 +259,19 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     const size = typeof update.size === 'number' ? update.size : 0;
     const costRecord = isRecord(update.cost) ? update.cost : undefined;
     const amount = costRecord && typeof costRecord.amount === 'number' ? costRecord.amount : 0;
-    const currency = costRecord && typeof costRecord.currency === 'string' ? costRecord.currency : 'USD';
-    const usageText = size > 0 ? `上下文用量：${used}/${size} tokens` : `上下文用量：${used} tokens`;
-    return amount > 0 ? `${usageText} · ${currency === 'USD' ? '$' : ''}${amount.toFixed(4)}` : usageText;
+    const currency =
+      costRecord && typeof costRecord.currency === 'string' ? costRecord.currency : 'USD';
+    const usageText =
+      size > 0 ? `上下文用量：${used}/${size} tokens` : `上下文用量：${used} tokens`;
+    return amount > 0
+      ? `${usageText} · ${currency === 'USD' ? '$' : ''}${amount.toFixed(4)}`
+      : usageText;
   };
 
-  const writeMessage = (process: AcpProcessState, message: JsonRpcRequest | JsonRpcNotification | JsonRpcResponse) => {
+  const writeMessage = (
+    process: AcpProcessState,
+    message: JsonRpcRequest | JsonRpcNotification | JsonRpcResponse,
+  ) => {
     process.child.stdin.write(`${JSON.stringify(message)}\n`);
   };
 
@@ -270,7 +279,12 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     writeMessage(process, { jsonrpc: '2.0', id, result });
   };
 
-  const sendErrorResponse = (process: AcpProcessState, id: JsonRpcId, code: number, message: string) => {
+  const sendErrorResponse = (
+    process: AcpProcessState,
+    id: JsonRpcId,
+    code: number,
+    message: string,
+  ) => {
     writeMessage(process, { jsonrpc: '2.0', id, error: { code, message } });
   };
 
@@ -298,7 +312,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   };
 
   // ACP 的 session/update 是结构化通知，这里只转换桌面端当前 UI 已能展示的事件。
-  const mapSessionUpdate = (process: AcpProcessState, params: SessionNotification): AgentEvent[] => {
+  const mapSessionUpdate = (
+    process: AcpProcessState,
+    params: SessionNotification,
+  ): AgentEvent[] => {
     const update = params.update;
     if (!isRecord(update)) {
       return [];
@@ -343,7 +360,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       const payload: unknown = {
         ...(params as Record<string, unknown>),
         ...(process.isReplaying ? { _replay: true } : {}),
-        ...(toolModel ? { toolModel } : {})
+        ...(toolModel ? { toolModel } : {}),
       };
       return [{ sessionId, type: 'tool_call', message: getToolCallMessage(update), payload }];
     }
@@ -374,7 +391,9 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     if (sessionUpdate === 'current_mode_update') {
       updateCurrentMode(process, update.currentModeId);
       const modeId = typeof update.currentModeId === 'string' ? update.currentModeId : '未知模式';
-      return [{ sessionId, type: 'status_update', message: `当前模式：${modeId}`, payload: params }];
+      return [
+        { sessionId, type: 'status_update', message: `当前模式：${modeId}`, payload: params },
+      ];
     }
     if (sessionUpdate === 'available_commands_update') {
       const commands = normalizeAvailableCommands(update.availableCommands);
@@ -386,8 +405,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           sessionId,
           type: 'commands_update',
           message: getAvailableCommandsMessage(commands.length),
-          payload: { commands }
-        }
+          payload: { commands },
+        },
       ];
     }
     if (sessionUpdate === 'session_info_update') {
@@ -397,7 +416,9 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     if (sessionUpdate === 'usage_update') {
       // v16.1.13 新增：每轮结束时 agent 下发上下文用量与可选费用。
       // 桌面端把它转成 usage_update 事件，由渲染层在右栏 Agent 状态区展示，不进消息流。
-      return [{ sessionId, type: 'usage_update', message: getUsageMessage(update), payload: params }];
+      return [
+        { sessionId, type: 'usage_update', message: getUsageMessage(update), payload: params },
+      ];
     }
 
     return [];
@@ -429,7 +450,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       sessionId: process.localSessionId,
       type: 'permission_request',
       message: getPermissionMessage(params),
-      payload: { ...params, requestId, options }
+      payload: { ...params, requestId, options },
     });
   };
 
@@ -439,7 +460,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const loadElicitationPlanPreview = async (
     process: AcpProcessState,
     requestId: string,
-    message: string
+    message: string,
   ) => {
     try {
       const fullPlan = await readFullPlanForApproval(process);
@@ -458,8 +479,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           if (pending?.process !== process) reasons.push('请求已被响应或替换');
           if (process.closed) reasons.push('进程已关闭');
           if (process.suppressCloseEvent) reasons.push('进程切换中');
-          if (agentProcesses.get(process.localSessionId) !== process) reasons.push('进程已被新实例替换');
-          addLog(process.localSessionId, 'info', `[plan-preview] 完整方案已读到但补发被丢弃（${reasons.join('；') || '未知失效'}），requestId=${requestId}`);
+          if (agentProcesses.get(process.localSessionId) !== process)
+            reasons.push('进程已被新实例替换');
+          addLog(
+            process.localSessionId,
+            'info',
+            `[plan-preview] 完整方案已读到但补发被丢弃（${reasons.join('；') || '未知失效'}），requestId=${requestId}`,
+          );
         }
         return;
       }
@@ -467,7 +493,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         sessionId: process.localSessionId,
         type: 'elicitation_plan_preview',
         message: '完整方案已加载',
-        payload: { requestId, fullPlan }
+        payload: { requestId, fullPlan },
       });
     } catch (error) {
       const message2 = error instanceof Error ? error.message : '未知原因';
@@ -496,8 +522,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         requestId,
         message: message2,
         requestedSchema,
-        ...(questionnaire ? { questionnaire } : {})
-      }
+        ...(questionnaire ? { questionnaire } : {}),
+      },
     });
     if (!questionnaire) {
       void loadElicitationPlanPreview(process, requestId, message2);
@@ -545,7 +571,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return;
     }
 
-    emitEvent({ sessionId: process.localSessionId, type: 'output', message: stringifySafe(message) });
+    emitEvent({
+      sessionId: process.localSessionId,
+      type: 'output',
+      message: stringifySafe(message),
+    });
   };
 
   const handleChunk = (process: AcpProcessState, chunk: Buffer, isError = false) => {
@@ -565,7 +595,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       clientInfo: {
         name: 'oh-my-pi-desktop',
         title: 'Oh My Pi Desktop',
-        version: CLIENT_VERSION
+        version: CLIENT_VERSION,
       },
       // 声明 elicitation.form 能力：omp 内置的 ExtensionToolWrapper 第2层审批门控
       // 在 always-ask/write 模式下会走 unstable_createElicitation（form 模式）请求用户确认，
@@ -573,8 +603,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       clientCapabilities: {
         elicitation: { form: {} },
         // 支持按计划 ID 更新和移除；未声明时 agent 不会发送 plan_update / plan_removed。
-        plan: {}
-      }
+        plan: {},
+      },
     });
 
     if (isRecord(initResult) && Array.isArray(initResult.authMethods)) {
@@ -607,14 +637,14 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       type: 'active_plan_update',
       message: planMode.active ? '当前存在未完成方案' : '当前没有未完成方案',
       // 这里只同步展示状态，不携带或恢复任何已经失效的 elicitation requestId。
-      payload: planMode
+      payload: planMode,
     });
   };
 
   const restoreAcpSession = async (
     process: AcpProcessState,
     acpSessionId: string,
-    method: AcpProcessState['initMethod']
+    method: AcpProcessState['initMethod'],
   ) => {
     // 标记重放窗口：sendRequest 期间 omp 会通过 session/update 把历史消息流回来。
     // load/fork 先缓存聊天事件，resume 仅用于刷新配置，直接丢弃聊天事件。
@@ -628,7 +658,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       response = await sendRequest(process, method, {
         sessionId: acpSessionId,
         cwd: process.workspacePath,
-        mcpServers: []
+        mcpServers: [],
       });
       replayEvents = process.replayEvents;
     } finally {
@@ -653,7 +683,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           const loadResponse = await sendRequest(process, 'session/load', {
             sessionId: process.acpSessionId,
             cwd: process.workspacePath,
-            mcpServers: []
+            mcpServers: [],
           });
           replayEvents = process.replayEvents;
           // 用 session/load 返回的 config 更新配置选项
@@ -681,13 +711,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       process.acpSessionId,
       undefined,
       true, // 仅加载/恢复历史，不置顶；只有发消息时才应置顶。
-      process.approvalProfile
+      process.approvalProfile,
     );
     emitEvent({
       sessionId: process.localSessionId,
       type: 'session_update',
       message: `ACP session 已${methodLabel(method)}`,
-      payload: { session }
+      payload: { session },
     });
     if (shouldBufferReplay) {
       const plans = await readHistoricalSessionPlans(process, replayEvents);
@@ -695,11 +725,15 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         sessionId: process.localSessionId,
         type: 'history_loaded',
         message: `历史消息已加载：${replayEvents.length} 条`,
-        payload: { events: replayEvents, plans }
+        payload: { events: replayEvents, plans },
       });
     }
     emitActivePlanUpdate(process, response);
-    addLog(process.localSessionId, 'info', `ACP session 已${methodLabel(method)}：${process.acpSessionId}`);
+    addLog(
+      process.localSessionId,
+      'info',
+      `ACP session 已${methodLabel(method)}：${process.acpSessionId}`,
+    );
     return process.acpSessionId;
   };
 
@@ -718,7 +752,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
     const response = await sendRequest(process, 'session/new', {
       cwd: process.workspacePath,
-      mcpServers: []
+      mcpServers: [],
     });
     if (!isRecord(response) || typeof response.sessionId !== 'string') {
       throw new Error('ACP session/new 未返回有效 sessionId');
@@ -740,7 +774,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       response.sessionId,
       undefined,
       false,
-      process.approvalProfile
+      process.approvalProfile,
     );
     emitActivePlanUpdate(process, response);
     addLog(process.localSessionId, 'info', `ACP session 已创建：${response.sessionId}`);
@@ -782,26 +816,28 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         return;
       }
       const message = code === 0 ? 'agent 已完成' : `agent 已退出，代码 ${code ?? 'unknown'}`;
-      emitEvent({ sessionId: process.localSessionId, type: code === 0 ? 'done' : 'error', message });
+      emitEvent({
+        sessionId: process.localSessionId,
+        type: code === 0 ? 'done' : 'error',
+        message,
+      });
     });
   };
 
   const startAgent = async (
     sessionId: string,
     workspacePath: string,
-    approvalProfile?: ApprovalProfile
+    approvalProfile?: ApprovalProfile,
   ) => {
     if (agentProcesses.has(sessionId)) {
       return { ok: true, message: 'agent 已在运行' };
     }
 
     const ompExecutable = getSetting('ompExecutablePath') || 'omp';
-    const args = approvalProfile
-      ? ['acp', '--approval-mode', approvalProfile]
-      : ['acp'];
+    const args = approvalProfile ? ['acp', '--approval-mode', approvalProfile] : ['acp'];
     const child = spawn(ompExecutable, args, {
       cwd: workspacePath,
-      env: { ...process.env, OMP_WORKSPACE: workspacePath }
+      env: { ...process.env, OMP_WORKSPACE: workspacePath },
     });
     const storedSession = readState().recentSessions.find((session) => session.id === sessionId);
 
@@ -823,7 +859,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       isReplaying: false,
       replayEvents: [],
       turnActive: false,
-      questionnaireFollowUps: []
+      questionnaireFollowUps: [],
     };
     agentProcesses.set(sessionId, processState);
     bindAgentProcess(processState);
@@ -831,7 +867,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     addLog(
       sessionId,
       'info',
-      approvalProfile ? `已启动 omp acp，审批档位：${approvalProfile}` : '已启动 omp acp 临时进程'
+      approvalProfile ? `已启动 omp acp，审批档位：${approvalProfile}` : '已启动 omp acp 临时进程',
     );
 
     try {
@@ -902,7 +938,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const restartAgentForWorkspace = async (
     sessionId: string,
     workspacePath: string,
-    approvalProfile: ApprovalProfile
+    approvalProfile: ApprovalProfile,
   ) => {
     stopSessionProcess(sessionId);
     const result = await startAgent(sessionId, workspacePath, approvalProfile);
@@ -916,7 +952,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     sessionId: string,
     workspacePath: string,
     content: AgentPromptContent,
-    options: { preserveSessionTitle?: boolean } = {}
+    options: { preserveSessionTitle?: boolean } = {},
   ) => {
     let processState = agentProcesses.get(sessionId);
     // 已有进程但 cwd 不一致：重启，确保后续 session/new 用的是当前 workspacePath。
@@ -924,18 +960,21 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       addLog(
         sessionId,
         'info',
-        `执行目录切换（${processState.workspacePath} → ${workspacePath}），重启 agent 子进程`
+        `执行目录切换（${processState.workspacePath} → ${workspacePath}），重启 agent 子进程`,
       );
-      processState = (
-        await restartAgentForWorkspace(
+      processState =
+        (await restartAgentForWorkspace(
           sessionId,
           workspacePath,
-          processState.approvalProfile ?? getStoredApprovalProfile(sessionId)
-        )
-      ) ?? undefined;
+          processState.approvalProfile ?? getStoredApprovalProfile(sessionId),
+        )) ?? undefined;
     }
     if (!processState) {
-      const result = await startAgent(sessionId, workspacePath, getStoredApprovalProfile(sessionId));
+      const result = await startAgent(
+        sessionId,
+        workspacePath,
+        getStoredApprovalProfile(sessionId),
+      );
       if (!result.ok) {
         return { ok: false, message: result.message };
       }
@@ -963,7 +1002,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     processState.turnActive = true;
     const promptRequest = sendRequest(processState, 'session/prompt', {
       sessionId: acpSessionId,
-      prompt: promptBlocks
+      prompt: promptBlocks,
     });
     promptRequest.then(
       (response) => {
@@ -971,8 +1010,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         if (processState.suppressCloseEvent) {
           return;
         }
-        const stopReason = isRecord(response) && typeof response.stopReason === 'string' ? response.stopReason : 'end_turn';
-        emitEvent({ sessionId, type: 'done', message: `agent 回合结束：${stopReason}`, payload: response });
+        const stopReason =
+          isRecord(response) && typeof response.stopReason === 'string'
+            ? response.stopReason
+            : 'end_turn';
+        emitEvent({
+          sessionId,
+          type: 'done',
+          message: `agent 回合结束：${stopReason}`,
+          payload: response,
+        });
         void dispatchQuestionnaireFollowUp(processState);
       },
       (error: Error) => {
@@ -981,7 +1028,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           return;
         }
         emitEvent({ sessionId, type: 'error', message: error.message });
-      }
+      },
     );
 
     if (!options.preserveSessionTitle) {
@@ -992,7 +1039,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         processState.acpSessionId,
         undefined,
         false,
-        processState.approvalProfile
+        processState.approvalProfile,
       );
     }
     addLog(sessionId, 'info', `用户：${content.text}`);
@@ -1001,7 +1048,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
   // 每次只续发一条。若同一会话连续出现问卷，下一条会等待续发回合结束，绝不打断它。
   const dispatchQuestionnaireFollowUp = async (process: AcpProcessState) => {
-    if (process.closed || process.suppressCloseEvent || agentProcesses.get(process.localSessionId) !== process) {
+    if (
+      process.closed ||
+      process.suppressCloseEvent ||
+      agentProcesses.get(process.localSessionId) !== process
+    ) {
       process.questionnaireFollowUps = [];
       return;
     }
@@ -1011,20 +1062,20 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       sessionId: process.localSessionId,
       type: 'user_message',
       message: followUp.text,
-      payload: { questionnaireRequestId: followUp.requestId }
+      payload: { questionnaireRequestId: followUp.requestId },
     });
     const result = await sendAgentMessage(
       process.localSessionId,
       process.workspacePath,
       { text: followUp.text },
-      { preserveSessionTitle: true }
+      { preserveSessionTitle: true },
     );
     if (!result.ok) {
       emitEvent({
         sessionId: process.localSessionId,
         type: 'error',
         message: result.message ?? '问卷答案续发失败',
-        payload: { questionnaireRequestId: followUp.requestId }
+        payload: { questionnaireRequestId: followUp.requestId },
       });
       return;
     }
@@ -1032,29 +1083,36 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       sessionId: process.localSessionId,
       type: 'status_update',
       message: '已将问卷答案发送给 agent，正在继续生成计划',
-      payload: { questionnaireRequestId: followUp.requestId, questionnaireFollowUp: true }
+      payload: { questionnaireRequestId: followUp.requestId, questionnaireFollowUp: true },
     });
   };
 
-  const getProcessWithSession = async (sessionId: string, workspacePath: string, suppressConfigEvent?: boolean) => {
+  const getProcessWithSession = async (
+    sessionId: string,
+    workspacePath: string,
+    suppressConfigEvent?: boolean,
+  ) => {
     let processState = agentProcesses.get(sessionId);
     // 与 sendAgentMessage 同样的防御：cwd 不一致就重启，避免 set_config_option 等操作落到旧目录。
     if (processState && !processState.closed && processState.workspacePath !== workspacePath) {
       addLog(
         sessionId,
         'info',
-        `执行目录切换（${processState.workspacePath} → ${workspacePath}），重启 agent 子进程`
+        `执行目录切换（${processState.workspacePath} → ${workspacePath}），重启 agent 子进程`,
       );
-      processState = (
-        await restartAgentForWorkspace(
+      processState =
+        (await restartAgentForWorkspace(
           sessionId,
           workspacePath,
-          processState.approvalProfile ?? getStoredApprovalProfile(sessionId)
-        )
-      ) ?? undefined;
+          processState.approvalProfile ?? getStoredApprovalProfile(sessionId),
+        )) ?? undefined;
     }
     if (!processState) {
-      const result = await startAgent(sessionId, workspacePath, getStoredApprovalProfile(sessionId));
+      const result = await startAgent(
+        sessionId,
+        workspacePath,
+        getStoredApprovalProfile(sessionId),
+      );
       if (!result.ok) {
         throw new Error(result.message);
       }
@@ -1087,7 +1145,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     sessionId: string,
     workspacePath: string,
     configId: string,
-    value: string | boolean
+    value: string | boolean,
   ) => {
     try {
       // 检测是否即将创建全新的 ACP session（无现有会话、无恢复目标）。
@@ -1095,7 +1153,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       // 中间态的 config_update 事件如果异步到达渲染端会覆盖用户选择，需要抑制。
       const existingProcess = agentProcesses.get(sessionId);
       const isNewSession =
-        !existingProcess || (!existingProcess.acpSessionId && !existingProcess.restoredAcpSessionId);
+        !existingProcess ||
+        (!existingProcess.acpSessionId && !existingProcess.restoredAcpSessionId);
       const processState = await getProcessWithSession(sessionId, workspacePath, isNewSession);
       if (!processState.acpSessionId) {
         throw new Error('ACP session 尚未创建');
@@ -1104,7 +1163,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       const response = await sendRequest(processState, 'session/set_config_option', {
         sessionId: processState.acpSessionId,
         configId,
-        value
+        value,
       });
       if (isRecord(response)) {
         updateConfigOptions(processState, response.configOptions);
@@ -1129,7 +1188,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     writeMessage(processState, {
       jsonrpc: '2.0',
       method: 'session/cancel',
-      params: { sessionId: processState.acpSessionId }
+      params: { sessionId: processState.acpSessionId },
     });
     emitEvent({ sessionId, type: 'status_update', message: '已请求取消当前回合' });
     return { ok: true };
@@ -1144,8 +1203,9 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     const option = pending.options.find((item) => {
       return item.kind.startsWith(allow ? 'allow' : 'reject');
     });
-    const outcome =
-      option ? { outcome: { outcome: 'selected', optionId: option.optionId } } : { outcome: { outcome: 'cancelled' } };
+    const outcome = option
+      ? { outcome: { outcome: 'selected', optionId: option.optionId } }
+      : { outcome: { outcome: 'cancelled' } };
 
     sendResponse(pending.process, pending.rpcId, outcome);
     pendingPermissions.delete(requestId);
@@ -1165,13 +1225,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
     // 只回传该 pending 请求中实际匹配到的 optionId，避免 UI 陈旧值串到其它并发审批请求。
     sendResponse(pending.process, pending.rpcId, {
-      outcome: { outcome: 'selected', optionId: selectedOption.optionId }
+      outcome: { outcome: 'selected', optionId: selectedOption.optionId },
     });
     pendingPermissions.delete(requestId);
     addLog(
       pending.process.localSessionId,
       'permission',
-      `审批响应：${selectedOption.kind} (${selectedOption.optionId})`
+      `审批响应：${selectedOption.kind} (${selectedOption.optionId})`,
     );
     return { ok: true };
   };
@@ -1181,17 +1241,14 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const respondElicitation = (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',
-    content?: Record<string, unknown>
+    content?: Record<string, unknown>,
   ) => {
     const pending = pendingElicitations.get(requestId);
     if (!pending) {
       return { ok: false, message: '输入请求已失效' };
     }
 
-    const result =
-      action === 'accept' && content
-        ? { action: 'accept', content }
-        : { action };
+    const result = action === 'accept' && content ? { action: 'accept', content } : { action };
     sendResponse(pending.process, pending.rpcId, result);
     pendingElicitations.delete(requestId);
     addLog(pending.process.localSessionId, 'permission', `输入响应：${action}`);
@@ -1202,14 +1259,17 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const respondQuestionnaire = (
     requestId: string,
     action: 'submit' | 'deny',
-    answers?: QuestionnaireAnswer[]
+    answers?: QuestionnaireAnswer[],
   ): QuestionnaireResponseResult => {
     const pending = pendingElicitations.get(requestId);
     if (!pending?.questionnaire) {
       return { ok: false, message: '问卷请求已失效', reason: 'stale' };
     }
     if (action === 'deny') {
-      sendResponse(pending.process, pending.rpcId, { action: 'accept', content: { value: 'Deny' } });
+      sendResponse(pending.process, pending.rpcId, {
+        action: 'accept',
+        content: { value: 'Deny' },
+      });
       pendingElicitations.delete(requestId);
       addLog(pending.process.localSessionId, 'permission', '问卷已拒绝');
       return { ok: true };
@@ -1222,9 +1282,12 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     // 必须先登记续发内容，再放行 eval，避免 ACP 极快结束时丢失用户答案。
     pending.process.questionnaireFollowUps.push({
       requestId,
-      text: formatQuestionnaireFollowUp(pending.questionnaire, validated)
+      text: formatQuestionnaireFollowUp(pending.questionnaire, validated),
     });
-    sendResponse(pending.process, pending.rpcId, { action: 'accept', content: { value: 'Approve' } });
+    sendResponse(pending.process, pending.rpcId, {
+      action: 'accept',
+      content: { value: 'Approve' },
+    });
     pendingElicitations.delete(requestId);
     addLog(pending.process.localSessionId, 'permission', '问卷已提交，等待当前回合结束后续发答案');
     return { ok: true };
@@ -1246,7 +1309,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
   // 拉取 agent 在指定 workspace 下保存的所有 session（ACP session/list）。
   // 若该 workspace 已有运行的子进程，优先复用其进程发送请求；否则启动一个临时子进程。
-  const listSessions = async (workspacePath: string, cursor?: string): Promise<ListSessionsResult> => {
+  const listSessions = async (
+    workspacePath: string,
+    cursor?: string,
+  ): Promise<ListSessionsResult> => {
     let processState = agentProcesses.get(`__list__${workspacePath}`);
     if (!processState || processState.closed) {
       // 临时子进程：用一个虚拟 localSessionId，完成后调用方通过 stopSessionProcess 杀掉。
@@ -1264,7 +1330,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     try {
       const response = await sendRequest(processState, 'session/list', {
         cwd: workspacePath,
-        cursor: cursor ?? null
+        cursor: cursor ?? null,
       });
       if (!isRecord(response)) {
         return { ok: false, message: 'session/list 返回结构无效' };
@@ -1279,14 +1345,14 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
             sessionId: item.sessionId,
             cwd: item.cwd,
             title: typeof item.title === 'string' ? item.title : undefined,
-            updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : undefined
-          }
+            updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : undefined,
+          },
         ];
       });
       return {
         ok: true,
         sessions,
-        nextCursor: typeof response.nextCursor === 'string' ? response.nextCursor : undefined
+        nextCursor: typeof response.nextCursor === 'string' ? response.nextCursor : undefined,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'session/list 调用失败';
@@ -1303,13 +1369,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     workspacePath: string,
     acpSessionId: string,
     initMethod: 'session/load' | 'session/resume' | 'session/fork',
-    approvalProfile: ApprovalProfile
+    approvalProfile: ApprovalProfile,
   ): Promise<SessionActionResult> => {
     let processState = agentProcesses.get(localSessionId);
     if (processState && !processState.closed && processState.workspacePath !== workspacePath) {
-      processState = (
-        await restartAgentForWorkspace(localSessionId, workspacePath, approvalProfile)
-      ) ?? undefined;
+      processState =
+        (await restartAgentForWorkspace(localSessionId, workspacePath, approvalProfile)) ??
+        undefined;
     }
     if (processState?.closed) {
       agentProcesses.delete(localSessionId);
@@ -1347,7 +1413,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       workspacePath,
       acpSessionId,
       'session/load',
-      getStoredApprovalProfile(localSessionId)
+      getStoredApprovalProfile(localSessionId),
     );
 
   const resumeSession = (localSessionId: string, workspacePath: string, acpSessionId: string) =>
@@ -1356,7 +1422,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       workspacePath,
       acpSessionId,
       'session/resume',
-      getStoredApprovalProfile(localSessionId)
+      getStoredApprovalProfile(localSessionId),
     );
 
   // 启动/切项目时刷新项目配置缓存：恢复已有 session 拿 configOptions，随后释放子进程。
@@ -1365,9 +1431,17 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   // 修复：改用 __config__${localSessionId} 作为临时进程 key，与用户打开的进程完全隔离；
   // 同时直接发 session/resume 请求（跳过 restoreAcpSession），避免 upsertSession 把假 id
   // 写进会话列表，也避免发出多余的 session_update 事件。
-  const refreshSessionConfig = async (localSessionId: string, workspacePath: string, acpSessionId: string) => {
+  const refreshSessionConfig = async (
+    localSessionId: string,
+    workspacePath: string,
+    acpSessionId: string,
+  ) => {
     const tempId = `__config__${localSessionId}`;
-    const started = await startAgent(tempId, workspacePath, getStoredApprovalProfile(localSessionId));
+    const started = await startAgent(
+      tempId,
+      workspacePath,
+      getStoredApprovalProfile(localSessionId),
+    );
     if (!started.ok) {
       return { ok: false, message: started.message };
     }
@@ -1383,9 +1457,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       const response = await sendRequest(processState, 'session/resume', {
         sessionId: acpSessionId,
         cwd: workspacePath,
-        mcpServers: []
+        mcpServers: [],
       });
-      const configOptions = isRecord(response) ? normalizeConfigOptions(response.configOptions) : [];
+      const configOptions = isRecord(response)
+        ? normalizeConfigOptions(response.configOptions)
+        : [];
       stopSessionProcess(tempId);
       return { ok: true, configOptions };
     } catch (error) {
@@ -1395,13 +1471,19 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     }
   };
 
-  const forkSession = (localSessionId: string, workspacePath: string, sourceAcpSessionId: string, title: string) => {
+  const forkSession = (
+    localSessionId: string,
+    workspacePath: string,
+    sourceAcpSessionId: string,
+    title: string,
+  ) => {
     // 先持久化占位会话（带渲染层传入的正确 title），确保 startAgent 的 readState() 能找到，
     // 避免 localSessionTitle fallback 到 '新的 agent 会话'。
     // 注意：此时 acpSessionId 尚未确定，restoreAcpSession 末尾的 upsertSession 会补全它。
     upsertSession(workspacePath, localSessionId, title, undefined, undefined, true);
     const sourceSession = readState().recentSessions.find(
-      (session) => session.projectPath === workspacePath && session.acpSessionId === sourceAcpSessionId
+      (session) =>
+        session.projectPath === workspacePath && session.acpSessionId === sourceAcpSessionId,
     );
     try {
       return attachToAcpSession(
@@ -1409,7 +1491,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         workspacePath,
         sourceAcpSessionId,
         'session/fork',
-        normalizeApprovalProfile(sourceSession?.approvalProfile)
+        normalizeApprovalProfile(sourceSession?.approvalProfile),
       );
     } catch (error) {
       // attachToAcpSession 失败时清理已持久化的占位记录，避免 state 中残留幽灵 session。
@@ -1422,17 +1504,20 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const updateApprovalProfile = async (
     sessionId: string,
     workspacePath: string,
-    approvalProfile: ApprovalProfile
+    approvalProfile: ApprovalProfile,
   ) => {
     const storedSession = readState().recentSessions.find(
-      (session) => session.id === sessionId && session.projectPath === workspacePath
+      (session) => session.id === sessionId && session.projectPath === workspacePath,
     );
     if (!storedSession) {
       return { ok: false, message: '当前会话不存在，请重新打开后再试' };
     }
     let interruptionMessage = '';
     const processState = agentProcesses.get(sessionId);
-    if (processState && (processState.turnActive || hasPendingPermissionsForProcess(processState))) {
+    if (
+      processState &&
+      (processState.turnActive || hasPendingPermissionsForProcess(processState))
+    ) {
       try {
         const cancelled = await cancelTurn(sessionId);
         if (cancelled.ok) {
@@ -1447,7 +1532,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         addLog(
           sessionId,
           'error',
-          `切换审批档位前取消回合失败：${error instanceof Error ? error.message : '未知原因'}`
+          `切换审批档位前取消回合失败：${error instanceof Error ? error.message : '未知原因'}`,
         );
         interruptionMessage = '当前回合未能正常取消，已终止旧运行环境并完成切换';
       }
@@ -1467,19 +1552,19 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       workspacePath,
       session.acpSessionId,
       'session/resume',
-      approvalProfile
+      approvalProfile,
     );
     if (!restored.ok) {
       addLog(
         sessionId,
         'error',
-        `审批档位已保存，但运行环境恢复失败：${restored.message ?? '未知原因'}`
+        `审批档位已保存，但运行环境恢复失败：${restored.message ?? '未知原因'}`,
       );
       stopSessionProcess(sessionId);
       return {
         ok: false,
         session,
-        message: '审批档位已保存，但运行环境恢复失败，可重试'
+        message: '审批档位已保存，但运行环境恢复失败，可重试',
       };
     }
     return { ok: true, session, message: interruptionMessage || undefined };
@@ -1495,7 +1580,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       writeMessage(processState, {
         jsonrpc: '2.0',
         method: 'session/close',
-        params: { sessionId: processState.acpSessionId }
+        params: { sessionId: processState.acpSessionId },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'session/close 失败';
@@ -1539,6 +1624,6 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     forkSession,
     closeSession,
     stopSessionProcess,
-    stopAll
+    stopAll,
   };
 };

@@ -51,7 +51,7 @@ export function useProjectActions(
     app.setDiffStatus('尚未读取 diff');
     app.setUsageText('');
     app.setExpandedProjectPaths((current) =>
-      current.includes(project.path) ? current : [...current, project.path]
+      current.includes(project.path) ? current : [...current, project.path],
     );
     const status = await window.ohMyPiDesktop.checkOmp(project.path);
     app.setOmpStatus(status.installed ? status.message : '未安装 omp');
@@ -107,7 +107,9 @@ export function useProjectActions(
       const status = await window.ohMyPiDesktop.checkOmp(app.selectedProject.path);
       app.setOmpStatus(status.installed ? status.message : '未安装 omp');
     } else {
-      app.setOmpStatus(result.ok ? (result.message || 'omp 已设置') : (result.message || 'omp 设置失败'));
+      app.setOmpStatus(
+        result.ok ? result.message || 'omp 已设置' : result.message || 'omp 设置失败',
+      );
     }
   };
 
@@ -115,7 +117,7 @@ export function useProjectActions(
     app.setExpandedProjectPaths((current) =>
       current.includes(projectPath)
         ? current.filter((path) => path !== projectPath)
-        : [...current, projectPath]
+        : [...current, projectPath],
     );
   };
 
@@ -128,7 +130,9 @@ export function useProjectActions(
     }
     app.setDesktopState((current) => ({
       ...current,
-      recentProjects: current.recentProjects.map((item) => (item.path === updated.path ? updated : item))
+      recentProjects: current.recentProjects.map((item) =>
+        item.path === updated.path ? updated : item,
+      ),
     }));
     app.setAgentStatus(next ? `已置顶 ${updated.name}` : `已取消置顶 ${updated.name}`);
   };
@@ -148,7 +152,9 @@ export function useProjectActions(
     }
     app.setDesktopState((current) => ({
       ...current,
-      recentProjects: current.recentProjects.map((item) => (item.path === updated.path ? updated : item))
+      recentProjects: current.recentProjects.map((item) =>
+        item.path === updated.path ? updated : item,
+      ),
     }));
     app.setAgentStatus(`已重命名为 ${updated.displayName ?? updated.name}`);
   };
@@ -157,7 +163,7 @@ export function useProjectActions(
     // 移除前若该项目正在被作为执行目录使用，先停掉其下任意仍在跑的会话进程。
     // recentSessions 里属该 projectPath 的会话逐一 stopSessionProcess 兜底。
     const sessionsToRemove = app.desktopState.recentSessions.filter(
-      (session) => session.projectPath === project.path
+      (session) => session.projectPath === project.path,
     );
     for (const session of sessionsToRemove) {
       await window.ohMyPiDesktop.stopSessionProcess(session.id);
@@ -172,7 +178,7 @@ export function useProjectActions(
     }
     app.setDesktopState((current) => ({
       ...current,
-      recentProjects: current.recentProjects.filter((item) => item.path !== project.path)
+      recentProjects: current.recentProjects.filter((item) => item.path !== project.path),
     }));
     // 若移除的是当前执行目录，清空选中态，并把当前会话相关的运行时缓存一并清空，
     // 让中间/右栏落到干净的空白态，避免「无目录 + 旧消息/用量/diff 残留」。

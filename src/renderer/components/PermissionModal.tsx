@@ -15,14 +15,19 @@ const optionActionClass = (option: PermissionOption): string => {
 
 export function PermissionModal({ request, onRespond }: PermissionModalProps) {
   const isPermissionRequest = request.options.some(
-    (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject')
+    (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject'),
   );
   const title = isPermissionRequest ? '权限审批' : '选择下一步';
   const emptyText = isPermissionRequest ? '暂无可用审批选项' : '暂无可用选项';
 
   return (
     <div className="approval-float-layer" role="presentation">
-      <section className="approval-modal" role="dialog" aria-modal="false" aria-labelledby="approval-title">
+      <section
+        className="approval-modal"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="approval-title"
+      >
         <h2 id="approval-title">{title}</h2>
         <p>{request.message}</p>
         <div className="modal-actions">

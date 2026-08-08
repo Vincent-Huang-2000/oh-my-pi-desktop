@@ -14,54 +14,62 @@
  * - GitBranchSwitchError 类型定义在 components/GitBranchSwitchErrorModal。
  */
 import { useCallback, useEffect } from 'react';
-import { resolveGitBranchSwitchFailure, type GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
+import {
+  resolveGitBranchSwitchFailure,
+  type GitBranchSwitchError,
+} from '../components/GitBranchSwitchErrorModal';
 import { REVIEW_SOURCE_LABEL, type ReviewSource } from '../lib/constants';
 import { useAppCore } from './useAppCore';
 
 export function useGitReview(app: ReturnType<typeof useAppCore>) {
-  const refreshDiff = useCallback(async (source: ReviewSource, project = app.selectedProjectRef.current) => {
-    const refreshId = app.diffRefreshIdRef.current + 1;
-    app.diffRefreshIdRef.current = refreshId;
-    const sourceLabel = REVIEW_SOURCE_LABEL[source];
+  const refreshDiff = useCallback(
+    async (source: ReviewSource, project = app.selectedProjectRef.current) => {
+      const refreshId = app.diffRefreshIdRef.current + 1;
+      app.diffRefreshIdRef.current = refreshId;
+      const sourceLabel = REVIEW_SOURCE_LABEL[source];
 
-    if (!project) {
-      app.setDiffText('');
-      app.setDiffStatus('请选择项目后查看 Git 改动');
-      return;
-    }
-
-    try {
-      app.setDiffStatus(`正在读取${sourceLabel}改动...`);
-      const result = await window.ohMyPiDesktop.getDiff(project.path, source);
-
-      // 用户快速切换项目/来源时，旧请求可能后返回；这里丢弃旧结果，避免右栏显示错项目 diff。
-      if (
-        refreshId !== app.diffRefreshIdRef.current ||
-        app.selectedProjectRef.current?.path !== project.path ||
-        app.reviewSourceRef.current !== source
-      ) {
+      if (!project) {
+        app.setDiffText('');
+        app.setDiffStatus('请选择项目后查看 Git 改动');
         return;
       }
 
-      app.setDiffText(result.diff);
-      if (!result.ok && !result.diff) {
-        app.setDiffStatus(result.message || `读取${sourceLabel}改动失败`);
+      try {
+        app.setDiffStatus(`正在读取${sourceLabel}改动...`);
+        const result = await window.ohMyPiDesktop.getDiff(project.path, source);
+
+        // 用户快速切换项目/来源时，旧请求可能后返回；这里丢弃旧结果，避免右栏显示错项目 diff。
+        if (
+          refreshId !== app.diffRefreshIdRef.current ||
+          app.selectedProjectRef.current?.path !== project.path ||
+          app.reviewSourceRef.current !== source
+        ) {
+          return;
+        }
+
+        app.setDiffText(result.diff);
+        if (!result.ok && !result.diff) {
+          app.setDiffStatus(result.message || `读取${sourceLabel}改动失败`);
+          return;
+        }
+        app.setDiffStatus(
+          result.diff ? `已读取${sourceLabel}改动` : result.message || `当前没有${sourceLabel}改动`,
+        );
+      } catch (error) {
+        if (
+          refreshId !== app.diffRefreshIdRef.current ||
+          app.selectedProjectRef.current?.path !== project.path ||
+          app.reviewSourceRef.current !== source
+        ) {
+          return;
+        }
+        app.setDiffText('');
+        app.setDiffStatus(error instanceof Error ? error.message : `读取${sourceLabel}改动失败`);
         return;
       }
-      app.setDiffStatus(result.diff ? `已读取${sourceLabel}改动` : result.message || `当前没有${sourceLabel}改动`);
-    } catch (error) {
-      if (
-        refreshId !== app.diffRefreshIdRef.current ||
-        app.selectedProjectRef.current?.path !== project.path ||
-        app.reviewSourceRef.current !== source
-      ) {
-        return;
-      }
-      app.setDiffText('');
-      app.setDiffStatus(error instanceof Error ? error.message : `读取${sourceLabel}改动失败`);
-      return;
-    }
-  }, []);
+    },
+    [],
+  );
 
   const refreshGitBranches = useCallback(async (project = app.selectedProjectRef.current) => {
     const refreshId = app.branchRefreshIdRef.current + 1;
@@ -75,7 +83,10 @@ export function useGitReview(app: ReturnType<typeof useAppCore>) {
 
     const result = await window.ohMyPiDesktop.getGitBranches(project.path);
     // 请求序号与项目路径共同防止快速切换项目时，旧仓库的异步结果覆盖当前审查状态。
-    if (refreshId !== app.branchRefreshIdRef.current || app.selectedProjectRef.current?.path !== project.path) {
+    if (
+      refreshId !== app.branchRefreshIdRef.current ||
+      app.selectedProjectRef.current?.path !== project.path
+    ) {
       return null;
     }
     app.setGitBranches(result.branches);
@@ -87,21 +98,24 @@ export function useGitReview(app: ReturnType<typeof useAppCore>) {
     return result.currentBranch;
   }, []);
 
-  const syncGitReview = useCallback(async (project = app.selectedProjectRef.current) => {
-    if (!project) {
-      await refreshGitBranches(project);
-      return;
-    }
+  const syncGitReview = useCallback(
+    async (project = app.selectedProjectRef.current) => {
+      if (!project) {
+        await refreshGitBranches(project);
+        return;
+      }
 
-    const nextBranch = await refreshGitBranches(project);
-    if (nextBranch === null || app.selectedProjectRef.current?.path !== project.path) {
-      return;
-    }
+      const nextBranch = await refreshGitBranches(project);
+      if (nextBranch === null || app.selectedProjectRef.current?.path !== project.path) {
+        return;
+      }
 
-    // 外部终端既可能切换分支，也可能改变暂存区或工作区；事件触发时需同步当前来源的 diff。
-    // 这里仍是 focus/visibility 驱动而非轮询，不会持续创建 Git 子进程。
-    await refreshDiff(app.reviewSourceRef.current, project);
-  }, [refreshDiff, refreshGitBranches]);
+      // 外部终端既可能切换分支，也可能改变暂存区或工作区；事件触发时需同步当前来源的 diff。
+      // 这里仍是 focus/visibility 驱动而非轮询，不会持续创建 Git 子进程。
+      await refreshDiff(app.reviewSourceRef.current, project);
+    },
+    [refreshDiff, refreshGitBranches],
+  );
 
   useEffect(() => {
     app.reviewSourceRef.current = app.reviewSource;
@@ -116,7 +130,6 @@ export function useGitReview(app: ReturnType<typeof useAppCore>) {
     app.setSwitchingGitBranch(false);
     void refreshGitBranches(app.selectedProject);
   }, [refreshGitBranches, app.selectedProject?.path]);
-
 
   const handleRefreshGitReview = async () => {
     // 用户主动刷新时同时同步分支列表、暂存区和工作区改动。
@@ -149,7 +162,7 @@ export function useGitReview(app: ReturnType<typeof useAppCore>) {
         app.setGitBranchSwitchError({
           ...failure,
           currentBranch: app.currentGitBranch,
-          targetBranch: branchName
+          targetBranch: branchName,
         });
         return;
       }
@@ -164,7 +177,7 @@ export function useGitReview(app: ReturnType<typeof useAppCore>) {
       app.setGitBranchSwitchError({
         ...failure,
         currentBranch: app.currentGitBranch,
-        targetBranch: branchName
+        targetBranch: branchName,
       });
     } finally {
       if (app.selectedProjectRef.current?.path === project.path) {

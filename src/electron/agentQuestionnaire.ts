@@ -11,12 +11,18 @@
  * 且列表外部必须严格匹配 `import json` + `print(json.dumps(questions))`
  * 模式，拒绝任意 eval。
  */
-import type { QuestionnaireAnswer, QuestionnaireDefinition, QuestionnaireOption, QuestionnaireQuestion } from './agentTypes.js';
+import type {
+  QuestionnaireAnswer,
+  QuestionnaireDefinition,
+  QuestionnaireOption,
+  QuestionnaireQuestion,
+} from './agentTypes.js';
 import { isRecord } from './agentUtils.js';
 
 // 仅识别 Plan 模式约定的静态 Python 问卷；不执行、不推断任意 Python 代码。
 export const parseQuestionnaireEval = (message: string): QuestionnaireDefinition | null => {
-  const header = /^Allow tool:\s*eval\s*\r?\nLanguage:\s*python\s*\r?\nCode:\s*\r?\n([\s\S]+)$/.exec(message);
+  const header =
+    /^Allow tool:\s*eval\s*\r?\nLanguage:\s*python\s*\r?\nCode:\s*\r?\n([\s\S]+)$/.exec(message);
   if (!header) return null;
   const code = header[1];
   const assignment = /^[ \t]*questions[ \t]*=[ \t]*/.exec(code);
@@ -50,7 +56,11 @@ export const parseQuestionnaireEval = (message: string): QuestionnaireDefinition
 
   // 列表之外只允许 json 导入和 questions 序列化打印，避免任意 eval 被伪装为问卷。
   const tail = code.slice(end);
-  if (!/^\s*import\s+json\s*\r?\n\s*print\s*\(\s*json\.dumps\s*\(\s*questions(?:\s*,\s*(?:ensure_ascii\s*=\s*(?:True|False)|indent\s*=\s*\d+))*\s*\)\s*\)\s*$/.test(tail)) {
+  if (
+    !/^\s*import\s+json\s*\r?\n\s*print\s*\(\s*json\.dumps\s*\(\s*questions(?:\s*,\s*(?:ensure_ascii\s*=\s*(?:True|False)|indent\s*=\s*\d+))*\s*\)\s*\)\s*$/.test(
+      tail,
+    )
+  ) {
     return null;
   }
 
@@ -92,26 +102,36 @@ export const parseQuestionnaireEval = (message: string): QuestionnaireDefinition
 
   const questions: QuestionnaireQuestion[] = [];
   for (const item of parsed) {
-    if (!isRecord(item) || typeof item.question !== 'string' || !item.question.trim() ||
-      typeof item.multiSelect !== 'boolean' || !Array.isArray(item.options) || item.options.length === 0) {
+    if (
+      !isRecord(item) ||
+      typeof item.question !== 'string' ||
+      !item.question.trim() ||
+      typeof item.multiSelect !== 'boolean' ||
+      !Array.isArray(item.options) ||
+      item.options.length === 0
+    ) {
       return null;
     }
     const options: QuestionnaireOption[] = [];
     for (const option of item.options) {
-      if (!isRecord(option) || typeof option.label !== 'string' || !option.label.trim() ||
-        (option.description !== undefined && typeof option.description !== 'string')) {
+      if (
+        !isRecord(option) ||
+        typeof option.label !== 'string' ||
+        !option.label.trim() ||
+        (option.description !== undefined && typeof option.description !== 'string')
+      ) {
         return null;
       }
       options.push({
         label: option.label,
-        ...(typeof option.description === 'string' ? { description: option.description } : {})
+        ...(typeof option.description === 'string' ? { description: option.description } : {}),
       });
     }
     questions.push({
       question: item.question,
       ...(typeof item.header === 'string' && item.header.trim() ? { header: item.header } : {}),
       options,
-      multiSelect: item.multiSelect
+      multiSelect: item.multiSelect,
     });
   }
   return { questions };
@@ -119,20 +139,27 @@ export const parseQuestionnaireEval = (message: string): QuestionnaireDefinition
 
 export const validateQuestionnaireAnswers = (
   questionnaire: QuestionnaireDefinition,
-  answers: QuestionnaireAnswer[] | undefined
+  answers: QuestionnaireAnswer[] | undefined,
 ): QuestionnaireAnswer[] | null => {
   if (!Array.isArray(answers) || answers.length !== questionnaire.questions.length) return null;
   const normalized: QuestionnaireAnswer[] = [];
   for (let index = 0; index < questionnaire.questions.length; index += 1) {
     const answer = answers.find((item) => item?.questionIndex === index);
     const question = questionnaire.questions[index];
-    if (!answer || !Array.isArray(answer.selections) || answer.selections.length === 0 ||
-      (!question.multiSelect && answer.selections.length !== 1)) {
+    if (
+      !answer ||
+      !Array.isArray(answer.selections) ||
+      answer.selections.length === 0 ||
+      (!question.multiSelect && answer.selections.length !== 1)
+    ) {
       return null;
     }
     const allowed = new Set(question.options.map((option) => option.label));
     const selections = [...new Set(answer.selections)];
-    if (selections.length !== answer.selections.length || selections.some((value) => typeof value !== 'string' || !allowed.has(value))) {
+    if (
+      selections.length !== answer.selections.length ||
+      selections.some((value) => typeof value !== 'string' || !allowed.has(value))
+    ) {
       return null;
     }
     normalized.push({ questionIndex: index, selections });
@@ -142,11 +169,12 @@ export const validateQuestionnaireAnswers = (
 
 export const formatQuestionnaireFollowUp = (
   questionnaire: QuestionnaireDefinition,
-  answers: QuestionnaireAnswer[]
-) => [
-  '用户已提交问卷答案，请据此继续当前 Plan 工作：',
-  ...answers.map((answer) => {
-    const question = questionnaire.questions[answer.questionIndex];
-    return `- ${question.header ? `[${question.header}] ` : ''}${question.question}：${answer.selections.join('、')}`;
-  })
-].join('\n');
+  answers: QuestionnaireAnswer[],
+) =>
+  [
+    '用户已提交问卷答案，请据此继续当前 Plan 工作：',
+    ...answers.map((answer) => {
+      const question = questionnaire.questions[answer.questionIndex];
+      return `- ${question.header ? `[${question.header}] ` : ''}${question.question}：${answer.selections.join('、')}`;
+    }),
+  ].join('\n');

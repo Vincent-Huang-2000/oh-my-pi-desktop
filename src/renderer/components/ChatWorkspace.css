@@ -39,7 +39,10 @@
   font-size: 16px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
+  transition:
+    background 0.15s,
+    box-shadow 0.15s,
+    transform 0.15s;
 }
 
 .scroll-to-bottom-btn:hover {
@@ -85,13 +88,13 @@
 
 .message.user {
   /* 用户消息：去掉左侧竖线，改用气泡包裹 */
-  width: fit-content;                      /* 根据内容自动收缩宽度 */
-  max-width: 85%;                          /* 限制气泡宽度上限，避免长消息占满整行 */
-  margin-left: auto;                       /* 气泡右对齐（贴近对话区右侧） */
+  width: fit-content; /* 根据内容自动收缩宽度 */
+  max-width: 85%; /* 限制气泡宽度上限，避免长消息占满整行 */
+  margin-left: auto; /* 气泡右对齐（贴近对话区右侧） */
   padding: 10px 14px;
   border: none;
-  border-radius: 14px;                     /* 圆角气泡 */
-  background: var(--color-accent-subtle);  /* 强调色浅底 */
+  border-radius: 14px; /* 圆角气泡 */
+  background: var(--color-accent-subtle); /* 强调色浅底 */
   box-shadow: var(--glass-shadow);
   position: relative;
 }
@@ -243,8 +246,12 @@
 }
 
 @keyframes command-pending-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── 消息内部 ── */
@@ -271,14 +278,17 @@
   border-radius: 5px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 /* 用户气泡内的复制按钮：改为绝对定位浮于气泡左下角外侧，不挤压气泡内容 */
 .message.user .msg-copy-btn {
   position: absolute;
   bottom: 4px;
-  left: -32px;                              /* 浮在气泡左下角外侧 */
+  left: -32px; /* 浮在气泡左下角外侧 */
   margin: 0;
 }
 
@@ -399,7 +409,10 @@
   border-radius: 6px;
   cursor: pointer;
   opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    background 0.15s;
   z-index: 1;
 }
 
@@ -485,10 +498,32 @@
 }
 
 /* 标题 */
-.markdown-body h1 { font-size: 1.4em; margin: 12px 0 6px 0; font-weight: 600; color: var(--color-text); }
-.markdown-body h2 { font-size: 1.25em; margin: 10px 0 6px 0; font-weight: 600; color: var(--color-text); }
-.markdown-body h3 { font-size: 1.1em; margin: 8px 0 4px 0; font-weight: 600; color: var(--color-text); }
-.markdown-body h4, .markdown-body h5, .markdown-body h6 { font-size: 1em; margin: 6px 0 4px 0; font-weight: 600; color: var(--color-text-muted); }
+.markdown-body h1 {
+  font-size: 1.4em;
+  margin: 12px 0 6px 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.markdown-body h2 {
+  font-size: 1.25em;
+  margin: 10px 0 6px 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.markdown-body h3 {
+  font-size: 1.1em;
+  margin: 8px 0 4px 0;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: 1em;
+  margin: 6px 0 4px 0;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
 
 /* 删除线 */
 .markdown-body del {
@@ -503,7 +538,7 @@
 }
 
 /* 任务列表 */
-.markdown-body input[type="checkbox"] {
+.markdown-body input[type='checkbox'] {
   margin-right: 6px;
   accent-color: var(--color-accent);
 }
@@ -522,7 +557,9 @@
   overflow: hidden;
 }
 /* 工具卡片内隐藏全局 message p 样式 */
-.tool-card > p { display: none; }
+.tool-card > p {
+  display: none;
+}
 
 .tool-card-header {
   display: flex;
@@ -560,14 +597,30 @@
 }
 
 /* 工具种类左边框着色 */
-.tool-read    { border-left-color: var(--color-read); }
-.tool-edit    { border-left-color: var(--color-edit); }
-.tool-delete  { border-left-color: var(--color-delete); }
-.tool-execute { border-left-color: var(--color-execute); }
-.tool-search  { border-left-color: var(--color-search); }
-.tool-think   { border-left-color: var(--color-think); }
-.tool-fetch   { border-left-color: var(--color-fetch); }
-.tool-switch_mode { border-left-color: var(--color-other); }
+.tool-read {
+  border-left-color: var(--color-read);
+}
+.tool-edit {
+  border-left-color: var(--color-edit);
+}
+.tool-delete {
+  border-left-color: var(--color-delete);
+}
+.tool-execute {
+  border-left-color: var(--color-execute);
+}
+.tool-search {
+  border-left-color: var(--color-search);
+}
+.tool-think {
+  border-left-color: var(--color-think);
+}
+.tool-fetch {
+  border-left-color: var(--color-fetch);
+}
+.tool-switch_mode {
+  border-left-color: var(--color-other);
+}
 
 /* 工具状态标签 */
 .tool-status {
@@ -582,10 +635,22 @@
   white-space: nowrap;
 }
 
-.status-pending  { color: var(--color-other); background: var(--color-surface-sunken); }
-.status-running  { color: var(--color-accent-strong); background: var(--color-surface-sunken); }
-.status-done     { color: var(--color-text-faint); background: var(--color-surface-sunken); }
-.status-error    { color: var(--color-error-text); background: var(--color-surface-sunken); }
+.status-pending {
+  color: var(--color-other);
+  background: var(--color-surface-sunken);
+}
+.status-running {
+  color: var(--color-accent-strong);
+  background: var(--color-surface-sunken);
+}
+.status-done {
+  color: var(--color-text-faint);
+  background: var(--color-surface-sunken);
+}
+.status-error {
+  color: var(--color-error-text);
+  background: var(--color-surface-sunken);
+}
 
 /* 工具调用模型徽标：紧邻状态标签，浅紫胶囊显示当时使用的模型展示名 */
 .tool-model {
@@ -613,7 +678,9 @@
 }
 
 @keyframes tool-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 进行中的工具卡片左边框轻微脉冲，强化「实时」感 */
@@ -623,8 +690,13 @@
 }
 
 @keyframes tool-card-pulse {
-  0%, 100% { border-left-color: var(--color-accent-strong); }
-  50% { border-left-color: var(--color-accent); }
+  0%,
+  100% {
+    border-left-color: var(--color-accent-strong);
+  }
+  50% {
+    border-left-color: var(--color-accent);
+  }
 }
 
 /* 工具文件位置 */
@@ -640,7 +712,7 @@
   background: var(--color-border-subtle);
   border-radius: 4px;
   font-size: 11px;
-  font-family: Consolas, "SFMono-Regular", monospace;
+  font-family: Consolas, 'SFMono-Regular', monospace;
   color: var(--color-text-muted);
   text-transform: none;
 }
@@ -807,7 +879,9 @@
   background: rgba(255, 255, 255, 0.55);
 }
 /* 计划卡片内隐藏全局 message p 样式 */
-.message.plan > p { display: none; }
+.message.plan > p {
+  display: none;
+}
 .plan-empty {
   padding: 12px 14px;
   color: var(--color-text-muted);
@@ -854,7 +928,8 @@
 }
 
 @keyframes plan-loading-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.45;
     transform: scale(0.9);
   }
@@ -909,13 +984,27 @@
   font-size: 11px;
 }
 
-.plan-pending .plan-status-icon     { color: var(--color-pending); }
-.plan-in_progress .plan-status-icon { color: var(--color-running); }
-.plan-completed .plan-status-icon   { color: var(--color-done); }
+.plan-pending .plan-status-icon {
+  color: var(--color-pending);
+}
+.plan-in_progress .plan-status-icon {
+  color: var(--color-running);
+}
+.plan-completed .plan-status-icon {
+  color: var(--color-done);
+}
 
-.plan-pending .plan-entry-content     { color: var(--color-pending); }
-.plan-in_progress .plan-entry-content { color: var(--color-text); font-weight: 500; }
-.plan-completed .plan-entry-content   { color: var(--color-other); text-decoration: line-through; }
+.plan-pending .plan-entry-content {
+  color: var(--color-pending);
+}
+.plan-in_progress .plan-entry-content {
+  color: var(--color-text);
+  font-weight: 500;
+}
+.plan-completed .plan-entry-content {
+  color: var(--color-other);
+  text-decoration: line-through;
+}
 
 /* ── 工具组头部 ── */
 .tool-group-header {
@@ -932,7 +1021,9 @@
   color: var(--color-text-muted);
   cursor: pointer;
   text-align: left;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .tool-group-header:hover {

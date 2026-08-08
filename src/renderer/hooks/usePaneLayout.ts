@@ -30,7 +30,7 @@ import {
   useCallback,
   useEffect,
   useRef,
-  useState
+  useState,
 } from 'react';
 import {
   LEFT_PANE_COLLAPSE_THRESHOLD,
@@ -165,7 +165,8 @@ export function usePaneLayout() {
   const expandLeftPane = useCallback(() => {
     // 用户手动展开：清除自动折叠标记；若窗口仍然偏窄，标记为手动展开以避免被立即重新折叠。
     autoCollapsedRef.current.left = false;
-    manualExpandRef.current.left = window.innerWidth - leftPaneWidth - rightPaneWidth < CHAT_RESTORE_WIDTH;
+    manualExpandRef.current.left =
+      window.innerWidth - leftPaneWidth - rightPaneWidth < CHAT_RESTORE_WIDTH;
     clearLeftPreviewTimers();
     setLeftPreviewOpen(false);
     setLeftPreviewMounted(false);
@@ -191,7 +192,8 @@ export function usePaneLayout() {
   const expandRightPane = useCallback(() => {
     // 用户手动展开：清除自动折叠标记；若窗口仍然偏窄，标记为手动展开以避免被立即重新折叠。
     autoCollapsedRef.current.right = false;
-    manualExpandRef.current.right = window.innerWidth - leftPaneWidth - rightPaneWidth < CHAT_RESTORE_WIDTH;
+    manualExpandRef.current.right =
+      window.innerWidth - leftPaneWidth - rightPaneWidth < CHAT_RESTORE_WIDTH;
     setRightPaneWidth((width) => normalizePaneWidth('right', width));
     setRightCollapsed(false);
   }, [leftPaneWidth, rightPaneWidth]);
@@ -204,21 +206,24 @@ export function usePaneLayout() {
     collapseRightPane();
   }, [rightCollapsed, expandRightPane, collapseRightPane]);
 
-  const startPaneResize = useCallback((side: PaneSide, event: ReactMouseEvent<HTMLDivElement>) => {
-    if ((side === 'left' && leftCollapsed) || (side === 'right' && rightCollapsed)) {
-      return;
-    }
-    event.preventDefault();
-    const startWidth = side === 'left' ? leftPaneWidth : rightPaneWidth;
-    resizeStateRef.current = {
-      side,
-      startX: event.clientX,
-      startWidth,
-      willCollapse: false
-    };
-    setResizingSide(side);
-    setCollapsePreviewSide(null);
-  }, [leftCollapsed, rightCollapsed, leftPaneWidth, rightPaneWidth]);
+  const startPaneResize = useCallback(
+    (side: PaneSide, event: ReactMouseEvent<HTMLDivElement>) => {
+      if ((side === 'left' && leftCollapsed) || (side === 'right' && rightCollapsed)) {
+        return;
+      }
+      event.preventDefault();
+      const startWidth = side === 'left' ? leftPaneWidth : rightPaneWidth;
+      resizeStateRef.current = {
+        side,
+        startX: event.clientX,
+        startWidth,
+        willCollapse: false,
+      };
+      setResizingSide(side);
+      setCollapsePreviewSide(null);
+    },
+    [leftCollapsed, rightCollapsed, leftPaneWidth, rightPaneWidth],
+  );
 
   // 拖拽过程中的 mousemove/mouseup 监听
   useEffect(() => {
@@ -296,22 +301,25 @@ export function usePaneLayout() {
   // 启动时从持久化 settings 恢复侧栏布局；读取失败保持默认布局。
   useEffect(() => {
     let cancelled = false;
-    window.ohMyPiDesktop.getState().then((state) => {
-      if (cancelled) {
-        return;
-      }
-      const persisted = sanitizePaneLayoutSettings(state.settings?.paneLayout);
-      if (persisted) {
-        setLeftPaneWidth(persisted.leftWidth);
-        setRightPaneWidth(persisted.rightWidth);
-        setLeftCollapsed(persisted.leftCollapsed);
-        setRightCollapsed(persisted.rightCollapsed);
-      }
-      hydratedRef.current = true;
-    }).catch(() => {
-      // 读取失败不阻塞使用，后续操作仍可正常持久化。
-      hydratedRef.current = true;
-    });
+    window.ohMyPiDesktop
+      .getState()
+      .then((state) => {
+        if (cancelled) {
+          return;
+        }
+        const persisted = sanitizePaneLayoutSettings(state.settings?.paneLayout);
+        if (persisted) {
+          setLeftPaneWidth(persisted.leftWidth);
+          setRightPaneWidth(persisted.rightWidth);
+          setLeftCollapsed(persisted.leftCollapsed);
+          setRightCollapsed(persisted.rightCollapsed);
+        }
+        hydratedRef.current = true;
+      })
+      .catch(() => {
+        // 读取失败不阻塞使用，后续操作仍可正常持久化。
+        hydratedRef.current = true;
+      });
     return () => {
       cancelled = true;
     };
@@ -382,31 +390,36 @@ export function usePaneLayout() {
   }, [resizingSide, evaluateAdaptiveLayout]);
 
   // 派生 className / style
-  const layoutClassName = [
-    'layout-grid',
-    resizingSide ? 'is-resizing' : ''
-  ].filter(Boolean).join(' ');
+  const layoutClassName = ['layout-grid', resizingSide ? 'is-resizing' : '']
+    .filter(Boolean)
+    .join(' ');
   const appShellClassName = [
     'app-shell',
     leftCollapsed ? 'left-pane-collapsed' : '',
-    resizingSide ? 'is-resizing' : ''
-  ].filter(Boolean).join(' ');
+    resizingSide ? 'is-resizing' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const layoutStyle: CSSProperties = {
     '--left-pane-width': `${leftCollapsed ? 0 : leftPaneWidth}px`,
-    '--right-pane-width': `${rightCollapsed ? 0 : rightPaneWidth}px`
+    '--right-pane-width': `${rightCollapsed ? 0 : rightPaneWidth}px`,
   } as CSSProperties;
   const leftHandleClassName = [
     'pane-resize-handle',
     'left',
     resizingSide === 'left' ? 'active' : '',
-    collapsePreviewSide === 'left' ? 'will-collapse' : ''
-  ].filter(Boolean).join(' ');
+    collapsePreviewSide === 'left' ? 'will-collapse' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const rightHandleClassName = [
     'pane-resize-handle',
     'right',
     resizingSide === 'right' ? 'active' : '',
-    collapsePreviewSide === 'right' ? 'will-collapse' : ''
-  ].filter(Boolean).join(' ');
+    collapsePreviewSide === 'right' ? 'will-collapse' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const leftPreviewClassName = leftPreviewOpen ? 'left-preview-panel open' : 'left-preview-panel';
 
   return {

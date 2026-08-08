@@ -27,7 +27,9 @@ export function useToolGroups(
   selectedSession: StoredSession | null,
   messageCache: { current: Record<string, ChatMessage[]> },
 ) {
-  const collapsedToolGroupsBySession = useRef<Record<string, Record<string, boolean | undefined>>>({});
+  const collapsedToolGroupsBySession = useRef<Record<string, Record<string, boolean | undefined>>>(
+    {},
+  );
   const [collapsedToolGroupsVersion, setCollapsedToolGroupsVersion] = useState(0);
   const bumpCollapsedToolGroups = useCallback(
     () => setCollapsedToolGroupsVersion((value) => value + 1),
@@ -59,7 +61,10 @@ export function useToolGroups(
 
   // 扫描整条消息流，找出所有「连续 tool 段」的 groupId（每段最后一条 tool 消息的 id），
   // 把未操作（undefined）的组设为 true 折叠。用于打开旧会话（load/resume/fork 重放）后一次性折叠全部工具组。
-  const collapseAllToolGroupsForSession = (sessionId: string, messagesForSession?: ChatMessage[]) => {
+  const collapseAllToolGroupsForSession = (
+    sessionId: string,
+    messagesForSession?: ChatMessage[],
+  ) => {
     const list = messagesForSession ?? messageCache.current[sessionId];
     if (!list || list.length === 0) {
       return;
@@ -109,18 +114,21 @@ export function useToolGroups(
   };
 
   // 用户点击摘要卡时通知切换折叠状态。
-  const handleSetToolGroupCollapsed = useCallback((groupId: string, collapsed: boolean) => {
-    const sessionId = selectedSession?.id;
-    if (!sessionId) {
-      return;
-    }
-    const bucket = collapsedToolGroupsBySession.current[sessionId] ?? {};
-    if (bucket[groupId] === collapsed) {
-      return;
-    }
-    collapsedToolGroupsBySession.current[sessionId] = { ...bucket, [groupId]: collapsed };
-    bumpCollapsedToolGroups();
-  }, [bumpCollapsedToolGroups, selectedSession?.id]);
+  const handleSetToolGroupCollapsed = useCallback(
+    (groupId: string, collapsed: boolean) => {
+      const sessionId = selectedSession?.id;
+      if (!sessionId) {
+        return;
+      }
+      const bucket = collapsedToolGroupsBySession.current[sessionId] ?? {};
+      if (bucket[groupId] === collapsed) {
+        return;
+      }
+      collapsedToolGroupsBySession.current[sessionId] = { ...bucket, [groupId]: collapsed };
+      bumpCollapsedToolGroups();
+    },
+    [bumpCollapsedToolGroups, selectedSession?.id],
+  );
 
   // 直接设置某个 session 指定 groupId 的折叠状态（不限当前 session；done 时用于重新收拢本回合工具组）。
   const setGroupCollapsed = (sessionId: string, groupId: string, collapsed: boolean) => {

@@ -62,7 +62,7 @@ export function useSessionLifecycle(
     void (async () => {
       const result = await window.ohMyPiDesktop.syncSessions(
         project.path,
-        app.selectedSessionRef.current?.id
+        app.selectedSessionRef.current?.id,
       );
       if (active && result.ok && result.state) {
         app.setDesktopState(result.state);
@@ -79,7 +79,7 @@ export function useSessionLifecycle(
       return;
     }
     const latestSession = app.desktopState.recentSessions.find(
-      (session) => session.projectPath === project.path && session.acpSessionId
+      (session) => session.projectPath === project.path && session.acpSessionId,
     );
     if (!latestSession?.acpSessionId) {
       return;
@@ -91,8 +91,6 @@ export function useSessionLifecycle(
     app.configRefreshByProject.current[project.path] = refreshKey;
     void refreshProjectConfigFromSession(latestSession);
   }, [app.desktopState.recentSessions, app.selectedProject, app.selectedSession]);
-
-
 
   const handleSelectSession = (session: StoredSession) => {
     app.selectSession(session);
@@ -125,7 +123,7 @@ export function useSessionLifecycle(
 
   const handleSelectProjectSession = async (project: StoredProject, session: StoredSession) => {
     app.setExpandedProjectPaths((current) =>
-      current.includes(project.path) ? current : [...current, project.path]
+      current.includes(project.path) ? current : [...current, project.path],
     );
     if (app.selectedProject?.path !== project.path) {
       // 切换执行目录前先停掉旧 session 子进程，并刷新 lastOpenedAt（不重排项目顺序）。
@@ -137,7 +135,10 @@ export function useSessionLifecycle(
 
   const syncProjectSessions = async (workspacePath: string) => {
     app.setAgentStatus('同步历史会话中');
-    const result = await window.ohMyPiDesktop.syncSessions(workspacePath, app.selectedSessionRef.current?.id);
+    const result = await window.ohMyPiDesktop.syncSessions(
+      workspacePath,
+      app.selectedSessionRef.current?.id,
+    );
     if (!result.ok) {
       app.setAgentStatus(result.message ?? '同步失败');
       return;
@@ -145,7 +146,9 @@ export function useSessionLifecycle(
     if (result.state) {
       app.setDesktopState(result.state);
     }
-    const count = result.state?.recentSessions.filter((session) => session.projectPath === workspacePath).length ?? 0;
+    const count =
+      result.state?.recentSessions.filter((session) => session.projectPath === workspacePath)
+        .length ?? 0;
     app.setAgentStatus(`已同步 ${count} 个会话`);
   };
 
@@ -157,7 +160,7 @@ export function useSessionLifecycle(
     const result = await window.ohMyPiDesktop.loadSession(
       session.id,
       session.projectPath,
-      session.acpSessionId
+      session.acpSessionId,
     );
     if (!result.ok) {
       app.setLoadingHistorySessionId((current) => (current === session.id ? null : current));
@@ -175,7 +178,7 @@ export function useSessionLifecycle(
     const result = await window.ohMyPiDesktop.resumeSession(
       session.id,
       session.projectPath,
-      session.acpSessionId
+      session.acpSessionId,
     );
     if (!result.ok) {
       app.setAgentStatus(result.message ?? '恢复配置失败');
@@ -189,7 +192,7 @@ export function useSessionLifecycle(
     const result = await window.ohMyPiDesktop.refreshSessionConfig(
       session.id,
       session.projectPath,
-      session.acpSessionId
+      session.acpSessionId,
     );
     const configOptions = result.configOptions ?? [];
     if (!result.ok || configOptions.length === 0) {
@@ -201,17 +204,18 @@ export function useSessionLifecycle(
         ...current.configCacheByProjectPath,
         [session.projectPath]: {
           configOptions,
-          availableCommands: current.configCacheByProjectPath[session.projectPath]?.availableCommands ?? [],
-          updatedAt: new Date().toISOString()
-        }
-      }
+          availableCommands:
+            current.configCacheByProjectPath[session.projectPath]?.availableCommands ?? [],
+          updatedAt: new Date().toISOString(),
+        },
+      },
     }));
   };
 
   const handleCloseSession = async (session: StoredSession) => {
     const isCurrent = app.selectedSessionRef.current?.id === session.id;
     const result = await window.ohMyPiDesktop.closeSession(session.id);
-    app.setAgentStatus(result.ok ? 'session 已关闭' : result.message ?? '关闭失败');
+    app.setAgentStatus(result.ok ? 'session 已关闭' : (result.message ?? '关闭失败'));
     if (!result.ok) {
       return;
     }
@@ -268,7 +272,7 @@ export function useSessionLifecycle(
       projectPath: project.path,
       title: `${session.title} (fork)`,
       approvalProfile: session.approvalProfile ?? DEFAULT_APPROVAL_PROFILE,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
     app.messageCache.current[newLocalId] = [];
     app.permissionBySession.current[newLocalId] = [];
@@ -292,7 +296,12 @@ export function useSessionLifecycle(
     app.setPermissionRequest(null);
     app.setElicitationRequest(null);
     app.setQuestionnaireRequest(null);
-    const result = await window.ohMyPiDesktop.forkSession(newLocalId, project.path, sourceAcpSessionId, forked.title);
+    const result = await window.ohMyPiDesktop.forkSession(
+      newLocalId,
+      project.path,
+      sourceAcpSessionId,
+      forked.title,
+    );
     if (!result.ok) {
       // fork 失败：清理占位会话的四个缓存条目，避免左栏残留幽灵会话与缓存泄漏。
       delete app.messageCache.current[newLocalId];
@@ -310,11 +319,15 @@ export function useSessionLifecycle(
         app.setMessages(app.messageCache.current[previousSession.id] ?? []);
         app.setUsageText(app.usageBySession.current[previousSession.id] ?? '');
         app.setPermissionRequest(app.permissionBySession.current[previousSession.id]?.[0] ?? null);
-        app.setElicitationRequest(app.elicitationBySession.current[previousSession.id]?.[0] ?? null);
-        app.setQuestionnaireRequest(app.questionnaireBySession.current[previousSession.id]?.[0] ?? null);
+        app.setElicitationRequest(
+          app.elicitationBySession.current[previousSession.id]?.[0] ?? null,
+        );
+        app.setQuestionnaireRequest(
+          app.questionnaireBySession.current[previousSession.id]?.[0] ?? null,
+        );
         // 还原原项目的 ACP 配置缓存，让顶栏选择器立即显示正确选项。
         app.setAcpConfigOptions(
-          app.desktopState.configCacheByProjectPath[previousProject.path]?.configOptions ?? []
+          app.desktopState.configCacheByProjectPath[previousProject.path]?.configOptions ?? [],
         );
         app.setDraftConfigValues({});
         app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -332,7 +345,9 @@ export function useSessionLifecycle(
     const newAcpSessionId = result.sessionId;
     if (newAcpSessionId) {
       app.updateSelectedSession((current) =>
-        current && current.id === newLocalId ? { ...current, acpSessionId: newAcpSessionId } : current
+        current && current.id === newLocalId
+          ? { ...current, acpSessionId: newAcpSessionId }
+          : current,
       );
     }
     app.setAgentStatus('已 Fork');
@@ -348,7 +363,7 @@ export function useSessionLifecycle(
       await window.ohMyPiDesktop.touchProjectLastOpened(project.path);
     }
     app.setExpandedProjectPaths((current) =>
-      current.includes(project.path) ? current : [...current, project.path]
+      current.includes(project.path) ? current : [...current, project.path],
     );
     // 顶部「新建会话」只进入空白会话界面；真正的本地 session 在首次发送消息时延迟创建。
     // 清理上一个 session 的折叠桶，避免重新进入历史 session 时看到旧折叠态残留。

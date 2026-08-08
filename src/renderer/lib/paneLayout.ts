@@ -69,10 +69,12 @@ export const sanitizePaneLayoutSettings = (raw: unknown): PaneLayoutSettings | n
   const candidate = raw as Partial<Record<keyof PaneLayoutSettings, unknown>>;
   const { leftWidth, rightWidth, leftCollapsed, rightCollapsed } = candidate;
   if (
-    typeof leftWidth !== 'number' || !Number.isFinite(leftWidth)
-    || typeof rightWidth !== 'number' || !Number.isFinite(rightWidth)
-    || typeof leftCollapsed !== 'boolean'
-    || typeof rightCollapsed !== 'boolean'
+    typeof leftWidth !== 'number' ||
+    !Number.isFinite(leftWidth) ||
+    typeof rightWidth !== 'number' ||
+    !Number.isFinite(rightWidth) ||
+    typeof leftCollapsed !== 'boolean' ||
+    typeof rightCollapsed !== 'boolean'
   ) {
     return null;
   }
@@ -103,7 +105,8 @@ export const computeAdaptiveCollapse = (
 ): PaneCollapseState => {
   const desired: PaneCollapseState = { left: left.collapsed, right: right.collapsed };
   // 当前对话区宽度。
-  let chatWidth = windowWidth - (left.collapsed ? 0 : left.width) - (right.collapsed ? 0 : right.width);
+  let chatWidth =
+    windowWidth - (left.collapsed ? 0 : left.width) - (right.collapsed ? 0 : right.width);
 
   if (chatWidth < CHAT_COLLAPSE_WIDTH) {
     // 空间不足：先折叠右栏（辅助面板），再折叠左栏。

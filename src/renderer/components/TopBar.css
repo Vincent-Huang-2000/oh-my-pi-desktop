@@ -117,7 +117,9 @@
   background: transparent;
   font-size: 13px;
   cursor: pointer;
-  transition: background-color 0.14s ease, color 0.14s ease;
+  transition:
+    background-color 0.14s ease,
+    color 0.14s ease;
 }
 
 .segment-select-trigger:hover:not(:disabled) {
@@ -130,8 +132,8 @@
 }
 
 /* 展开/选中态：用主色浅底强调当前正在编辑的段，避免外发光在成组容器里溢出。 */
-.segment-select-trigger[aria-expanded="true"],
-.model-picker-anchor .segment-select-trigger[aria-expanded="true"] {
+.segment-select-trigger[aria-expanded='true'],
+.model-picker-anchor .segment-select-trigger[aria-expanded='true'] {
   background: var(--color-surface-sunken);
   color: var(--color-accent-strong);
 }
@@ -139,15 +141,17 @@
 .segment-select-chevron {
   flex-shrink: 0;
   color: var(--color-text-tertiary);
-  transition: transform 0.18s ease, color 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    color 0.18s ease;
 }
 
 .segment-select-trigger:hover:not(:disabled) .segment-select-chevron,
-.segment-select-trigger[aria-expanded="true"] .segment-select-chevron {
+.segment-select-trigger[aria-expanded='true'] .segment-select-chevron {
   color: var(--color-text-faint);
 }
 
-.segment-select-trigger[aria-expanded="true"] .segment-select-chevron {
+.segment-select-trigger[aria-expanded='true'] .segment-select-chevron {
   transform: rotate(180deg);
 }
 
@@ -197,7 +201,10 @@
   color: var(--color-text-tertiary);
   background: transparent;
   cursor: pointer;
-  transition: background 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+  transition:
+    background 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
 .pane-toggle-button:hover {
@@ -259,7 +266,10 @@
   color: var(--color-text-tertiary);
   background: #fff;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .omp-path-setting-button:hover {
@@ -285,7 +295,10 @@
   color: var(--color-text-tertiary);
   background: var(--color-surface);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .theme-toggle-button:hover {

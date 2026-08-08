@@ -118,4 +118,3 @@ export type CommandResult = {
   stderr: string;
   code: number | null;
 };
-

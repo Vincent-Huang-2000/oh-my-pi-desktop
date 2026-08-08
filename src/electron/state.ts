@@ -30,7 +30,7 @@ import type {
   StoredLog,
   StoredProject,
   StoredSession,
-  ToolModelSnapshot
+  ToolModelSnapshot,
 } from './types.js';
 
 const stateFileName = 'oh-my-pi-desktop-state.json';
@@ -79,7 +79,7 @@ const defaultState: DesktopState = {
   logs: [],
   configCacheByProjectPath: {},
   toolModelSnapshotsBySession: {},
-  settings: {}
+  settings: {},
 };
 
 const getStatePath = () => path.join(app.getPath('userData'), stateFileName);
@@ -91,7 +91,10 @@ export const readState = (): DesktopState => {
     if (!state.configCacheByProjectPath || typeof state.configCacheByProjectPath !== 'object') {
       state.configCacheByProjectPath = {};
     }
-    if (!state.toolModelSnapshotsBySession || typeof state.toolModelSnapshotsBySession !== 'object') {
+    if (
+      !state.toolModelSnapshotsBySession ||
+      typeof state.toolModelSnapshotsBySession !== 'object'
+    ) {
       state.toolModelSnapshotsBySession = {};
     }
     if (!state.settings || typeof state.settings !== 'object') {
@@ -99,7 +102,7 @@ export const readState = (): DesktopState => {
     }
     state.recentSessions = state.recentSessions.map((session) => ({
       ...session,
-      approvalProfile: normalizeApprovalProfile(session.approvalProfile)
+      approvalProfile: normalizeApprovalProfile(session.approvalProfile),
     }));
     return state;
   } catch {
@@ -112,22 +115,23 @@ export const writeState = (state: DesktopState) => {
   fs.writeFileSync(getStatePath(), JSON.stringify(state, null, 2), 'utf8');
 };
 // 读取全局设置项；未设置时返回 undefined。
-export const getSetting = <K extends keyof DesktopSettings>(key: K): DesktopSettings[K] | undefined => {
+export const getSetting = <K extends keyof DesktopSettings>(
+  key: K,
+): DesktopSettings[K] | undefined => {
   return readState().settings?.[key];
 };
 
 // 写入全局设置项。
 export const setSetting = <K extends keyof DesktopSettings>(
   key: K,
-  value: DesktopSettings[K]
+  value: DesktopSettings[K],
 ): void => {
   const state = readState();
   writeState({
     ...state,
-    settings: { ...state.settings, [key]: value }
+    settings: { ...state.settings, [key]: value },
   });
 };
-
 
 export const addLog = (sessionId: string, level: StoredLog['level'], message: string) => {
   const entry: StoredLog = {
@@ -135,7 +139,7 @@ export const addLog = (sessionId: string, level: StoredLog['level'], message: st
     sessionId,
     level,
     message,
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
   // 首次写入或距上次 flush 较久时，从磁盘补齐旧日志头，避免只写本次缓冲丢失历史。
   // 正常流式运行期间，同一批次的追加调用会复用 pendingLogs。
@@ -171,7 +175,7 @@ export const updateProjectConfigCache = (projectPath: string, configOptions: Acp
   state.configCacheByProjectPath[projectPath] = {
     configOptions,
     availableCommands: existing?.availableCommands ?? [],
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
   writeState(state);
   return state;
@@ -182,7 +186,7 @@ export const updateProjectConfigCache = (projectPath: string, configOptions: Acp
 // 写入时保留同项目缓存里的 configOptions，避免互相覆盖。
 export const updateProjectCommandsCache = (
   projectPath: string,
-  availableCommands: AcpAvailableCommand[]
+  availableCommands: AcpAvailableCommand[],
 ) => {
   if (availableCommands.length === 0) {
     return readState();
@@ -192,7 +196,7 @@ export const updateProjectCommandsCache = (
   state.configCacheByProjectPath[projectPath] = {
     configOptions: existing?.configOptions ?? [],
     availableCommands,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
   };
   writeState(state);
   return state;
@@ -202,7 +206,7 @@ export const updateProjectCommandsCache = (
 export const saveToolModelSnapshot = (
   acpSessionId: string,
   toolCallId: string,
-  model: ToolModelSnapshot
+  model: ToolModelSnapshot,
 ) => {
   if (!acpSessionId || !toolCallId) {
     return readState();
@@ -214,7 +218,7 @@ export const saveToolModelSnapshot = (
   }
   state.toolModelSnapshotsBySession[acpSessionId] = {
     ...snapshots,
-    [toolCallId]: model
+    [toolCallId]: model,
   };
   writeState(state);
   return state;
@@ -236,7 +240,7 @@ export const copyToolModelSnapshots = (sourceAcpSessionId: string, targetAcpSess
   }
   state.toolModelSnapshotsBySession[targetAcpSessionId] = {
     ...source,
-    ...(state.toolModelSnapshotsBySession[targetAcpSessionId] ?? {})
+    ...(state.toolModelSnapshotsBySession[targetAcpSessionId] ?? {}),
   };
   writeState(state);
   return state;
@@ -251,11 +255,11 @@ export const upsertProject = (workspacePath: string) => {
     path: workspacePath,
     name: path.basename(workspacePath),
     lastOpenedAt: new Date().toISOString(),
-    ...(existing?.pinned ? { pinned: true } : {})
+    ...(existing?.pinned ? { pinned: true } : {}),
   };
   state.recentProjects = [
     project,
-    ...state.recentProjects.filter((item) => item.path !== workspacePath)
+    ...state.recentProjects.filter((item) => item.path !== workspacePath),
   ].slice(0, 8);
   writeState(state);
   return project;
@@ -346,7 +350,7 @@ export const upsertSession = (
   updatedAt?: string,
   // 为 true 时只更新字段，不把 session 移动到列表顶部（用于仅加载/恢复历史而非开始对话的场景）。
   preserveOrder?: boolean,
-  approvalProfile?: ApprovalProfile
+  approvalProfile?: ApprovalProfile,
 ) => {
   const state = readState();
   const existing = state.recentSessions.find((item) => item.id === id);
@@ -356,7 +360,7 @@ export const upsertSession = (
     title,
     acpSessionId: acpSessionId ?? existing?.acpSessionId,
     approvalProfile: normalizeApprovalProfile(approvalProfile ?? existing?.approvalProfile),
-    updatedAt: updatedAt ?? existing?.updatedAt ?? new Date().toISOString()
+    updatedAt: updatedAt ?? existing?.updatedAt ?? new Date().toISOString(),
   };
   if (preserveOrder && existing) {
     // 原位更新：替换同位置的元素，不移动到顶部。
@@ -364,7 +368,7 @@ export const upsertSession = (
   } else {
     state.recentSessions = [
       session,
-      ...state.recentSessions.filter((item) => item.id !== id)
+      ...state.recentSessions.filter((item) => item.id !== id),
     ].slice(0, maxRecentSessions);
   }
   writeState(state);
@@ -392,7 +396,7 @@ export const updateSessionApprovalProfile = (id: string, approvalProfile: Approv
 export const reconcileProjectSessions = (
   projectPath: string,
   remote: { sessionId: string; cwd: string; title?: string; updatedAt?: string }[],
-  keepLocalId?: string
+  keepLocalId?: string,
 ): DesktopState => {
   const state = readState();
   const others = state.recentSessions.filter((item) => item.projectPath !== projectPath);
@@ -400,14 +404,15 @@ export const reconcileProjectSessions = (
 
   const rebuilt: StoredSession[] = remote.map((item) => {
     const matches = localForProject.filter((session) => session.acpSessionId === item.sessionId);
-    const existing = (keepLocalId && matches.find((session) => session.id === keepLocalId)) || matches[0];
+    const existing =
+      (keepLocalId && matches.find((session) => session.id === keepLocalId)) || matches[0];
     return {
       id: existing ? existing.id : `acp-${item.sessionId}`,
       projectPath,
       title: item.title ?? existing?.title ?? `session ${item.sessionId.slice(0, 6)}`,
       acpSessionId: item.sessionId,
       approvalProfile: normalizeApprovalProfile(existing?.approvalProfile),
-      updatedAt: item.updatedAt ?? existing?.updatedAt ?? new Date().toISOString()
+      updatedAt: item.updatedAt ?? existing?.updatedAt ?? new Date().toISOString(),
     };
   });
 
@@ -422,4 +427,3 @@ export const reconcileProjectSessions = (
   writeState(state);
   return state;
 };
-

@@ -25,7 +25,7 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
   // 把指定 requestId 的问卷从队列移除，并推进当前弹窗到下一项或置空。
   const advanceToNextQuestionnaire = (requestId: string, sessionId: string) => {
     const remaining = (app.questionnaireBySession.current[sessionId] ?? []).filter(
-      (request) => request.requestId !== requestId
+      (request) => request.requestId !== requestId,
     );
     app.questionnaireBySession.current[sessionId] = remaining;
     if (app.selectedSessionRef.current?.id === sessionId) {
@@ -46,14 +46,14 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
       return;
     }
     const remaining = (app.permissionBySession.current[sessionId] ?? []).filter(
-      (request) => request.requestId !== requestId
+      (request) => request.requestId !== requestId,
     );
     app.permissionBySession.current[sessionId] = remaining;
     if (app.selectedSessionRef.current?.id === sessionId) {
       const nextRequest = remaining[0] ?? null;
       app.setPermissionRequest(nextRequest);
       const nextIsPermission = nextRequest?.options.some(
-        (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject')
+        (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject'),
       );
       app.setAgentStatus(nextRequest ? (nextIsPermission ? '等待审批' : '等待选择') : '继续运行');
     }
@@ -63,25 +63,30 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
   const handleElicitation = async (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',
-    content?: Record<string, unknown>
+    content?: Record<string, unknown>,
   ) => {
     if (!app.selectedSession) {
       return;
     }
     const sessionId = app.selectedSession.id;
     const matched = (app.elicitationBySession.current[sessionId] ?? []).find(
-      (item) => item.requestId === requestId
+      (item) => item.requestId === requestId,
     );
     if (!matched) {
       return;
     }
     const requestKind = matched.kind;
     const submittingText = requestKind === 'question' ? '正在提交选择…' : '正在提交确认…';
-    const markSubmitting = (current: ChatMessage[]) => current.map((message) =>
-      message.elicitationRequestId === requestId
-        ? { ...message, elicitationStatus: 'submitting' as const, elicitationResult: submittingText }
-        : message
-    );
+    const markSubmitting = (current: ChatMessage[]) =>
+      current.map((message) =>
+        message.elicitationRequestId === requestId
+          ? {
+              ...message,
+              elicitationStatus: 'submitting' as const,
+              elicitationResult: submittingText,
+            }
+          : message,
+      );
     app.setAgentStatus(requestKind === 'question' ? '正在提交选择' : '正在提交确认');
     app.setMessages((current) => {
       const next = markSubmitting(current);
@@ -91,17 +96,18 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     const result = await window.ohMyPiDesktop.elicitationResponse(requestId, action, content);
     const updateElicitationRecord = (
       status: NonNullable<ChatMessage['elicitationStatus']>,
-      resultText: string
+      resultText: string,
     ) => {
-      const updateMessages = (current: ChatMessage[]) => current.map((message) => {
-        if (message.elicitationRequestId === requestId) {
-          return { ...message, elicitationStatus: status, elicitationResult: resultText };
-        }
-        if (message.planPreviewRequestId === requestId && status !== 'failed') {
-          return { ...message, planPreview: false, planPreviewRequestId: undefined };
-        }
-        return message;
-      });
+      const updateMessages = (current: ChatMessage[]) =>
+        current.map((message) => {
+          if (message.elicitationRequestId === requestId) {
+            return { ...message, elicitationStatus: status, elicitationResult: resultText };
+          }
+          if (message.planPreviewRequestId === requestId && status !== 'failed') {
+            return { ...message, planPreview: false, planPreviewRequestId: undefined };
+          }
+          return message;
+        });
       if (app.selectedSessionRef.current?.id === sessionId) {
         app.setMessages((current) => {
           const next = updateMessages(current);
@@ -109,33 +115,41 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
           return next;
         });
       } else {
-        app.messageCache.current[sessionId] = updateMessages(app.messageCache.current[sessionId] ?? []);
+        app.messageCache.current[sessionId] = updateMessages(
+          app.messageCache.current[sessionId] ?? [],
+        );
       }
     };
     const remaining = (app.elicitationBySession.current[sessionId] ?? []).filter(
-      (request) => request.requestId !== requestId
+      (request) => request.requestId !== requestId,
     );
     app.elicitationBySession.current[sessionId] = remaining;
     if (!result.ok) {
       updateElicitationRecord('failed', '确认失败：请求已失效');
       if (app.selectedSessionRef.current?.id === sessionId) {
         app.setElicitationRequest(remaining[0] ?? null);
-        app.setAgentStatus(remaining[0]
-          ? (remaining[0].kind === 'question' ? '等待选择' : '等待确认')
-          : (requestKind === 'question' ? '提交失败' : '确认失败'));
+        app.setAgentStatus(
+          remaining[0]
+            ? remaining[0].kind === 'question'
+              ? '等待选择'
+              : '等待确认'
+            : requestKind === 'question'
+              ? '提交失败'
+              : '确认失败',
+        );
       }
       return;
     }
     const elicitationResult = getElicitationResultText(matched, action, content);
     updateElicitationRecord(
       action === 'accept' ? 'accepted' : action === 'decline' ? 'declined' : 'cancelled',
-      elicitationResult
+      elicitationResult,
     );
     if (app.selectedSessionRef.current?.id === sessionId) {
       app.setElicitationRequest(remaining[0] ?? null);
-      app.setAgentStatus(remaining[0]
-        ? (remaining[0].kind === 'question' ? '等待选择' : '等待确认')
-        : '继续运行');
+      app.setAgentStatus(
+        remaining[0] ? (remaining[0].kind === 'question' ? '等待选择' : '等待确认') : '继续运行',
+      );
     }
   };
 
@@ -143,27 +157,28 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
   const handleQuestionnaire = async (
     requestId: string,
     action: 'submit' | 'deny',
-    answers?: QuestionnaireAnswer[]
+    answers?: QuestionnaireAnswer[],
   ) => {
     if (!app.selectedSession) {
       return false;
     }
     const sessionId = app.selectedSession.id;
     const requestExists = (app.questionnaireBySession.current[sessionId] ?? []).some(
-      (request) => request.requestId === requestId
+      (request) => request.requestId === requestId,
     );
     if (!requestExists) {
       return false;
     }
     const updateRecord = (
       status: NonNullable<ChatMessage['elicitationStatus']>,
-      resultText: string
+      resultText: string,
     ) => {
-      const updateMessages = (current: ChatMessage[]) => current.map((message) =>
-        message.elicitationRequestId === requestId
-          ? { ...message, elicitationStatus: status, elicitationResult: resultText }
-          : message
-      );
+      const updateMessages = (current: ChatMessage[]) =>
+        current.map((message) =>
+          message.elicitationRequestId === requestId
+            ? { ...message, elicitationStatus: status, elicitationResult: resultText }
+            : message,
+        );
       if (app.selectedSessionRef.current?.id === sessionId) {
         app.setMessages((current) => {
           const next = updateMessages(current);
@@ -171,7 +186,9 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
           return next;
         });
       } else {
-        app.messageCache.current[sessionId] = updateMessages(app.messageCache.current[sessionId] ?? []);
+        app.messageCache.current[sessionId] = updateMessages(
+          app.messageCache.current[sessionId] ?? [],
+        );
       }
     };
     if (action === 'submit') {

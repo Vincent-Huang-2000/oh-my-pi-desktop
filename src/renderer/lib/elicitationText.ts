@@ -12,7 +12,7 @@ import type { ElicitationRequest } from '../types';
 export const getElicitationResultText = (
   request: ElicitationRequest,
   action: 'accept' | 'decline' | 'cancel',
-  content?: Record<string, unknown>
+  content?: Record<string, unknown>,
 ) => {
   if (action === 'decline') return '已拒绝';
   if (action === 'cancel') return '已取消';

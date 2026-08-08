@@ -3,7 +3,6 @@ import type { ElicitationRequest } from '../types';
 import { formatElicitationOptionLabel, isElicitationOtherOption } from '../utils';
 import './ElicitationModal.css';
 
-
 type ElicitationModalProps = {
   request: ElicitationRequest;
   onRespond: (action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown>) => void;
@@ -14,10 +13,12 @@ type ElicitationModalProps = {
 const REJECT_RAW_VALUES = new Set(['Deny', 'Reject']);
 const stripRecommendedSuffix = (option: string) =>
   option.endsWith(' (Recommended)') ? option.slice(0, -' (Recommended)'.length) : option;
-const isElicitationRejectOption = (option: string) => REJECT_RAW_VALUES.has(stripRecommendedSuffix(option));
+const isElicitationRejectOption = (option: string) =>
+  REJECT_RAW_VALUES.has(stripRecommendedSuffix(option));
 
 // approval 场景的选项按钮 className：拒绝=Danger，其余=Primary，为每个选项都提供明确视觉语义。
-const approvalOptionClass = (option: string) => (isElicitationRejectOption(option) ? 'danger-action' : 'primary-action');
+const approvalOptionClass = (option: string) =>
+  isElicitationRejectOption(option) ? 'danger-action' : 'primary-action';
 
 // ACP elicitation 表单弹窗：同时兼容工具审批和 AskTool 原生提问。
 // omp 总是发单字段 value，按其 type 分支渲染：
@@ -58,10 +59,23 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
 
   return (
     <div className="approval-float-layer" role="presentation">
-      <section className="approval-modal" role="dialog" aria-modal="false" aria-labelledby="elicitation-title">
-        <h2 id="elicitation-title">{request.kind === 'question' ? 'Agent 需要你的回答' : '需要确认'}</h2>
-        <p>{request.hasPlanPreview ? 'Agent 已完成方案，请在消息流的「待确认方案」卡片中查看完整内容，确认是否执行。' : message}</p>
-        {field.description && <p style={{ fontSize: '12px', marginTop: '-10px' }}>{field.description}</p>}
+      <section
+        className="approval-modal"
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="elicitation-title"
+      >
+        <h2 id="elicitation-title">
+          {request.kind === 'question' ? 'Agent 需要你的回答' : '需要确认'}
+        </h2>
+        <p>
+          {request.hasPlanPreview
+            ? 'Agent 已完成方案，请在消息流的「待确认方案」卡片中查看完整内容，确认是否执行。'
+            : message}
+        </p>
+        {field.description && (
+          <p style={{ fontSize: '12px', marginTop: '-10px' }}>{field.description}</p>
+        )}
         <div className="modal-actions">
           {isSelect ? (
             <>
@@ -71,7 +85,9 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
                 const className =
                   request.kind === 'approval'
                     ? approvalOptionClass(option)
-                    : option.endsWith(' (Recommended)') ? 'primary-action' : '';
+                    : option.endsWith(' (Recommended)')
+                      ? 'primary-action'
+                      : '';
                 return (
                   <button
                     className={className}
@@ -117,7 +133,11 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
             </>
           ) : isBoolean ? (
             <>
-              <button className="primary-action" type="button" onClick={() => onRespond('accept', { value: true })}>
+              <button
+                className="primary-action"
+                type="button"
+                onClick={() => onRespond('accept', { value: true })}
+              >
                 <span>确认</span>
               </button>
               <button type="button" onClick={() => onRespond('decline')}>
