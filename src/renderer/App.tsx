@@ -14,6 +14,8 @@
  * - 修改 UI 结构前先读 docs/UI/ui-layout-reference.md。
  * - IPC 通道新增/修改必须同步 ipc.ts + preload.ts + vite-env.d.ts。
  */
+import { useEffect } from 'react';
+
 import { ChatWorkspace } from './components/ChatWorkspace';
 import { ContextPane } from './components/ContextPane';
 import { ElicitationModal } from './components/ElicitationModal';
@@ -56,6 +58,7 @@ import { useSessionLifecycle } from './hooks/useSessionLifecycle';
 import { useMessageFlow } from './hooks/useMessageFlow';
 import { useAgentEvents } from './hooks/useAgentEvents';
 import { useApprovalFlow } from './hooks/useApprovalFlow';
+import { applyTheme, toggleTheme } from './theme';
 import { useConfigSync } from './hooks/useConfigSync';
 import './styles.css';
 
@@ -78,6 +81,11 @@ export default function App() {
   const approvalFlow = useApprovalFlow(app);
   const configSync = useConfigSync(app);
   useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff);
+  // 主题切换：themeId 变化时同步到 DOM，触发 CSS 变量覆盖。
+  useEffect(() => {
+    applyTheme(app.themeId);
+  }, [app.themeId]);
+
 
 
   return (
@@ -132,6 +140,11 @@ export default function App() {
         onToggleRightPane={paneLayout.toggleRightPane}
         onSelectOmpPath={() => void projectActions.handleSelectOmpPath()}
         onSelectWorkspace={() => void projectActions.handleSelectWorkspace()}
+        themeId={app.themeId}
+        onToggleTheme={() => {
+          const newId = toggleTheme(app.themeId);
+          void app.persistTheme(newId);
+        }}
       />
       <section className={paneLayout.layoutClassName}>
         <ChatWorkspace

@@ -27,6 +27,18 @@
   overflow-y: auto;
 }
 
+/* 输入框滚动条：窄 + 随主题色自动适配 */
+.composer textarea::-webkit-scrollbar {
+  width: 6px;
+}
+.composer textarea::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.composer textarea::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .composer textarea:focus-visible {
   outline: none;
 }

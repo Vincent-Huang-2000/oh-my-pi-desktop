@@ -361,6 +361,18 @@
   overflow-x: auto;
 }
 
+/* 代码块滚动条：窄 + 随主题色自动适配 */
+.code-block-wrapper pre::-webkit-scrollbar {
+  height: 6px;
+}
+.code-block-wrapper pre::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.code-block-wrapper pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .code-block-wrapper pre code {
   background: none;
   color: var(--color-text);
@@ -661,6 +673,18 @@
   overflow-x: auto;
 }
 
+/* diff 内容滚动条：随主题色自动适配 */
+.diff-content::-webkit-scrollbar {
+  height: 6px;
+}
+.diff-content::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.diff-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .diff-content code {
   white-space: pre;
 }
@@ -691,6 +715,19 @@
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* 工具输出滚动条：随主题色自动适配 */
+.tool-output-content::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.tool-output-content::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+.tool-output-content::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 /* ── 计划卡片 ── */

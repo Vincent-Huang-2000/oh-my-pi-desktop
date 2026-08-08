@@ -92,6 +92,8 @@ const desktop = {
   selectOmpPath: () => ipcRenderer.invoke('desktop:select-omp-path'),
   // 保存侧栏布局（宽度与折叠状态）到 settings.paneLayout。
   setPaneLayout: (layout: PaneLayoutSettings) => ipcRenderer.invoke('desktop:set-pane-layout', layout),
+  // 保存当前主题 ID 到全局设置。
+  setThemeId: (themeId: string) => ipcRenderer.invoke('desktop:set-theme', themeId),
   createSession: (projectPath: string, title: string, approvalProfile: ApprovalProfile) =>
     ipcRenderer.invoke('desktop:create-session', projectPath, title, approvalProfile),
   startAgent: (sessionId: string, workspacePath: string) =>

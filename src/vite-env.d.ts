@@ -60,11 +60,14 @@ type PaneLayoutSettings = {
   rightCollapsed: boolean;
 };
 
+// 全局设置，与 src/electron/types.ts 保持同步。各字段说明：
+// - ompExecutablePath：用户指定的 omp 可执行文件路径；为空时使用 PATH 中的 'omp'。
+// - paneLayout：侧栏布局（宽度与折叠状态）；缺失时使用默认布局。
+// - themeId：当前激活的主题 ID；未设置时使用默认浅色主题 'light'。
 type DesktopSettings = {
-  // 用户指定的 omp 可执行文件路径；为空时使用 PATH 中的 'omp'。
   ompExecutablePath?: string;
-  // 侧栏布局（宽度与折叠状态）；缺失时使用默认布局。
   paneLayout?: PaneLayoutSettings;
+  themeId?: string;
 };
 
 type DesktopState = {
@@ -158,6 +161,8 @@ interface Window {
     selectOmpPath: () => Promise<{ ok: boolean; path?: string; message?: string }>;
     // 保存侧栏布局（宽度与折叠状态），启动时随 getState 恢复。
     setPaneLayout: (layout: PaneLayoutSettings) => Promise<{ ok: boolean; message?: string }>;
+    // 保存当前主题 ID 到全局设置，启动时随 getState 恢复。
+    setThemeId: (themeId: string) => Promise<{ ok: boolean; message?: string }>;
     createSession: (
       projectPath: string,
       title: string,

@@ -14,7 +14,7 @@
   outline: none;
 }
 .elicitation-input:focus {
-  border-color: var(--accent-primary, #8fd0b1);
+  border-color: var(--color-accent);
 }
 
 .elicitation-inline-actions {

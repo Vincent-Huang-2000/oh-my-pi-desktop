@@ -271,3 +271,29 @@
 .omp-path-setting-button:active {
   background: var(--color-accent-hover);
 }
+
+/* ── 主题切换按钮 ── */
+.theme-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-tertiary);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.theme-toggle-button:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+}
+
+.theme-toggle-button:active {
+  background: var(--color-accent-hover);
+}

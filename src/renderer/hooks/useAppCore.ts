@@ -17,6 +17,7 @@ import type { PendingAttachment } from '../lib/attachments';
 import { DEFAULT_APPROVAL_PROFILE, type DraftConfigValues, type ReviewSource } from '../lib/constants';
 import type { PendingSlashCommand } from '../lib/slashCommands';
 import type { GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
+import { DEFAULT_THEME_ID, getTheme } from '../theme';
 
 export function useAppCore() {
   const [desktopState, setDesktopState] = useState<DesktopState>({
@@ -97,6 +98,18 @@ export function useAppCore() {
   const [draftApprovalProfile, setDraftApprovalProfile] = useState<ApprovalProfile>(
     DEFAULT_APPROVAL_PROFILE
   );
+  // 当前激活的主题 ID；未持久化时使用默认浅色主题。
+  const [themeId, setLocalThemeId] = useState(DEFAULT_THEME_ID);
+
+  // 持久化并切换主题：写入 settings.themeId + 更新本地 state。
+  const persistTheme = async (id: string) => {
+    setLocalThemeId(id);
+    try {
+      await window.ohMyPiDesktop.setThemeId(id);
+    } catch {
+      // 持久化失败不阻塞 UI；下次启动回退到旧值。
+    }
+  };
   // 审批运行环境恢复失败时在输入区展示可操作提示；详细原因只写主进程日志。
   const [approvalProfileNotice, setApprovalProfileNotice] = useState('');
   const [approvalRestoreFailed, setApprovalRestoreFailed] = useState(false);
@@ -334,6 +347,12 @@ export function useAppCore() {
       setOmpPath(savedOmpPath);
       await reloadState();
       // reloadState 已通过 selectProject 同步 selectedProjectRef，用其路径检测 OMP 状态，
+      // 恢复持久化的主题 ID；未设置或已失效（如对应主题被移除）时保持默认浅色，
+      // 避免 state 持有无效值导致图标与实际 CSS 主题不一致。
+      const savedThemeId = state.settings?.themeId;
+      if (savedThemeId && getTheme(savedThemeId)) {
+        setLocalThemeId(savedThemeId);
+      }
       // 避免重启后 ompStatus 停留在初始值 '未检测'。
       const projectPath = selectedProjectRef.current?.path;
       if (projectPath) {
@@ -358,6 +377,8 @@ export function useAppCore() {
     selectedSession,
     messages,
     prompt,
+    themeId,
+    persistTheme,
     pendingAttachments,
     ompStatus,
     ompPath,

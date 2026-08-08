@@ -301,6 +301,15 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     return { ok: true };
   });
 
+  // 保存当前主题 ID 到全局设置。
+  ipcMain.handle('desktop:set-theme', (_event, themeId: unknown) => {
+    if (typeof themeId !== 'string' || themeId.length === 0 || themeId.length > 64) {
+      return { ok: false, message: '主题 ID 格式不正确' };
+    }
+    setSetting('themeId', themeId);
+    return { ok: true };
+  });
+
   // 打开文件选择对话框让用户选择 omp 可执行文件，保存设置并执行 --version 验证。
   ipcMain.handle('desktop:select-omp-path', async () => {
     const result = await dialog.showOpenDialog({

@@ -41,6 +41,8 @@ export type DesktopSettings = {
   ompExecutablePath?: string;
   // 侧栏布局（宽度与折叠状态）；缺失时使用默认布局。
   paneLayout?: PaneLayoutSettings;
+  // 当前激活的主题ID；未设置时使用默认浅色主题 'light'。
+  themeId?: string;
 };
 
 export type DesktopState = {

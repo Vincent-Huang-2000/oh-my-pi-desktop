@@ -15,6 +15,9 @@ type TopBarProps = {
   // 打开/添加项目目录（系统目录选择器 → upsert project）。上提到顶栏身份区后，
   // 左栏折叠时也能访问，避免出现"折叠后无法加入项目"的死角。
   onSelectWorkspace: () => void;
+  // 当前激活的主题 ID，决定浅色/深色图标的展示。
+  themeId: string;
+  onToggleTheme: () => void;
 };
 
 // 顶栏全局控件：身份区 + 运行时区。
@@ -30,7 +33,9 @@ export function TopBar({
   onToggleLeftPane,
   onToggleRightPane,
   onSelectOmpPath,
-  onSelectWorkspace
+  onSelectWorkspace,
+  themeId,
+  onToggleTheme
 }: TopBarProps) {
   // 顶栏布局分为两个视觉层级（详见 docs/UI/ui-layout-reference.md §3）：
   //   1) 身份区（topbar-identity）：品牌 + 当前项目名，轻量展示。
@@ -112,6 +117,31 @@ export function TopBar({
           <span className={ompBroken ? 'status-dot danger' : 'status-dot'} aria-hidden="true" />
           {ompStatus}
         </span>
+        <button
+          type="button"
+          className="theme-toggle-button"
+          aria-label={themeId === 'light' ? '切换到深色主题' : '切换到浅色主题'}
+          title={themeId === 'light' ? '切换到深色主题' : '切换到浅色主题'}
+          onClick={onToggleTheme}
+        >
+          {themeId === 'light' ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5" />
+              <line x1="12" y1="1" x2="12" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="23" />
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+              <line x1="1" y1="12" x2="3" y2="12" />
+              <line x1="21" y1="12" x2="23" y2="12" />
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+            </svg>
+          )}
+        </button>
         <button
           type="button"
           className="omp-path-setting-button"

@@ -631,3 +631,173 @@ summary:focus-visible {
 .message-list:hover::-webkit-scrollbar-thumb {
   background: var(--color-border);    /* 鼠标移入中间区域才显示滑块 */
 }
+
+
+/* ============================================================
+ * 夜间主题（data-theme="dark"）
+ *
+ * 覆盖 :root 层所有语义色彩变量 + 修复各组件中的硬编码色值。
+ * 注册新主题时按相同模式新增 [data-theme="<id>"] 块即可。
+ * ============================================================ */
+
+[data-theme="dark"] {
+  /* ── 强调色基色（暗色背景下调亮以保持可见度） ── */
+  --theme-accent-h: 245;
+  --theme-accent-s: 79%;
+  --theme-accent-l: 68%;
+
+  /* ── 渐变色（暗色版） ── */
+  --theme-grad-1: #1e2350;
+  --theme-grad-2: #25203f;
+  --theme-grad-3: #32202f;
+  --theme-grad-4: #2b2032;
+
+  /* ── 语义层：强调色 ── */
+  --color-accent:          hsl(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l));
+  --color-accent-strong:   hsl(var(--theme-accent-h), var(--theme-accent-s), 72%);
+  --color-accent-subtle:   hsla(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l), 0.18);
+  --color-accent-hover:    hsla(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l), 0.10);
+  --color-accent-hover-strong: hsla(var(--theme-accent-h), var(--theme-accent-s), var(--theme-accent-l), 0.24);
+
+  /* ── 语义层：中性色 ── */
+  --color-bg:            #111318;
+  --color-surface:       #1a1e25;
+  --color-surface-alt:   #21252f;
+  --color-surface-sunken:#282c37;
+  --color-border:        #323640;
+  --color-border-subtle: #282c37;
+  --color-text:          #d6dae3;
+  --color-text-muted:    #8e93a4;
+  --color-text-tertiary: #606678;
+  --color-text-faint:    #434856;
+
+  /* ── Markdown 代码与表格 ── */
+  --color-code-inline-bg: #2a2238;
+  --color-code-inline-text: #c4a9ea;
+  --color-code-block-bg:  #1b1f2c;
+  --color-table-header-bg:#1b1f2c;
+  --color-table-stripe-bg:#1d2130;
+
+  /* ── 毛玻璃令牌（暗色半透明底） ── */
+  --glass-bg:            rgba(26, 30, 37, 0.78);
+  --glass-bg-strong:     rgba(26, 30, 37, 0.94);
+  --glass-blur:          blur(24px) saturate(120%);
+  --glass-blur-light:    blur(16px) saturate(110%);
+  --glass-border:        rgba(255, 255, 255, 0.08);
+  --glass-border-subtle: rgba(255, 255, 255, 0.05);
+  --glass-shadow:        0 8px 32px rgba(0, 0, 0, 0.4);
+
+  /* ── 功能色 ── */
+  --color-tool:          #2a2a22;
+  --color-pin:           #e0a83a;
+  --color-error:         #2d1a18;
+  --color-error-border:  #4a2d2a;
+  --color-error-text:    #f87171;
+  --color-error-bg-hover:#30201e;
+
+  /* ── 状态色 ── */
+  --color-running:       #60a5fa;
+  --color-done:          #34d399;
+  --color-pending:       #6b7280;
+}
+
+/* ── 组件级硬编码色值覆盖（暗色主题） ──
+   这些选择器覆盖因各组件内写了 hex/rgba 等非变量色值而需要。
+   后续可逐步将这些色值迁移到 :root 变量中以消除此区块。 */
+
+[data-theme="dark"] .message-list {
+  background: rgba(26, 30, 37, 0.88);
+}
+
+[data-theme="dark"] .scroll-to-bottom-btn {
+  background: var(--color-surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .scroll-to-bottom-btn:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .tool-card-header {
+  background: rgba(26, 30, 37, 0.6);
+}
+
+[data-theme="dark"] .message.plan {
+  background: rgba(26, 30, 37, 0.65);
+}
+
+[data-theme="dark"] .plan-mode-banner {
+  color: #e0a83a;
+  background: #2a2418;
+}
+
+[data-theme="dark"] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .composer-card {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .composer-command-palette {
+  background: rgba(26, 30, 37, 0.96);
+  box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .attach-menu {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .command-palette-dropdown {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .review-branch-menu {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .review-diff-toggle {
+  box-shadow: 1px 0 0 rgba(50, 54, 64, 0.9);
+}
+
+[data-theme="dark"] .model-picker-popup {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .segment-select-dropdown {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .questionnaire-item {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+[data-theme="dark"] .pane-toggle-button.active {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .omp-path-setting-button {
+  background: var(--color-surface);
+}
+
+/* 滚动条暗色适配 */
+[data-theme="dark"] .message-list::-webkit-scrollbar-thumb,
+[data-theme="dark"] .project-list::-webkit-scrollbar-thumb,
+[data-theme="dark"] .context-panel::-webkit-scrollbar-thumb,
+[data-theme="dark"] .review-diff-files::-webkit-scrollbar-thumb,
+[data-theme="dark"] .review-diff-code::-webkit-scrollbar-thumb,
+[data-theme="dark"] .review-diff-hunk-nav::-webkit-scrollbar-thumb,
+[data-theme="dark"] .review-diff-box::-webkit-scrollbar-thumb,
+[data-theme="dark"] .code-block-wrapper pre::-webkit-scrollbar-thumb,
+[data-theme="dark"] .tool-output-content::-webkit-scrollbar-thumb,
+[data-theme="dark"] .diff-content::-webkit-scrollbar-thumb,
+[data-theme="dark"] .composer textarea::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .message-list:hover::-webkit-scrollbar-thumb,
+[data-theme="dark"] .code-block-wrapper pre:hover::-webkit-scrollbar-thumb,
+[data-theme="dark"] .tool-output-content:hover::-webkit-scrollbar-thumb,
+[data-theme="dark"] .diff-content:hover::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+}
