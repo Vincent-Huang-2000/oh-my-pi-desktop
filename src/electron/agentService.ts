@@ -36,6 +36,7 @@ import {
   upsertSession
 } from './state.js';
 import type { AgentEvent, ApprovalProfile, AcpAvailableCommand } from './types.js';
+import { CLIENT_VERSION } from './agentTypes.js';
 import type {
   AcpProcessState,
   AgentEventSender,
@@ -564,7 +565,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       clientInfo: {
         name: 'oh-my-pi-desktop',
         title: 'Oh My Pi Desktop',
-        version: '0.1.0' // CLIENT_VERSION
+        version: CLIENT_VERSION
       },
       // 声明 elicitation.form 能力：omp 内置的 ExtensionToolWrapper 第2层审批门控
       // 在 always-ask/write 模式下会走 unstable_createElicitation（form 模式）请求用户确认，

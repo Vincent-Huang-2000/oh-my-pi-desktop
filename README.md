@@ -4,7 +4,11 @@ oh-my-pi 的桌面客户端，指挥你的Ai模型去干活吧！
 
 你只需要负责描述需求，agent 负责执行：它会在 `omp acp` 子进程中读写文件、运行命令、审查 diff、管理 Git 分支。每个敏感操作都会先征求你的同意，所有改动看得见、可回退。
 
-当前版本 `0.1.0`，面向 Windows 平台。
+当前版本 `0.2.0`，面向 Windows 平台。
+
+![界面截图1_亮色主题](docs/images/main-window.png)
+
+![界面截图1_暗色主题](docs/images/main-window-2.png)
 
 ## 功能特性
 
@@ -14,6 +18,7 @@ oh-my-pi 的桌面客户端，指挥你的Ai模型去干活吧！
 - **会话管理**：新建、恢复、复制（Fork）、关闭，`Ctrl+K` 全局搜索历史会话
 - **代码审查**：VS Code 风格 diff 高亮，本地 Git 分支查看与切换
 - **安全可控**：敏感操作先征求同意，审批策略三档可选，模型与推理强度随时切换
+- **深色主题**：浅色/深色一键切换，选择持久化，重启后自动恢复
 
 ## 前置依赖
 
@@ -60,7 +65,7 @@ npm run dist:win
 ```
 
 - **主进程**：管理 agent 子进程生命周期、权限审批、状态持久化（JSON 文件）
-- **渲染进程**：React 19 三栏 UI，通过 34 个 IPC 通道与主进程通信
+- **渲染进程**：React 19 三栏 UI，通过 35 个 IPC 通道与主进程通信
 - **agent 子进程**：`omp acp`，通过 stdio JSON-RPC 与主进程交互
 
 ## 技术栈
@@ -80,7 +85,7 @@ src/
 ├── electron/                 # 主进程
 │   ├── main.ts               # 应用入口
 │   ├── window.ts             # BrowserWindow 工厂
-│   ├── preload.ts            # contextBridge（34 invoke + 1 事件通道）
+│   ├── preload.ts            # contextBridge（35 invoke + 1 事件通道）
 │   ├── ipc.ts                # IPC handler 注册
 │   ├── agentService.ts       # agent 子进程管理与 JSON-RPC 解析
 │   ├── agentPlan.ts          # ACP plan 事件解析
@@ -96,6 +101,7 @@ src/
 │   ├── components/           # UI 组件（TopBar / ProjectPane / ChatWorkspace / 各弹窗等，同名 .css 配套）
 │   ├── hooks/                # 业务逻辑 hooks（useAppCore / useAgentEvents / useSessionLifecycle 等）
 │   ├── lib/                  # 纯逻辑模块（slashCommands / paneLayout / attachments / messageMerge 等）
+│   ├── theme.ts              # 主题注册表与切换（applyTheme / toggleTheme）
 │   ├── highlight-themes/     # 代码高亮主题
 │   ├── types.ts              # 渲染层类型定义
 │   ├── utils.ts              # 工具函数
