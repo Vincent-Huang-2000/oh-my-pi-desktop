@@ -28,7 +28,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { FormEvent, ClipboardEvent, KeyboardEvent } from 'react';
+import type { FormEvent, ClipboardEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -402,7 +402,7 @@ function CodeBlock(props: React.ComponentProps<'pre'>) {
 
   const handleCopy = useCallback(() => {
     const text = preRef.current?.textContent ?? '';
-    navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -454,7 +454,7 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
   const [copyMsgDone, setCopyMsgDone] = useState(false);
 
   const handleCopyMessage = useCallback(() => {
-    navigator.clipboard.writeText(message.text).then(() => {
+    void navigator.clipboard.writeText(message.text).then(() => {
       setCopyMsgDone(true);
       setTimeout(() => setCopyMsgDone(false), 2000);
     });
@@ -691,7 +691,7 @@ type ToolGroupHeaderProps = {
   expanded: boolean;
   onToggle: () => void;
 };
-function ToolGroupHeader({ groupId, count, hasError, expanded, onToggle }: ToolGroupHeaderProps) {
+function ToolGroupHeader({ groupId: _groupId, count, hasError, expanded, onToggle }: ToolGroupHeaderProps) {
   return (
     <button
       type="button"
@@ -1037,7 +1037,7 @@ export function ChatWorkspace({
   onSubmit,
   onCancel,
   onElicitationRespond,
-  onPaste,
+  onPaste: _onPaste,
   onRemovePendingAttachment,
   onSelectFile,
   onSetToolGroupCollapsed,
@@ -1181,27 +1181,6 @@ export function ChatWorkspace({
     });
   };
 
-  // 键盘事件：Esc 收起命令面板；单独 Enter 发送消息；Shift+Enter 换行；Ctrl+Enter 无操作。
-  const handleTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Escape' && paletteOpen) {
-      event.preventDefault();
-      setPaletteDismissed(true);
-      return;
-    }
-    if (event.key === 'Enter') {
-      // Ctrl+Enter 不换行也不发送
-      if (event.ctrlKey) {
-        event.preventDefault();
-        return;
-      }
-      // 单独 Enter（无修饰键、非 IME 组合态）发送消息
-      if (!event.shiftKey && !event.metaKey && !event.nativeEvent.isComposing) {
-        event.preventDefault();
-        formRef.current?.requestSubmit();
-      }
-      // Shift+Enter / Meta+Enter / IME 组合态：由浏览器处理换行
-    }
-  };
 
   // 完整计划保留在消息流；右上角只派生轻量摘要与定位入口。
   const { planMessages, conversationMessages } = useMemo(

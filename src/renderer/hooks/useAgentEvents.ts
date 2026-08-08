@@ -21,12 +21,14 @@
  * - 不再在每个事件上更新 desktopState.logs——主进程 agentService 已通过 addLog 写盘，
  *   渲染端不需重复构建 120 条日志数组来触发整棵 App 重渲染。
  */
+// TODO: utils.ts functions (getPayloadPermissionOptions, getPayloadElicitationField, etc.)
+// need explicit return type annotations to eliminate no-unsafe-* warnings.
+
 import { useEffect } from 'react';
 import type {
   AcpConfigOption,
   ChatMessage,
   ElicitationRequest,
-  PermissionOption,
   PermissionRequest,
   QuestionnaireRequest,
 } from '../types';
@@ -72,7 +74,7 @@ export function useAgentEvents(
         const req: PermissionRequest = {
           requestId: getPayloadRequestId(event.payload),
           message: event.message,
-          options: getPayloadPermissionOptions(event.payload) as PermissionOption[],
+          options: getPayloadPermissionOptions(event.payload),
         };
         const currentQueue = app.permissionBySession.current[event.sessionId] ?? [];
         const nextQueue = currentQueue.some((item) => item.requestId === req.requestId)

@@ -72,7 +72,7 @@ export function ContextPane({
       }
       clearTimeout(syncTimer);
       // 恢复窗口时 focus 与 visibilitychange 可能连续触发，短暂去抖可避免重复启动 Git 子进程。
-      syncTimer = setTimeout(onSyncGitReview, 80);
+      syncTimer = setTimeout(() => { void onSyncGitReview(); }, 80);
     };
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {

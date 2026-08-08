@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import './GitBranchSwitchErrorModal.css';
+/* eslint-disable react-refresh/only-export-components */
+
 
 const GIT_BRANCH_SWITCH_ERROR_MESSAGES: Record<GitBranchSwitchFailureReason, string> = {
   'unmerged-files':

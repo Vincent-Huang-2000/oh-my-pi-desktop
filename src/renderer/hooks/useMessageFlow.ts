@@ -75,7 +75,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     // 不再只应用用户显式改过的草稿值——否则未改动项会落到 omp 默认配置，
     // 出现"重启后直接发消息用了别的模型/推理强度"的问题。
     // 来源：app.displayedConfigOptions 已合并缓存配置 + 草稿覆盖，直接取 currentValue。
-    let configValuesToApply: DraftConfigValues = {};
+  const configValuesToApply: DraftConfigValues = {};
     // 防御：若 app.selectedSession 不属于当前 app.selectedProject（理论上不应发生，但闭包/快速切换下可能），
     // 视同没有 session，新建一个绑定到当前项目的 session，避免复用旧项目子进程。
     if (!session || session.projectPath !== app.selectedProject.path) {

@@ -309,7 +309,7 @@ export function useSessionLifecycle(
       delete app.usageBySession.current[newLocalId];
       toolGroups.resetCollapsedToolGroupsForSession(newLocalId);
       // 兜底杀掉可能已 spawn 但 ACP 握手/fork 阶段失败的 agent 子进程（不存在则 no-op）。
-      window.ohMyPiDesktop.stopSessionProcess(newLocalId);
+      void window.ohMyPiDesktop.stopSessionProcess(newLocalId);
       app.setLoadingHistorySessionId((current) => (current === newLocalId ? null : current));
       // 跨项目 fork 失败：回滚到原项目与会话，恢复消息/用量/权限/配置缓存。
       // 同项目 fork 失败：置空选中会话，清空中间栏，左栏不再并入占位行。

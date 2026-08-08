@@ -14,10 +14,7 @@
  * - GitBranchSwitchError 类型定义在 components/GitBranchSwitchErrorModal。
  */
 import { useCallback, useEffect } from 'react';
-import {
-  resolveGitBranchSwitchFailure,
-  type GitBranchSwitchError,
-} from '../components/GitBranchSwitchErrorModal';
+import { resolveGitBranchSwitchFailure } from '../components/GitBranchSwitchErrorModal';
 import { REVIEW_SOURCE_LABEL, type ReviewSource } from '../lib/constants';
 import { useAppCore } from './useAppCore';
 

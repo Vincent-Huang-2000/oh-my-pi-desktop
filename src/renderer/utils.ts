@@ -21,7 +21,8 @@ export const getPayloadRequestId = (payload: unknown) => {
     return '';
   }
   const record = payload as Record<string, unknown>;
-  return String(record.requestId ?? record.id ?? '');
+  const raw = record.requestId ?? record.id;
+  return typeof raw === 'string' || typeof raw === 'number' ? `${raw}` : '';
 };
 
 export const getPayloadMessageId = (payload: unknown) => {
@@ -37,12 +38,13 @@ export const getPayloadMessageId = (payload: unknown) => {
   return typeof messageId === 'string' ? messageId : '';
 };
 
-export const getPayloadConfigOptions = (payload: unknown) => {
+export const getPayloadConfigOptions = (payload: unknown): unknown[] => {
   if (!payload || typeof payload !== 'object') {
     return [];
   }
   const record = payload as Record<string, unknown>;
-  return Array.isArray(record.configOptions) ? record.configOptions : [];
+  const opts = record.configOptions;
+  return Array.isArray(opts) ? opts : [];
 };
 
 export const getPayloadPermissionOptions = (payload: unknown) => {
@@ -329,10 +331,9 @@ export const getPayloadToolCall = (payload: unknown) => {
           typeof (loc as Record<string, unknown>).path === 'string',
       )
       .map((loc) => {
-        const l = loc as Record<string, unknown>;
-        const line = l.line;
+        const line = loc.line;
         return {
-          path: String(l.path),
+          path: String(loc.path),
           line: typeof line === 'number' || line === null ? line : undefined,
         };
       });
@@ -506,7 +507,7 @@ export const groupModelOptions = (
   const groups = new Map<string, NonNullable<AcpConfigOption['options']>>();
   for (const option of options) {
     const provider =
-      readProvider(option as { description?: string }) ?? inferModelProvider(option.name);
+      readProvider(option) ?? inferModelProvider(option.name);
     const list = groups.get(provider) ?? [];
     list.push(option);
     groups.set(provider, list);

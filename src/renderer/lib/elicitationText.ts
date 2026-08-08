@@ -22,6 +22,10 @@ export const getElicitationResultText = (
     if (value.endsWith(' Done selecting') || value === 'Done selecting') return '已完成选择';
     return `已选择：${value.replace(/ \(Recommended\)$/, '')}`;
   }
-  if (value !== undefined) return `已提交：${String(value)}`;
+  if (value !== undefined) {
+    if (typeof value === 'string') return `已提交：${value}`;
+    if (typeof value === 'number' || typeof value === 'boolean') return `已提交：${String(value)}`;
+    return `已提交：${JSON.stringify(value)}`;
+  }
   return '已提交';
 };

@@ -460,7 +460,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const loadElicitationPlanPreview = async (
     process: AcpProcessState,
     requestId: string,
-    message: string,
+    _message: string,
   ) => {
     try {
       const fullPlan = await readFullPlanForApproval(process);
@@ -653,7 +653,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     process.replayMode = shouldBufferReplay ? 'buffer' : 'suppress';
     process.replayEvents = [];
     let response: unknown;
-    let replayEvents: AgentEvent[] = [];
+    let replayEvents: AgentEvent[];
     try {
       response = await sendRequest(process, method, {
         sessionId: acpSessionId,
@@ -1130,6 +1130,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   // 纯读取已运行子进程当前缓存的 configOptions：绝不为读取配置而 spawn 进程或新建 session。
   // 配合"首次发消息才真正建 omp 会话"——草稿会话在发出首条消息前不应产生空的 omp 会话；
   // session 真正建立（new/load/resume/fork）后，configOptions 会通过 config_update 事件推给渲染端。
+  // eslint-disable-next-line @typescript-eslint/require-await -- AgentService 接口要求返回 Promise
   const getSessionConfig = async (sessionId: string, _workspacePath: string) => {
     const processState = agentProcesses.get(sessionId);
     if (!processState || processState.closed || !processState.acpSessionId) {
@@ -1175,7 +1176,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return { ok: false, message };
     }
   };
-
+  // eslint-disable-next-line @typescript-eslint/require-await -- AgentService 接口要求返回 Promise
   const cancelTurn = async (sessionId: string) => {
     const processState = agentProcesses.get(sessionId);
     if (!processState || processState.closed || !processState.acpSessionId) {

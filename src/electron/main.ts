@@ -35,7 +35,7 @@ const agentService = createAgentService(sendAgentEvent);
 
 registerDesktopIpcHandlers(agentService);
 
-app.whenReady().then(() => {
+void app.whenReady().then(() => {
   void createWindow({ electronDirname: __dirname, devServerUrl });
 
   app.on('activate', () => {

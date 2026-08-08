@@ -18,13 +18,6 @@ type QuestionnaireAnswer = {
   selections: string[];
 };
 
-// ACP 会话信息（对应 ACP SessionInfo）。
-type AcpSessionInfo = {
-  sessionId: string;
-  cwd: string;
-  title?: string;
-  updatedAt?: string;
-};
 
 type AgentEvent = {
   sessionId: string;

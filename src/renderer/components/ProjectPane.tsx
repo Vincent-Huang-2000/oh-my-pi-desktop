@@ -531,9 +531,9 @@ export function ProjectPane({
     if (projectListRef.current) {
       const groupEl = projectListRef.current.querySelector(
         `[data-project-path="${CSS.escape(projectPath)}"]`,
-      ) as HTMLElement | null;
+      );
       if (groupEl) {
-        const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
+        const headerEl = groupEl.querySelector('.project-header');
         pendingScrollAdjustRef.current = {
           projectPath,
           headerViewportTop: headerEl ? headerEl.getBoundingClientRect().top : 0,
@@ -548,9 +548,9 @@ export function ProjectPane({
     pendingScrollAdjustRef.current = null;
     const groupEl = projectListRef.current.querySelector(
       `[data-project-path="${CSS.escape(pending.projectPath)}"]`,
-    ) as HTMLElement | null;
+    );
     if (!groupEl) return;
-    const headerEl = groupEl.querySelector('.project-header') as HTMLElement | null;
+    const headerEl = groupEl.querySelector('.project-header');
     if (!headerEl) return;
     const newTop = headerEl.getBoundingClientRect().top;
     const delta = newTop - pending.headerViewportTop;

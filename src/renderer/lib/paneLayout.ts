@@ -116,7 +116,6 @@ export const computeAdaptiveCollapse = (
     }
     if (chatWidth < CHAT_COLLAPSE_WIDTH && !desired.left && !manualExpand.left) {
       desired.left = true;
-      chatWidth += left.width;
     }
     return desired;
   }
