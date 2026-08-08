@@ -10,6 +10,10 @@
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && tsc -p tsconfig.electron.json && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
     "build": "tsc --noEmit -p tsconfig.json && tsc -p tsconfig.electron.json && vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.electron.json",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
+    "lint": "npm run typecheck && npm run format:check",
     "dist:win": "npm run build && electron-builder --win portable",
     "start": "electron .",
     "preview": "vite preview"
@@ -32,7 +36,7 @@
     "electron": "^42.4.1",
     "electron-builder": "^26.15.3",
     "typescript": "^5.9.0",
-    "vite": "^7.0.0",
+    "prettier": "^3.9.6",
     "wait-on": "^8.0.0"
   },
   "build": {
