@@ -28,7 +28,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import type { FormEvent, ClipboardEvent } from 'react';
+import type { FormEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -1043,7 +1043,7 @@ export function ChatWorkspace({
   onSubmit,
   onCancel,
   onElicitationRespond,
-  onPaste: _onPaste,
+  onPaste,
   onRemovePendingAttachment,
   onSelectFile,
   onSetToolGroupCollapsed,
@@ -1161,6 +1161,28 @@ export function ChatWorkspace({
   const handlePromptChange = (value: string) => {
     setPaletteDismissed(false);
     onPromptChange(value);
+  };
+
+  // 键盘事件：Esc 收起命令面板；单独 Enter 发送消息；Shift+Enter 换行；Ctrl+Enter 无操作。
+  const handleTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Escape' && paletteOpen) {
+      event.preventDefault();
+      setPaletteDismissed(true);
+      return;
+    }
+    if (event.key === 'Enter') {
+      // Ctrl+Enter 不换行也不发送。
+      if (event.ctrlKey) {
+        event.preventDefault();
+        return;
+      }
+      // 单独 Enter（无修饰键、非 IME 组合态）触发表单提交。
+      if (!event.shiftKey && !event.metaKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        formRef.current?.requestSubmit();
+      }
+      // Shift+Enter / Meta+Enter / IME 组合态：由浏览器处理换行。
+    }
   };
 
   // 自动调整 textarea 高度：内容增多时先拉高，超过最大高度显示滚动条。
@@ -1557,6 +1579,8 @@ export function ChatWorkspace({
               ref={textareaRef}
               value={prompt}
               onChange={(event) => handlePromptChange(event.target.value)}
+              onKeyDown={handleTextareaKeyDown}
+              onPaste={onPaste}
               placeholder="向 oh-my-pi agent 说明你想做什么（输入 / 唤起命令，支持粘贴图片）..."
               disabled={!selectedProject}
             />
