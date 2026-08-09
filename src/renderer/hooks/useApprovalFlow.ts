@@ -17,11 +17,14 @@
  * - elicitaiton 的 markSubmitting 模式在 IPC 等待前先隐藏操作控件，防用户重复提交。
  * - questionnaire stale 失败需调用 advanceToNextQuestionnaire 推进队列，否则会卡住后续问卷。
  */
+import { useRef } from 'react';
 import type { ChatMessage, QuestionnaireAnswer } from '../types';
 import { getElicitationResultText } from '../lib/elicitationText';
 import type { useAppCore } from './useAppCore';
 
 export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
+  // 防止同一 permission request 被并发提交多次（双击 / 快速重试）。
+  const pendingPermissionIds = useRef(new Set<string>());
   // 把指定 requestId 的问卷从队列移除，并推进当前弹窗到下一项或置空。
   const advanceToNextQuestionnaire = (requestId: string, sessionId: string) => {
     const remaining = (app.questionnaireBySession.current[sessionId] ?? []).filter(
@@ -32,7 +35,6 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
       app.setQuestionnaireRequest(remaining[0] ?? null);
     }
   };
-
   // 权限审批：调用 IPC 后清理当前 session 的弹窗缓存（其它 session 的不受影响）。
   const handlePermission = async (optionId: string) => {
     if (!app.permissionRequest || !app.selectedSession) {
@@ -40,22 +42,36 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     }
     const sessionId = app.selectedSession.id;
     const requestId = app.permissionRequest.requestId;
-    const result = await window.ohMyPiDesktop.permissionOptionResponse(requestId, optionId);
-    if (!result.ok) {
-      app.setAgentStatus('审批失败');
+
+    // 防止同一 request 被并发提交多次
+    if (pendingPermissionIds.current.has(requestId)) {
       return;
     }
-    const remaining = (app.permissionBySession.current[sessionId] ?? []).filter(
-      (request) => request.requestId !== requestId,
-    );
-    app.permissionBySession.current[sessionId] = remaining;
-    if (app.selectedSessionRef.current?.id === sessionId) {
-      const nextRequest = remaining[0] ?? null;
-      app.setPermissionRequest(nextRequest);
-      const nextIsPermission = nextRequest?.options.some(
-        (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject'),
+    pendingPermissionIds.current.add(requestId);
+
+    // IPC 前先给即时视觉反馈
+    app.setAgentStatus('正在提交审批…');
+
+    try {
+      const result = await window.ohMyPiDesktop.permissionOptionResponse(requestId, optionId);
+      if (!result.ok) {
+        app.setAgentStatus('审批失败');
+        return;
+      }
+      const remaining = (app.permissionBySession.current[sessionId] ?? []).filter(
+        (request) => request.requestId !== requestId,
       );
-      app.setAgentStatus(nextRequest ? (nextIsPermission ? '等待审批' : '等待选择') : '继续运行');
+      app.permissionBySession.current[sessionId] = remaining;
+      if (app.selectedSessionRef.current?.id === sessionId) {
+        const nextRequest = remaining[0] ?? null;
+        app.setPermissionRequest(nextRequest);
+        const nextIsPermission = nextRequest?.options.some(
+          (option) => option.kind.startsWith('allow') || option.kind.startsWith('reject'),
+        );
+        app.setAgentStatus(nextRequest ? (nextIsPermission ? '等待审批' : '等待选择') : '继续运行');
+      }
+    } finally {
+      pendingPermissionIds.current.delete(requestId);
     }
   };
 

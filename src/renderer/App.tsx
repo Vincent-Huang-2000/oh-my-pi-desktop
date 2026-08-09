@@ -18,13 +18,8 @@ import { useEffect } from 'react';
 
 import { ChatWorkspace } from './components/ChatWorkspace';
 import { ContextPane } from './components/ContextPane';
-import { ElicitationModal } from './components/ElicitationModal';
-import {
-  GitBranchSwitchErrorModal
-} from './components/GitBranchSwitchErrorModal';
-import { PermissionModal } from './components/PermissionModal';
+import { GitBranchSwitchErrorModal } from './components/GitBranchSwitchErrorModal';
 import { ProjectPane } from './components/ProjectPane';
-import { QuestionnaireModal } from './components/QuestionnaireModal';
 import { SessionSearchModal } from './components/SessionSearchModal';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
@@ -40,11 +35,6 @@ import { useSessionLifecycle } from './hooks/useSessionLifecycle';
 import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
 import { applyTheme, toggleTheme } from './theme';
-import type {
-  ElicitationRequest
-} from './types';
-
-const EMPTY_ELICITATION_REQUESTS: ElicitationRequest[] = [];
 
 export default function App() {
   const app = useAppCore();
@@ -61,6 +51,15 @@ export default function App() {
   const approvalFlow = useApprovalFlow(app);
   const configSync = useConfigSync(app);
   useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff);
+
+  const activeApprovalRequestId =
+    app.activeApprovalKind === 'permission'
+      ? (app.permissionRequest?.requestId ?? null)
+      : app.activeApprovalKind === 'elicitation'
+        ? (app.elicitationRequest?.requestId ?? null)
+        : app.activeApprovalKind === 'questionnaire'
+          ? (app.questionnaireRequest?.requestId ?? null)
+          : null;
   // 主题切换：themeId 变化时同步到 DOM，触发 CSS 变量覆盖。
   useEffect(() => {
     applyTheme(app.themeId);
@@ -162,9 +161,16 @@ export default function App() {
           collapsedToolGroups={toolGroups.collapsedToolGroups}
           isHistoryLoading={app.loadingHistorySessionId === app.selectedSession?.id}
           historyScrollResetToken={app.historyScrollResetToken}
-          elicitationRequests={
-            app.elicitationBySession.current[app.selectedSession?.id ?? ''] ??
-            EMPTY_ELICITATION_REQUESTS
+          activeApprovalRequestId={activeApprovalRequestId}
+          permissionRequest={app.activeApprovalKind === 'permission' ? app.permissionRequest : null}
+          elicitationRequest={
+            app.activeApprovalKind === 'elicitation' ? app.elicitationRequest : null
+          }
+          questionnaireRequest={
+            app.activeApprovalKind === 'questionnaire' ? app.questionnaireRequest : null
+          }
+          questionnaireRequests={
+            app.questionnaireBySession.current[app.selectedSession?.id ?? ''] ?? []
           }
           modelConfig={app.modelConfig}
           modeConfig={app.modeConfig}
@@ -186,9 +192,16 @@ export default function App() {
           onPaste={messageFlow.handlePaste}
           onSubmit={(event) => void messageFlow.handleSubmit(event)}
           onCancel={() => void messageFlow.handleCancelTurn()}
+          onPermissionRespond={(optionId) => approvalFlow.handlePermission(optionId)}
           onElicitationRespond={(requestId, action, content) =>
             void approvalFlow.handleElicitation(requestId, action, content)
           }
+          onSelectQuestionnaire={app.setQuestionnaireRequest}
+          onQuestionnaireRespond={(action, answers) => {
+            const requestId = app.questionnaireRequest?.requestId;
+            if (!requestId) return Promise.resolve(false);
+            return approvalFlow.handleQuestionnaire(requestId, action, answers);
+          }}
           onSetToolGroupCollapsed={toolGroups.handleSetToolGroupCollapsed}
         />
 
@@ -335,34 +348,6 @@ export default function App() {
         <GitBranchSwitchErrorModal
           error={app.gitBranchSwitchError}
           onClose={gitReview.closeGitBranchSwitchError}
-        />
-      )}
-
-      {app.activeApprovalKind === 'permission' && app.permissionRequest && (
-        <PermissionModal
-          request={app.permissionRequest}
-          onRespond={(optionId) => void approvalFlow.handlePermission(optionId)}
-        />
-      )}
-
-      {app.activeApprovalKind === 'elicitation' && app.elicitationRequest && (
-        <ElicitationModal
-          request={app.elicitationRequest}
-          onRespond={(action, content) =>
-            void approvalFlow.handleElicitation(app.elicitationRequest!.requestId, action, content)
-          }
-        />
-      )}
-
-      {app.activeApprovalKind === 'questionnaire' && app.questionnaireRequest && (
-        <QuestionnaireModal
-          key={app.questionnaireRequest.requestId}
-          request={app.questionnaireRequest}
-          requests={app.questionnaireBySession.current[app.selectedSession?.id ?? ''] ?? []}
-          onSelect={app.setQuestionnaireRequest}
-          onRespond={(action, answers) =>
-            approvalFlow.handleQuestionnaire(app.questionnaireRequest!.requestId, action, answers)
-          }
         />
       )}
     </main>

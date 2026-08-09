@@ -8,13 +8,38 @@
   position: relative;
   display: grid;
 
-  /* 对话区背景：半透明白让底层渐变透出（light）/ 深色半透明（dark），
-     由 --color-workspace-bg 控制 */
-
-  /* 中间对话区只有消息流 + 输入区两行。 */
+  /* 消息流与输入区依次占据真实布局空间；审批坞与消息流叠加在同一行。 */
   grid-template-rows: minmax(0, 1fr) minmax(100px, auto);
   background: var(--color-workspace-bg);
   min-height: 0;
+}
+
+.message-stream {
+  grid-row: 1;
+  grid-column: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+/* 审批坞与消息流同占第一行网格，靠右下角叠加：不挤压输入区，其位置也不依赖
+   composer 高度（随附件/多行输入动态变化），从根本上避免遮挡输入区。
+   底距 98px = 消息列表 padding-bottom 22px + 滚动按钮底距 24px + 按钮高 36px
+   + 16px 间距，与「滚动到底部」按钮（sticky 约束盒为 scrollport，含 padding）
+   错开；按钮或消息列表内边距调整时需同步更新该值。 */
+.approval-dock {
+  grid-row: 1;
+  grid-column: 1;
+  place-self: end;
+  z-index: 10;
+  margin: 0 16px 98px 0;
+  min-width: 0;
+  min-height: 0;
+}
+
+.composer {
+  grid-row: 2;
+  grid-column: 1;
 }
 
 /* ── 消息列表 ── */
@@ -36,11 +61,11 @@
   margin-left: auto;
   border: 1px solid var(--color-border);
   border-radius: 50%;
-  background: #fff;
+  background: var(--color-surface);
   color: var(--color-text-muted);
   font-size: 16px;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  box-shadow: var(--shadow-card);
   transition:
     background 0.15s,
     box-shadow 0.15s,
@@ -48,8 +73,8 @@
 }
 
 .scroll-to-bottom-btn:hover {
-  background: var(--color-accent-subtle);
-  box-shadow: 0 4px 14px rgb(0 0 0 / 12%);
+  background: var(--color-accent-hover);
+  box-shadow: var(--shadow-float);
   transform: translateY(-1px);
 }
 
@@ -80,24 +105,24 @@
 /* ── 消息基础 ── */
 .message {
   max-width: 100%;
-  margin-bottom: 10px;
-  padding: 4px 12px 4px 14px;
+  margin-bottom: 8px;
+  padding: 2px 12px 2px 14px;
   border: none;
   border-left: 3px solid transparent;
-  border-radius: 0;
-  background: none;
+  border-radius: var(--radius-md);
+  background: transparent;
 }
 
 .message.user {
-  /* 用户消息：去掉左侧竖线，改用气泡包裹 */
+  /* 用户消息保留身份气泡，但不再通过描边和阴影强化为独立卡片。 */
   width: fit-content; /* 根据内容自动收缩宽度 */
   max-width: 85%; /* 限制气泡宽度上限，避免长消息占满整行 */
   margin-left: auto; /* 气泡右对齐（贴近对话区右侧） */
   padding: 10px 14px;
-  border: none;
-  border-radius: 14px; /* 圆角气泡 */
+  border: 0;
+  border-radius: var(--radius-xl); /* 圆角气泡 */
   background: var(--color-accent-subtle); /* 强调色浅底 */
-  box-shadow: var(--glass-shadow);
+  box-shadow: none;
   position: relative;
 }
 
@@ -128,14 +153,23 @@
   font-style: normal;
 }
 
-/* elicitation 内联记录：弱于对话气泡，但保留清晰的处理状态与结果。 */
+/* elicitation 待处理时保留操作面；已处理记录收敛为消息流中的状态行。 */
 .message.elicitation {
-  margin: 6px 0 10px;
+  margin: 6px 0 8px;
   padding: 10px 12px;
   border: 1px solid var(--color-border-subtle);
   border-left: 3px solid var(--color-accent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: var(--color-surface-sunken);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-process);
+}
+
+.message.elicitation.elicitation-resolved {
+  margin: 4px 0 8px;
+  padding: 5px 0 5px 12px;
+  border: 0;
+  border-left: 2px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .elicitation-header {
@@ -152,7 +186,8 @@
   font-weight: 600;
 }
 
-.elicitation-header time {
+.elicitation-header time,
+.elicitation-resolved-row time {
   color: var(--color-text-muted);
   font-size: 11px;
 }
@@ -175,12 +210,41 @@
   font-weight: 500;
 }
 
-.message.elicitation-accepted {
+.message.elicitation .elicitation-pending-hint {
+  margin-top: 5px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.elicitation-resolved-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px var(--space-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.elicitation-resolved-question {
+  flex: 1 1 220px;
+  color: var(--color-text);
+}
+
+.elicitation-resolved-result {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.message.elicitation.elicitation-resolved.elicitation-accepted {
   border-left-color: var(--color-done);
 }
 
-.message.elicitation-declined,
-.message.elicitation-cancelled {
+.message.elicitation.elicitation-resolved.elicitation-accepted .elicitation-title {
+  color: var(--color-done);
+}
+
+.message.elicitation.elicitation-resolved.elicitation-declined,
+.message.elicitation.elicitation-resolved.elicitation-cancelled {
   border-left-color: var(--color-border);
 }
 
@@ -305,11 +369,11 @@
   max-width: 100%;
   margin-bottom: 6px;
   padding: 6px 12px;
-  border: 0;
+  border: 1px solid var(--color-border-subtle);
   border-left: 3px solid var(--color-accent);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-md);
   font-size: 12px;
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-process);
 }
 
 .message.status p {
@@ -357,10 +421,10 @@
 .code-block-wrapper {
   position: relative;
   margin: 8px 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
-  background: var(--color-surface);
+  background: var(--color-surface-output);
 }
 
 .code-block-wrapper pre {
@@ -554,11 +618,15 @@
   margin-top: 0;
 }
 
-/* ── 工具调用卡片 ── */
+/* ── 工具调用列表 ── */
 .tool-card {
-  border-left: 4px solid var(--color-border);
+  margin: 0 0 0 14px;
   padding: 0;
-  overflow: hidden;
+  border: 0;
+  border-left: 2px solid var(--color-border-strong);
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
 }
 
 /* 工具卡片内隐藏全局 message p 样式 */
@@ -570,10 +638,8 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 10px 14px;
-
-  /* 工具卡片头部轻透明，不加 blur 避免流式更新性能开销 */
-  background: rgb(255 255 255 / 50%);
+  padding: 7px 12px;
+  background: transparent;
 }
 
 .tool-icon {
@@ -582,14 +648,14 @@
 }
 
 .tool-kind-label {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-tertiary);
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--color-text-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--color-border-subtle);
+  text-transform: uppercase;
 }
 
 .tool-title {
@@ -635,52 +701,74 @@
   border-left-color: var(--color-other);
 }
 
-/* 工具状态标签 */
+.tool-card + .tool-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.tool-superseded-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  margin: 0 0 0 14px;
+  padding: 7px 12px;
+  border-left: 2px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.tool-card + .tool-superseded-summary,
+.tool-superseded-summary + .tool-card {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.tool-superseded-summary-icon {
+  color: var(--color-text-tertiary);
+}
+
+/* 工具状态：用文字和状态点表达，不再额外生成状态胶囊。 */
 .tool-status {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .status-pending {
-  color: var(--color-other);
-  background: var(--color-surface-sunken);
+  color: var(--color-status-pending-text);
 }
 
 .status-running {
-  color: var(--color-accent-strong);
-  background: var(--color-surface-sunken);
+  color: var(--color-status-running-text);
 }
 
 .status-done {
-  color: var(--color-text-faint);
-  background: var(--color-surface-sunken);
+  color: var(--color-status-done-text);
 }
 
 .status-error {
-  color: var(--color-error-text);
-  background: var(--color-surface-sunken);
+  color: var(--color-status-error-text);
 }
 
-/* 工具调用模型徽标：紧邻状态标签，浅紫胶囊显示当时使用的模型展示名 */
+/* 工具调用模型信息作为次级元数据内联呈现。 */
 .tool-model {
   flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
+  max-width: 160px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 500;
-  color: var(--color-text-muted);
-  background: var(--theme-grad-2);
-  white-space: nowrap;
-  max-width: 160px;
-  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 进行中状态的旋转指示器：让编辑/执行过程可见「正在进行」 */
@@ -720,25 +808,25 @@
 .tool-locations {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 14px 8px;
+  gap: 8px;
+  padding: 0 12px 7px;
 }
 
 .tool-file {
-  padding: 2px 8px;
-  background: var(--color-border-subtle);
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: Consolas, SFMono-Regular, monospace;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
+  font-family: Consolas, SFMono-Regular, monospace;
+  font-size: 11px;
   text-transform: none;
 }
 
-/* 工具 diff 块 */
+/* diff 仅在实际内容区域保留表面，去除外层卡片。 */
 .tool-diffs {
-  border-top: 1px solid var(--color-border-subtle);
-  padding: 8px 14px;
-  background: var(--color-surface-sunken);
+  padding: 4px 12px 8px;
+  border-top: 0;
+  background: transparent;
 }
 
 .tool-diff-block {
@@ -756,7 +844,7 @@
   padding: 10px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-output);
   font-size: 11px;
   line-height: 1.45;
   overflow-x: auto;
@@ -780,30 +868,30 @@
   white-space: pre;
 }
 
-/* 工具流式文本输出（命令输出 / 读取结果等中间产物） */
+/* 工具流式文本输出仅保留代码内容表面。 */
 .tool-output {
-  border-top: 1px solid var(--color-border-subtle);
-  padding: 8px 14px;
-  background: var(--color-tool);
+  padding: 4px 12px 8px;
+  border-top: 0;
+  background: transparent;
 }
 
 .tool-output summary {
   cursor: pointer;
-  color: var(--color-other);
-  padding: 4px 0;
+  color: var(--color-text-muted);
+  padding: 3px 0;
 }
 
 .tool-output-content {
-  margin: 6px 0 0;
+  max-height: 240px;
+  margin: 4px 0 0;
   padding: 10px;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  font-size: 11px;
-  background: var(--color-tool);
-  max-height: 320px;
   overflow: auto;
-  white-space: pre-wrap;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-output);
+  font-size: 11px;
   overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 /* 工具输出滚动条：随主题色自动适配 */
@@ -821,32 +909,25 @@
   background: transparent;
 }
 
-/* ── 计划卡片 ── */
-.floating-plan-panel {
-  position: absolute;
-  z-index: 8;
-  top: 16px;
-  right: 16px;
+/* ── 顶部计划状态槽 ── */
+.plan-status-slot {
   display: flex;
-  width: max-content;
-  max-width: calc(100% - 32px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-md);
-  background: var(--glass-bg-strong);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: var(--glass-blur-light);
+  justify-content: flex-end;
+  min-height: 40px;
+  padding: 8px 22px 0;
 }
 
-.floating-plan-toggle {
+.plan-status-control {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-height: 36px;
+  min-height: 32px;
   max-width: 100%;
-  padding: 7px 10px;
+  padding: 6px 8px;
   border: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: 12px;
@@ -854,30 +935,30 @@
   cursor: pointer;
 }
 
-.floating-plan-toggle:hover {
+.plan-status-control:hover {
   background: var(--color-accent-hover);
 }
 
-.floating-plan-pending {
+.plan-status-pending {
   justify-content: flex-start;
   color: var(--color-text-muted);
   cursor: default;
 }
 
-.floating-plan-pending:hover {
+.plan-status-pending:hover {
   background: transparent;
 }
 
-.floating-plan-toggle:active {
+.plan-status-control:active {
   transform: translateY(1px);
 }
 
-.floating-plan-toggle:focus-visible {
+.plan-status-control:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
 
-.floating-plan-locate {
+.plan-status-locate {
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 500;
@@ -886,17 +967,15 @@
 
 .message.plan {
   max-width: 100%;
-  margin-bottom: 10px;
+  margin: 6px 0 10px;
 
-  /* 顶部定位时避开右上角的计划摘要浮层，确保方案标题完整可见。 */
-  scroll-margin-top: 64px;
+  /* 顶部计划状态槽不覆盖消息流，定位时仅保留正常阅读留白。 */
+  scroll-margin-top: 12px;
   padding: 0;
-  border: 1px solid var(--color-accent-subtle);
-  border-left-width: 1px;
-  border-radius: 6px;
-
-  /* 计划卡片轻微透明，透出对话区底色 */
-  background: rgb(255 255 255 / 55%);
+  border: 0;
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0;
+  background: transparent;
 }
 
 /* 计划卡片内隐藏全局 message p 样式 */
@@ -905,32 +984,82 @@
 }
 
 .plan-empty {
-  padding: 12px 14px;
+  padding: 6px 12px;
   color: var(--color-text-muted);
 }
 
 .plan-loading {
-  border-color: var(--color-border-subtle);
-  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+}
+
+/* 思考过程后的计划创建提示保持紧凑状态行，不展开成整行计划卡片。 */
+.message.plan.plan-loading {
+  display: inline-flex;
+  flex-direction: column;
+  width: fit-content;
+  max-width: calc(100% - 44px);
+  margin: 8px 0;
+  border-left: 0;
+}
+
+.plan-loading .plan-header {
+  justify-content: flex-start;
+  min-height: 24px;
+  padding: 4px 0;
+}
+
+.plan-loading .plan-loading-body {
+  padding: 0 0 0 20px;
 }
 
 .plan-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
-  padding: 10px 14px;
-  font-weight: 600;
+  min-height: 32px;
+  padding: 6px 12px;
+  color: var(--color-text);
   font-size: 13px;
-  border-bottom: 1px solid var(--color-accent-subtle);
+  font-weight: 600;
+}
+
+summary.plan-header {
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.plan-header::-webkit-details-marker {
+  display: none;
+}
+
+summary.plan-header:hover {
+  background: var(--color-accent-hover);
+}
+
+.plan-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plan-caret {
+  color: var(--color-accent);
+  font-size: 11px;
+  transition: transform 0.12s ease;
+}
+
+details.plan[open] .plan-caret {
+  transform: rotate(90deg);
 }
 
 /* 未能从磁盘读到完整方案、仅展示摘要时的降级提示。 */
 .plan-degraded-hint {
-  padding: 6px 14px;
+  margin: 0 12px 4px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--color-warning-text);
+  color: var(--color-warning-text);
   font-size: 12px;
-  color: #b8860b;
-  background: #fff8e1;
-  border-bottom: 1px solid var(--color-accent-subtle);
 }
 
 .plan-loading-dot {
@@ -943,7 +1072,7 @@
 }
 
 .plan-loading-body {
-  padding: 10px 14px 12px;
+  padding: 0 12px 8px;
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.55;
@@ -964,13 +1093,13 @@
 
 .plan-progress {
   margin-left: auto;
+  color: var(--color-accent);
   font-size: 11px;
   font-weight: 500;
-  color: var(--color-accent);
 }
 
 .plan-document {
-  padding: 10px 14px 12px;
+  padding: 4px 12px 8px;
   color: var(--color-text);
   font-size: 13px;
   line-height: 1.6;
@@ -987,7 +1116,7 @@
 
 .plan-entries {
   margin: 0;
-  padding: 8px 0;
+  padding: 4px 12px 8px;
   list-style: none;
 }
 
@@ -995,7 +1124,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 5px 14px;
+  padding: 4px 0;
   font-size: 13px;
   line-height: 1.55;
 }
@@ -1039,49 +1168,49 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 8px 12px;
   margin: 4px 0;
-  background: var(--color-tool);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  font-size: 13px;
   text-align: left;
   transition:
     background 0.12s ease,
-    border-color 0.12s ease;
+    color 0.12s ease;
 }
 
 .tool-group-header:hover {
-  background: var(--color-border-subtle);
-  border-color: var(--color-border);
+  background: var(--color-accent-hover);
+  color: var(--color-text);
 }
 
-.tool-group-header-error {
-  border-left: 3px solid var(--color-error-text);
+.tool-group-header-error .tool-group-header-label {
+  color: var(--color-error-text);
 }
 
 .tool-group-header-caret {
+  flex-shrink: 0;
   color: var(--color-accent);
   font-size: 11px;
-  flex-shrink: 0;
 }
 
 .tool-group-header-label {
-  color: var(--color-text);
+  color: inherit;
 }
 
 /* ── 回合折叠：把 user → 思考过程 → 最终回答组织在一起 ── */
 .turn-block {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-/* 思考过程折叠容器：用淡虚线左边框暗示它属于上方 user 消息 */
+/* 思考过程与回合内容以留白关联，不再使用连续虚线轨道。 */
 .turn-process {
-  margin: 4px 0 10px 12px;
-  padding-left: 12px;
-  border-left: 2px dashed var(--color-border);
+  margin: 2px 0 8px;
+  padding-left: 0;
+  border-left: 0;
 }
 
 /* 思考过程折叠/展开按钮 */
@@ -1116,7 +1245,7 @@
 
 /* 思考过程展开后的内容区 */
 .turn-process-content {
-  padding-top: 4px;
+  padding-top: 2px;
 }
 
 .turn-process-content .message:first-child {
@@ -1146,7 +1275,7 @@
   width: 56px;
   height: 56px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   object-fit: cover;
 }
 
@@ -1160,10 +1289,10 @@
   padding: 1px 5px;
   font-size: 10px;
   line-height: 1.4;
-  color: #fff;
+  color: var(--color-on-accent);
   text-overflow: ellipsis;
   white-space: nowrap;
-  background: rgb(0 0 0 / 55%);
+  background: var(--color-image-overlay);
   border-radius: 0 0 11px 11px;
 }
 
@@ -1208,7 +1337,7 @@
   max-width: 200px;
   padding: 6px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
 }
 

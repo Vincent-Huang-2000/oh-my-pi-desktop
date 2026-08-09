@@ -39,6 +39,25 @@
   --color-accent-hover-strong: hsl(
     var(--theme-accent-h) var(--theme-accent-s) var(--theme-accent-l) / 18%
   );
+  --color-on-accent: #fff;
+
+  /* —— 对话工作区表面：区分阅读内容、过程信息与可滚动输出 —— */
+  --color-surface-process: #f8f7fb;
+  --color-surface-output: #f5f6f8;
+  --color-border-strong: #cdd5ce;
+  --color-status-pending-bg: #f1f3f2;
+  --color-status-pending-text: #66716c;
+  --color-status-running-bg: #eaf2ff;
+  --color-status-running-text: #2563b8;
+  --color-status-done-bg: #e8f7ef;
+  --color-status-done-text: #18794e;
+  --color-status-error-bg: #fff0ee;
+  --color-status-error-text: #c9382a;
+  --color-warning-bg: #fff8e1;
+  --color-warning-text: #9a6700;
+  --color-image-overlay: rgb(0 0 0 / 55%);
+  --shadow-card: 0 2px 12px rgb(30 40 37 / 8%);
+  --shadow-float: 0 6px 18px rgb(30 40 37 / 12%);
 
   /* —— 中性色（文字 / 背景 / 边框） —— */
   --color-bg: #f7f7f3;
@@ -95,6 +114,8 @@
   /* —— 圆角 / 间距 —— */
   --radius-sm: 7px;
   --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -504,20 +525,23 @@ textarea:disabled {
   font-size: 15px;
 }
 
-/* 审批类交互悬浮在右下角，不遮挡对话区，用户可继续查看 agent 输出。 */
-.approval-float-layer {
-  position: fixed;
-  right: 20px;
-  bottom: 44px;
-  z-index: 120;
-  width: min(420px, calc(100vw - 40px));
+/* 审批坞内的请求面板由工作区正常布局承载，不再覆盖输入区。 */
+.approval-dock-panel {
+  position: relative;
+  width: min(420px, 100%);
+  max-width: 100%;
+  margin-left: auto;
   pointer-events: none;
 }
 
-/* ACP slash 命令面板、待发送图片、项目组内操作按钮 */
+.approval-dock-panel:has(.questionnaire-modal) {
+  width: min(620px, 100%);
+}
+
+/* ACP 审批、elicitation 与问卷共用面板基础。 */
 .approval-modal {
   width: 100%;
-  max-height: min(560px, calc(100vh - 88px));
+  max-height: min(420px, 40vh);
   overflow-y: auto;
   padding: 20px;
   border: 1px solid var(--glass-border);
@@ -667,6 +691,26 @@ summary:focus-visible {
 
 [data-theme='dark'] {
   /* ── 强调色基色（暗色背景下调亮以保持可见度） ── */
+
+  --color-on-accent: #fff;
+
+  /* ── 对话工作区表面与状态 ── */
+  --color-surface-process: #1d2030;
+  --color-surface-output: #171b25;
+  --color-border-strong: #454b5b;
+  --color-status-pending-bg: #252a34;
+  --color-status-pending-text: #a2a9b7;
+  --color-status-running-bg: #172945;
+  --color-status-running-text: #7db8ff;
+  --color-status-done-bg: #15372c;
+  --color-status-done-text: #6ee7ae;
+  --color-status-error-bg: #3b2020;
+  --color-status-error-text: #fca5a5;
+  --color-warning-bg: #322b16;
+  --color-warning-text: #f4c95d;
+  --color-image-overlay: rgb(0 0 0 / 65%);
+  --shadow-card: 0 2px 12px rgb(0 0 0 / 25%);
+  --shadow-float: 0 6px 18px rgb(0 0 0 / 30%);
   --theme-accent-h: 245;
   --theme-accent-s: 79%;
   --theme-accent-l: 68%;
@@ -739,19 +783,19 @@ summary:focus-visible {
 
 [data-theme='dark'] .scroll-to-bottom-btn {
   background: var(--color-surface);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 35%);
+  box-shadow: var(--shadow-card);
 }
 
 [data-theme='dark'] .scroll-to-bottom-btn:hover {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 45%);
+  box-shadow: var(--shadow-float);
 }
 
 [data-theme='dark'] .tool-card-header {
-  background: rgb(26 30 37 / 60%);
+  background: var(--color-surface-process);
 }
 
 [data-theme='dark'] .message.plan {
-  background: rgb(26 30 37 / 65%);
+  background: var(--color-surface);
 }
 
 [data-theme='dark'] .plan-mode-banner {
@@ -773,7 +817,7 @@ summary:focus-visible {
 }
 
 [data-theme='dark'] .attach-menu {
-  box-shadow: 0 6px 18px rgb(0 0 0 / 30%);
+  box-shadow: var(--shadow-float);
 }
 
 [data-theme='dark'] .command-palette-dropdown {

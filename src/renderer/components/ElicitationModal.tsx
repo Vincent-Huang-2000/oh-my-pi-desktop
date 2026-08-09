@@ -58,7 +58,7 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
   };
 
   return (
-    <div className="approval-float-layer" role="presentation">
+    <div className="approval-dock-panel" role="presentation">
       <section
         className="approval-modal"
         role="dialog"

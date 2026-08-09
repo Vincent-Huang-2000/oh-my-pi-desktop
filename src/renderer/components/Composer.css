@@ -5,17 +5,17 @@
 .composer {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 0;
-  padding: 14px 18px;
+  padding: 10px 16px;
   background: transparent;
 }
 
 .composer textarea {
   width: 100%;
-  min-height: 88px;
+  min-height: 72px;
   resize: none;
-  padding: 12px;
+  padding: 10px 12px;
   border: 0;
   border-radius: 0;
   color: var(--color-text);
@@ -46,9 +46,9 @@
 .composer-input {
   position: relative;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
-  box-shadow: 0 2px 12px rgb(30 40 37 / 8%);
+  box-shadow: var(--shadow-card);
 }
 
 /* 卡片顶部工具栏行：左侧配置区，右侧操作按钮。 */
@@ -56,7 +56,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
@@ -85,9 +85,9 @@
 .composer-input .model-picker-popover {
   top: auto;
   bottom: calc(100% + 6px);
-  background: rgb(255 255 255 / 94%);
-  backdrop-filter: blur(24px) saturate(200%);
-  box-shadow: 0 -8px 28px rgb(30 40 37 / 14%);
+  background: var(--color-surface);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-float);
 }
 
 /* 审批档位提示紧贴会话配置区；只展示风险/恢复失败，不挤占消息主区域。 */
@@ -105,7 +105,7 @@
   color: var(--color-pin);
 }
 
-/* 发送/停止合并按钮：圆形图标按钮，默认发送态（青绿），运行中变停止态（橙红）。 */
+/* 发送/停止合并按钮：发送使用主题强调色，运行中变为错误语义色。 */
 .composer-icon-button {
   width: 34px;
   height: 34px;
@@ -113,10 +113,10 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-accent);
   background: var(--color-accent);
-  color: var(--color-accent-strong);
+  color: var(--color-on-accent);
   cursor: pointer;
   transition:
     background 0.15s,
@@ -126,8 +126,8 @@
 }
 
 .composer-icon-button:hover:not(:disabled) {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
 }
 
 .composer-icon-button:disabled {
@@ -146,8 +146,7 @@
   border-color: var(--color-error-border);
 }
 
-/* 加号按钮：复用 composer-icon-button 的尺寸/圆角基础，但改成中性灰描边，
-   与发送按钮的青绿色填充区分，避免误点。 */
+/* 加号按钮：复用 composer-icon-button 的尺寸/圆角基础，维持中性描边避免误点。 */
 .composer-attach-button {
   border-color: var(--color-border);
   background: var(--color-surface);
@@ -165,20 +164,32 @@
   position: relative;
 }
 
-/* 卡片工具栏内的按钮：缩小 + 统一轻量中性风格，去紫色填充。 */
+/* 工具栏保留中性附件入口；发送按钮单独使用强调色。 */
 .composer-actions-right .composer-icon-button {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border-color: var(--color-border-subtle);
   background: transparent;
   color: var(--color-text-muted);
 }
 
-.composer-actions-right .composer-icon-button:hover:not(:disabled) {
-  background: var(--color-surface-sunken);
+.composer-actions-right .composer-attach-button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
   border-color: var(--color-border);
   color: var(--color-text);
+}
+
+.composer-actions-right .composer-icon-button:not(.composer-attach-button, .is-stop) {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.composer-actions-right
+  .composer-icon-button:not(.composer-attach-button, .is-stop):hover:not(:disabled) {
+  border-color: var(--color-accent-strong);
+  background: var(--color-accent-strong);
 }
 
 /* 停止按钮保留红色警示。 */
@@ -203,9 +214,9 @@
   min-width: 168px;
   padding: 4px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: 0 6px 18px rgb(30 40 37 / 12%);
+  box-shadow: var(--shadow-float);
 }
 
 .attach-menu-item {
@@ -238,8 +249,8 @@
   overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgb(31 42 37 / 14%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
 }
 
 .command-palette-list {

@@ -32,19 +32,24 @@ import type { FormEvent, ClipboardEvent, KeyboardEvent } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { ElicitationModal } from './ElicitationModal';
 import { ModelPickerPopover } from './ModelPickerPopover';
+import { PermissionModal } from './PermissionModal';
+import { QuestionnaireModal } from './QuestionnaireModal';
 import { SegmentSelect } from './SegmentSelect';
 import type {
   AcpConfigOption,
   ChatMessage,
   ElicitationRequest,
+  PermissionRequest,
   PlanEntry,
+  QuestionnaireAnswer,
+  QuestionnaireRequest,
   ToolCallDiffBlock,
   ToolCallLocation,
   ToolKind,
   ToolCallStatus,
 } from '../types';
-import { formatElicitationOptionLabel, isElicitationOtherOption } from '../utils';
 import './ChatWorkspace.css';
 import './Composer.css';
 
@@ -82,11 +87,16 @@ type ChatWorkspaceProps = {
   // 工具组折叠 map：key = 该工具组最后一条 tool 消息的 id。
   // true = 折叠成摘要卡、false = 用户主动展开、undefined = 从未操作（默认折叠）。
   collapsedToolGroups: Record<string, boolean | undefined>;
-  // 历史会话批量加载时显示中间栏加载态。
+  // 会话历史回放期间显示加载占位，避免把空缓存误当成空会话。
   isHistoryLoading: boolean;
   // 历史消息完成渲染后递增，用于把消息区定位到顶部。
   historyScrollResetToken: number;
-  elicitationRequests: ElicitationRequest[];
+  // 当前审批队首由 App 的 activeApprovalKind 选择；消息流仅展示对应状态。
+  activeApprovalRequestId: string | null;
+  permissionRequest: PermissionRequest | null;
+  elicitationRequest: ElicitationRequest | null;
+  questionnaireRequest: QuestionnaireRequest | null;
+  questionnaireRequests: QuestionnaireRequest[];
   // 会话配置（与 composer 同处）：模型 / Agent 模式 / 推理强度 / 审批档位。
   // ACP 三项配置与桌面端审批档位都位于输入框纸飞机按钮左侧。
   modelConfig?: AcpConfigOption;
@@ -102,11 +112,17 @@ type ChatWorkspaceProps = {
   onPromptChange: (value: string) => void;
   onSubmit: (event: FormEvent) => void;
   onCancel: () => void;
+  onPermissionRespond: (optionId: string) => Promise<void>;
   onElicitationRespond: (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',
     content?: Record<string, unknown>,
   ) => void;
+  onSelectQuestionnaire: (request: QuestionnaireRequest) => void;
+  onQuestionnaireRespond: (
+    action: 'submit' | 'deny',
+    answers?: QuestionnaireAnswer[],
+  ) => Promise<boolean>;
   onPaste: (event: ClipboardEvent<HTMLTextAreaElement>) => void;
   onRemovePendingAttachment: (index: number) => void;
   // 点击加号菜单的「添加文件」时触发，由 App 打开系统文件选择器（accept 不限）。
@@ -156,16 +172,32 @@ const PLAN_STATUS_LABEL: Record<PlanEntry['status'], string> = {
 // 距底部小于该距离时认为用户没有主动离开最新消息，流式更新可以继续跟随到底部。
 const AUTO_SCROLL_BOTTOM_THRESHOLD = 96;
 
+const SUPERSEDED_READ_OUTPUT = '[Superseded by a newer read of this file]';
+
+// 仅压缩 ACP 明确标记为被后续读取替代的失败记录，其他失败始终保留供排查。
+const isSupersededRead = (message: ChatMessage) =>
+  message.toolKind === 'read' &&
+  message.toolStatus === 'failed' &&
+  message.toolOutput?.trim() === SUPERSEDED_READ_OUTPUT;
+
 /* -------------------------------------------------------
  * 子组件：结构化消息渲染
  * ------------------------------------------------------- */
 
-/* 工具调用卡片 */
+/* 工具调用条目 */
 function ToolCallCard({ message }: { message: ChatMessage }) {
   const kind = message.toolKind ?? 'other';
   const meta = TOOL_KIND_META[kind];
   const status = message.toolStatus;
   const statusMeta = status ? STATUS_META[status] : null;
+  const [isToolOutputOpen, setIsToolOutputOpen] = useState(status !== 'completed');
+  const hasUserToggledToolOutput = useRef(false);
+
+  useEffect(() => {
+    if (!hasUserToggledToolOutput.current) {
+      setIsToolOutputOpen(status !== 'completed');
+    }
+  }, [status]);
 
   return (
     <article className={`message tool tool-card tool-${kind}`} key={message.id}>
@@ -210,7 +242,14 @@ function ToolCallCard({ message }: { message: ChatMessage }) {
         </div>
       )}
       {message.toolOutput && (
-        <details className="tool-output" open>
+        <details
+          className="tool-output"
+          open={isToolOutputOpen}
+          onToggle={(event) => {
+            hasUserToggledToolOutput.current = true;
+            setIsToolOutputOpen(event.currentTarget.open);
+          }}
+        >
           <summary>输出</summary>
           <pre className="tool-output-content">
             <code>{message.toolOutput}</code>
@@ -223,7 +262,7 @@ function ToolCallCard({ message }: { message: ChatMessage }) {
 
 const MemoizedToolCallCard = React.memo(ToolCallCard);
 
-/* 计划列表 */
+/* 计划记录：摘要始终留在消息流中，完整内容按需展开。 */
 function PlanCard({ message }: { message: ChatMessage }) {
   if (message.planPending) {
     return (
@@ -243,11 +282,20 @@ function PlanCard({ message }: { message: ChatMessage }) {
 
   if (message.planContentType === 'markdown') {
     return (
-      <article id={`plan-message-${message.id}`} className="message plan" key={message.id}>
-        <div className="plan-header">
-          {'📋'}{' '}
-          {message.planActive ? '当前未完成方案' : message.planPreview ? '待确认方案' : '方案文档'}
-        </div>
+      <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+        <summary className="plan-header">
+          <span className="plan-heading">
+            <span className="plan-caret" aria-hidden="true">
+              ▸
+            </span>
+            {'📋'}{' '}
+            {message.planActive
+              ? '当前未完成方案'
+              : message.planPreview
+                ? '待确认方案'
+                : '方案文档'}
+          </span>
+        </summary>
         {message.planPreviewDegraded && (
           <div className="plan-degraded-hint">
             ⚠️ 未能加载完整方案，以下为摘要，完整内容请查看弹窗或在终端确认。
@@ -256,18 +304,25 @@ function PlanCard({ message }: { message: ChatMessage }) {
         <div className="plan-document">
           <MemoizedMarkdownContent text={message.text} />
         </div>
-      </article>
+      </details>
     );
   }
 
   if (message.planContentType === 'file') {
     return (
-      <article id={`plan-message-${message.id}`} className="message plan" key={message.id}>
-        <div className="plan-header">{'📋'} 计划文件</div>
+      <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+        <summary className="plan-header">
+          <span className="plan-heading">
+            <span className="plan-caret" aria-hidden="true">
+              ▸
+            </span>
+            {'📋'} 计划文件
+          </span>
+        </summary>
         <div className="plan-document">
           <code>{message.text}</code>
         </div>
-      </article>
+      </details>
     );
   }
 
@@ -284,17 +339,22 @@ function PlanCard({ message }: { message: ChatMessage }) {
     );
   }
 
-  const completed = entries.filter((e: PlanEntry) => e.status === 'completed').length;
+  const completed = entries.filter((entry: PlanEntry) => entry.status === 'completed').length;
   const total = entries.length;
 
   return (
-    <article id={`plan-message-${message.id}`} className="message plan" key={message.id}>
-      <div className="plan-header">
-        {'\u{1F4CB}'} 执行计划
+    <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+      <summary className="plan-header">
+        <span className="plan-heading">
+          <span className="plan-caret" aria-hidden="true">
+            ▸
+          </span>
+          {'\u{1F4CB}'} 执行计划
+        </span>
         <span className="plan-progress">
           {completed}/{total}
         </span>
-      </div>
+      </summary>
       <ol className="plan-entries">
         {entries.map((entry: PlanEntry, i: number) => (
           <li key={i} className={`plan-entry plan-${entry.status}`}>
@@ -303,27 +363,20 @@ function PlanCard({ message }: { message: ChatMessage }) {
           </li>
         ))}
       </ol>
-    </article>
+    </details>
   );
 }
 
 const MemoizedPlanCard = React.memo(PlanCard);
 
-type FloatingPlanPanelProps = {
+type PlanStatusBarProps = {
   messages: ChatMessage[];
   onLocate: (messageId: string) => void;
 };
 
-type ElicitationActionContextValue = {
-  // 暴露完整队列：每个 pending 消息都能按自己的 requestId 独立匹配，不再只认队首。
-  requests: ElicitationRequest[];
-  onRespond: ChatWorkspaceProps['onElicitationRespond'];
-};
-
-const ElicitationActionContext = React.createContext<ElicitationActionContextValue | null>(null);
-
-/* 右上角仅保留计划摘要；完整内容按事件顺序留在消息流中。 */
-function FloatingPlanPanel({ messages, onLocate }: FloatingPlanPanelProps) {
+const ApprovalRequestContext = React.createContext<string | null>(null);
+/* 计划状态行占据消息流顶部的真实布局空间，不覆盖右对齐的用户消息。 */
+function PlanStatusBar({ messages, onLocate }: PlanStatusBarProps) {
   const latest = messages[messages.length - 1];
   const entries = latest.planEntries ?? [];
   const completed = entries.filter((entry) => entry.status === 'completed').length;
@@ -338,21 +391,21 @@ function FloatingPlanPanel({ messages, onLocate }: FloatingPlanPanelProps) {
           : `执行计划${entries.length > 0 ? ` · ${completed}/${entries.length}` : ''}`;
 
   return (
-    <aside className="floating-plan-panel">
+    <aside className="plan-status-slot">
       {latest.planPending ? (
-        <div className="floating-plan-toggle floating-plan-pending" aria-live="polite">
+        <div className="plan-status-control plan-status-pending" aria-live="polite">
           <span className="plan-loading-dot" aria-hidden="true" />
           <span>{label}</span>
         </div>
       ) : (
         <button
           type="button"
-          className="floating-plan-toggle"
+          className="plan-status-control"
           onClick={() => onLocate(latest.id)}
-          title="定位到消息流中的完整计划"
+          title="定位到消息流中的计划摘要"
         >
           <span>{label}</span>
-          <span className="floating-plan-locate">查看</span>
+          <span className="plan-status-locate">查看</span>
         </button>
       )}
     </aside>
@@ -479,19 +532,9 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
 
 const MemoizedSimpleMessage = React.memo(SimpleMessage);
 
-/* elicitation 记录：工具审批和 AskTool 原生提问都在消息流内完成并保留结果。 */
+/* elicitation 记录：审批操作统一由下方审批坞承载，消息流只保留请求与结果。 */
 function ElicitationMessage({ message }: { message: ChatMessage }) {
-  const actionContext = React.useContext(ElicitationActionContext);
-  // 队列里每个 pending 请求都能按自己的 requestId 独立匹配，不再依赖队首。
-  const request = actionContext?.requests.find(
-    (item) => item.requestId === message.elicitationRequestId,
-  );
-  const [textValue, setTextValue] = useState('');
-  const [customInputOpen, setCustomInputOpen] = useState(false);
-  useEffect(() => {
-    setTextValue('');
-    setCustomInputOpen(false);
-  }, [request?.requestId]);
+  const activeApprovalRequestId = React.useContext(ApprovalRequestContext);
   const time = message.createdAt
     ? new Date(message.createdAt).toLocaleTimeString('zh-CN', {
         hour: '2-digit',
@@ -499,6 +542,10 @@ function ElicitationMessage({ message }: { message: ChatMessage }) {
       })
     : '';
   const isPending = message.elicitationStatus === 'pending';
+  const isResolved =
+    message.elicitationStatus === 'accepted' ||
+    message.elicitationStatus === 'declined' ||
+    message.elicitationStatus === 'cancelled';
   const isQuestionnaire = message.elicitationKind === 'questionnaire';
   const isQuestion = message.elicitationKind === 'question';
   const title = isPending
@@ -518,147 +565,90 @@ function ElicitationMessage({ message }: { message: ChatMessage }) {
         : isQuestion
           ? '问答记录'
           : '确认记录';
+  const pendingHint =
+    message.elicitationRequestId === activeApprovalRequestId
+      ? '请在下方审批坞处理。'
+      : '已进入审批队列，等待前一项处理完成。';
 
   return (
     <article
-      className={`message elicitation elicitation-${message.elicitationStatus ?? 'pending'}`}
+      className={`message elicitation elicitation-${message.elicitationStatus ?? 'pending'}${isResolved ? ' elicitation-resolved' : ''}`}
     >
-      <header className="elicitation-header">
-        <span className="elicitation-title">{title}</span>
-        {time && <time dateTime={message.createdAt}>{time}</time>}
-      </header>
-      <p className="elicitation-question">{message.text}</p>
-      {isPending && request && actionContext && (
-        <div className="elicitation-inline-actions">
-          {request.field.description && <small>{request.field.description}</small>}
-          {request.field.type === 'string' && request.field.options?.length ? (
-            <>
-              {request.field.options.map((option, index) => {
-                const isRecommended = option.endsWith(' (Recommended)');
-                return (
-                  <button
-                    className={
-                      (request.kind === 'approval' && index === 0) || isRecommended
-                        ? 'primary-action'
-                        : ''
-                    }
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      // ACP 模式没有 AskTool 使用的 ui.editor；Other 在桌面端原地展开输入，
-                      // 自定义文本作为选择值返回，让当前工具回合可以继续。
-                      if (request.kind === 'question' && isElicitationOtherOption(option)) {
-                        setTextValue('');
-                        setCustomInputOpen(true);
-                        return;
-                      }
-                      actionContext.onRespond(request.requestId, 'accept', { value: option });
-                    }}
-                  >
-                    {formatElicitationOptionLabel(option)}
-                  </button>
-                );
-              })}
-              {request.kind === 'question' && (
-                <button
-                  type="button"
-                  onClick={() => actionContext.onRespond(request.requestId, 'cancel')}
-                >
-                  取消回答
-                </button>
-              )}
-              {customInputOpen && (
-                <div className="elicitation-custom-answer">
-                  <input
-                    autoFocus
-                    className="elicitation-inline-input"
-                    placeholder="输入自定义回答"
-                    value={textValue}
-                    onChange={(event) => setTextValue(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' && textValue.trim()) {
-                        actionContext.onRespond(request.requestId, 'accept', {
-                          value: textValue.trim(),
-                        });
-                      }
-                    }}
-                  />
-                  <button
-                    className="primary-action"
-                    type="button"
-                    disabled={!textValue.trim()}
-                    onClick={() =>
-                      actionContext.onRespond(request.requestId, 'accept', {
-                        value: textValue.trim(),
-                      })
-                    }
-                  >
-                    提交自定义回答
-                  </button>
-                </div>
-              )}
-            </>
-          ) : request.field.type === 'boolean' ? (
-            <>
-              <button
-                className="primary-action"
-                type="button"
-                onClick={() =>
-                  actionContext.onRespond(request.requestId, 'accept', { value: true })
-                }
-              >
-                确认
-              </button>
-              <button
-                type="button"
-                onClick={() => actionContext.onRespond(request.requestId, 'decline')}
-              >
-                取消
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                className="elicitation-inline-input"
-                type={
-                  request.field.type === 'number' || request.field.type === 'integer'
-                    ? 'number'
-                    : 'text'
-                }
-                placeholder={
-                  request.field.description ?? (request.kind === 'question' ? '输入你的回答' : '')
-                }
-                value={textValue}
-                onChange={(event) => setTextValue(event.target.value)}
-              />
-              <button
-                className="primary-action"
-                type="button"
-                disabled={request.field.type === 'string' && textValue.trim() === ''}
-                onClick={() => {
-                  const value =
-                    request.field.type === 'number' || request.field.type === 'integer'
-                      ? Number(textValue)
-                      : textValue;
-                  actionContext.onRespond(request.requestId, 'accept', { value });
-                }}
-              >
-                提交
-              </button>
-              <button
-                type="button"
-                onClick={() => actionContext.onRespond(request.requestId, 'cancel')}
-              >
-                取消
-              </button>
-            </>
+      {isResolved ? (
+        <div className="elicitation-resolved-row">
+          <span className="elicitation-title">{title}</span>
+          <span className="elicitation-resolved-question">{message.text}</span>
+          {message.elicitationResult && (
+            <span className="elicitation-resolved-result">{message.elicitationResult}</span>
           )}
+          {time && <time dateTime={message.createdAt}>{time}</time>}
         </div>
-      )}
-      {message.elicitationResult && (
-        <p className="elicitation-result">{message.elicitationResult}</p>
+      ) : (
+        <>
+          <header className="elicitation-header">
+            <span className="elicitation-title">{title}</span>
+            {time && <time dateTime={message.createdAt}>{time}</time>}
+          </header>
+          <p className="elicitation-question">{message.text}</p>
+          {isPending && <p className="elicitation-pending-hint">{pendingHint}</p>}
+          {message.elicitationResult && (
+            <p className="elicitation-result">{message.elicitationResult}</p>
+          )}
+        </>
       )}
     </article>
+  );
+}
+
+type ApprovalDockProps = Pick<
+  ChatWorkspaceProps,
+  | 'permissionRequest'
+  | 'elicitationRequest'
+  | 'questionnaireRequest'
+  | 'questionnaireRequests'
+  | 'onPermissionRespond'
+  | 'onElicitationRespond'
+  | 'onSelectQuestionnaire'
+  | 'onQuestionnaireRespond'
+>;
+
+function ApprovalDock({
+  permissionRequest,
+  elicitationRequest,
+  questionnaireRequest,
+  questionnaireRequests,
+  onPermissionRespond,
+  onElicitationRespond,
+  onSelectQuestionnaire,
+  onQuestionnaireRespond,
+}: ApprovalDockProps) {
+  const hasRequest = Boolean(permissionRequest || elicitationRequest || questionnaireRequest);
+
+  return (
+    <aside
+      className={`approval-dock${hasRequest ? ' has-request' : ''}`}
+      aria-label={hasRequest ? '审批坞' : undefined}
+      aria-hidden={hasRequest ? undefined : true}
+    >
+      {permissionRequest ? (
+        <PermissionModal request={permissionRequest} onRespond={onPermissionRespond} />
+      ) : elicitationRequest ? (
+        <ElicitationModal
+          request={elicitationRequest}
+          onRespond={(action, content) =>
+            onElicitationRespond(elicitationRequest.requestId, action, content)
+          }
+        />
+      ) : questionnaireRequest ? (
+        <QuestionnaireModal
+          key={questionnaireRequest.requestId}
+          request={questionnaireRequest}
+          requests={questionnaireRequests}
+          onSelect={onSelectQuestionnaire}
+          onRespond={onQuestionnaireRespond}
+        />
+      ) : null}
+    </aside>
   );
 }
 
@@ -680,13 +670,13 @@ function MessageRenderer({ message }: { message: ChatMessage }) {
 
 const MemoizedMessageRenderer = React.memo(MessageRenderer);
 
-/* 工具组头部（折叠/展开态共用）：一行展示「N 个工具调用 · 含错误」+ caret 方向。
+/* 工具组头部（折叠/展开态共用）：一行展示工具调用、已覆盖记录和实际错误数量。
    - 折叠态 caret=▶，点击展开整组；
-   - 展开态 caret=▼，点击收起整组。
-   错误计数用于决定是否给头部加红边；状态由 App 维护。 */
+   - 展开态 caret=▼，点击收起整组。 */
 type ToolGroupHeaderProps = {
   groupId: string;
   count: number;
+  supersededReadCount: number;
   hasError: boolean;
   expanded: boolean;
   onToggle: () => void;
@@ -694,6 +684,7 @@ type ToolGroupHeaderProps = {
 function ToolGroupHeader({
   groupId: _groupId,
   count,
+  supersededReadCount,
   hasError,
   expanded,
   onToggle,
@@ -710,17 +701,79 @@ function ToolGroupHeader({
       </span>
       <span className="tool-group-header-label">
         {count} 个工具调用
+        {supersededReadCount > 0 ? ` · ${supersededReadCount} 项已覆盖` : ''}
         {hasError ? ' · 包含错误' : ''}
       </span>
     </button>
   );
 }
 
+function SupersededReadSummary({ count }: { count: number }) {
+  return (
+    <div className="tool-superseded-summary">
+      <span className="tool-superseded-summary-icon" aria-hidden="true">
+        ↳
+      </span>
+      <span>{count} 次读取已被后续操作覆盖</span>
+    </div>
+  );
+}
+
+type ToolGroupItem =
+  | { kind: 'tool'; message: ChatMessage }
+  | { kind: 'supersededReadSummary'; id: string; count: number };
+
+type CompactToolGroup = {
+  items: ToolGroupItem[];
+  supersededReadCount: number;
+};
+
+function compactToolGroupMessages(messages: ChatMessage[]): CompactToolGroup {
+  const items: ToolGroupItem[] = [];
+  let supersededReadCount = 0;
+  let totalSupersededReadCount = 0;
+  let firstSupersededReadId = '';
+
+  const flushSupersededReads = () => {
+    if (supersededReadCount === 0) {
+      return;
+    }
+    items.push({
+      kind: 'supersededReadSummary',
+      id: firstSupersededReadId,
+      count: supersededReadCount,
+    });
+    supersededReadCount = 0;
+    firstSupersededReadId = '';
+  };
+
+  for (const message of messages) {
+    if (isSupersededRead(message)) {
+      if (supersededReadCount === 0) {
+        firstSupersededReadId = message.id;
+      }
+      supersededReadCount += 1;
+      totalSupersededReadCount += 1;
+      continue;
+    }
+    flushSupersededReads();
+    items.push({ kind: 'tool', message });
+  }
+  flushSupersededReads();
+
+  return { items, supersededReadCount: totalSupersededReadCount };
+}
+
 /* 消息段类型：单条消息 或 连续 tool 消息组 */
 type MessageSegment =
   | { kind: 'single'; message: ChatMessage }
-  | { kind: 'toolGroup'; groupId: string; messages: ChatMessage[] };
-
+  | {
+      kind: 'toolGroup';
+      groupId: string;
+      messages: ChatMessage[];
+      items: ToolGroupItem[];
+      supersededReadCount: number;
+    };
 type MessageSequenceProps = {
   messages: ChatMessage[];
   collapsedToolGroups: Record<string, boolean | undefined>;
@@ -742,7 +795,14 @@ function MessageSequence({
         return;
       }
       const last = buffer[buffer.length - 1];
-      result.push({ kind: 'toolGroup', groupId: last.id, messages: buffer });
+      const compacted = compactToolGroupMessages(buffer);
+      result.push({
+        kind: 'toolGroup',
+        groupId: last.id,
+        messages: buffer,
+        items: compacted.items,
+        supersededReadCount: compacted.supersededReadCount,
+      });
       buffer = [];
     };
     for (const message of messages) {
@@ -769,20 +829,30 @@ function MessageSequence({
           );
         }
         const collapsed = collapsedToolGroups[segment.groupId] !== false;
-        const hasError = segment.messages.some((message) => message.toolStatus === 'failed');
+        const hasError = segment.messages.some(
+          (message) => message.toolStatus === 'failed' && !isSupersededRead(message),
+        );
         return (
           <Fragment key={`tool-group-${segment.groupId}`}>
             <ToolGroupHeader
               groupId={segment.groupId}
               count={segment.messages.length}
+              supersededReadCount={segment.supersededReadCount}
               hasError={hasError}
               expanded={!collapsed}
               onToggle={() => onSetToolGroupCollapsed(segment.groupId, !collapsed)}
             />
             {!collapsed &&
-              segment.messages.map((message) => (
-                <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
-              ))}
+              segment.items.map((item) =>
+                item.kind === 'tool' ? (
+                  <MemoizedMessageRenderer
+                    key={getMessageRenderKey(item.message)}
+                    message={item.message}
+                  />
+                ) : (
+                  <SupersededReadSummary key={`superseded-read-${item.id}`} count={item.count} />
+                ),
+              )}
           </Fragment>
         );
       })}
@@ -944,7 +1014,7 @@ function CommandPendingCard({ pending }: { pending: PendingSlashCommand }) {
 }
 
 type MessageStreamProps = {
-  planMessages: ChatMessage[];
+  activePlanMessages: ChatMessage[];
   conversationMessages: ChatMessage[];
   messageItems: React.ReactNode;
   selectedProject: StoredProject | null;
@@ -957,9 +1027,9 @@ type MessageStreamProps = {
   onScrollToBottom: () => void;
 };
 
-/* 消息流与受控输入区隔离；仅消息、滚动或会话状态变化时才重新渲染历史内容。 */
+/* 计划状态槽位于滚动区上方，消息与输入区始终拥有各自的可用空间。 */
 function MessageStream({
-  planMessages,
+  activePlanMessages,
   conversationMessages,
   messageItems,
   selectedProject,
@@ -972,9 +1042,9 @@ function MessageStream({
   onScrollToBottom,
 }: MessageStreamProps) {
   return (
-    <>
-      {planMessages.length > 0 && (
-        <FloatingPlanPanel messages={planMessages} onLocate={onLocatePlan} />
+    <div className="message-stream">
+      {activePlanMessages.length > 0 && (
+        <PlanStatusBar messages={activePlanMessages} onLocate={onLocatePlan} />
       )}
       <div
         ref={messageListRef}
@@ -1010,7 +1080,7 @@ function MessageStream({
           </button>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1028,7 +1098,11 @@ export function ChatWorkspace({
   collapsedToolGroups,
   isHistoryLoading,
   historyScrollResetToken,
-  elicitationRequests,
+  activeApprovalRequestId,
+  permissionRequest,
+  elicitationRequest,
+  questionnaireRequest,
+  questionnaireRequests,
   modelConfig,
   modeConfig,
   thinkingConfig,
@@ -1042,7 +1116,10 @@ export function ChatWorkspace({
   onPromptChange,
   onSubmit,
   onCancel,
+  onPermissionRespond,
   onElicitationRespond,
+  onSelectQuestionnaire,
+  onQuestionnaireRespond,
   onPaste,
   onRemovePendingAttachment,
   onSelectFile,
@@ -1050,19 +1127,6 @@ export function ChatWorkspace({
 }: ChatWorkspaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
-  // App 每次输入都会重新创建审批回调；通过 ref 读取最新实现，保持消息流的 callback identity。
-  const elicitationRespondRef = useRef(onElicitationRespond);
-  elicitationRespondRef.current = onElicitationRespond;
-  const handleElicitationRespond = useCallback<ChatWorkspaceProps['onElicitationRespond']>(
-    (requestId, action, content) => {
-      elicitationRespondRef.current(requestId, action, content);
-    },
-    [],
-  );
-  const elicitationActionValue = useMemo<ElicitationActionContextValue>(
-    () => ({ requests: elicitationRequests, onRespond: handleElicitationRespond }),
-    [elicitationRequests, handleElicitationRespond],
-  );
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const shouldFollowMessagesRef = useRef(true);
   // 是否已离开消息流底部（用于显示「滚动到底部」浮动按钮）。
@@ -1209,14 +1273,38 @@ export function ChatWorkspace({
     });
   };
 
-  // 完整计划保留在消息流；右上角只派生轻量摘要与定位入口。
-  const { planMessages, conversationMessages } = useMemo(
+  // 仅在创建中、待确认或仍有未完成步骤时显示顶部计划状态槽。
+  const { activePlanMessages, conversationMessages } = useMemo(
     () => ({
-      planMessages: messages.filter((message) => message.role === 'plan'),
+      activePlanMessages: messages.filter(
+        (message) =>
+          message.role === 'plan' &&
+          (message.planPending ||
+            message.planPreview ||
+            message.planActive ||
+            message.planEntries?.some((entry) => entry.status !== 'completed') === true),
+      ),
       conversationMessages: messages,
     }),
     [messages],
   );
+
+  // 提交中的 elicitation 在消息流显示状态，审批坞暂时移除操作以防重复响应。
+  // 依赖 messages 数组引用而非长度：markSubmitting 只改字段不改长度，长度作
+  // 代理指标会漏掉这次更新；引用在审批等待期间稳定（agent 暂停、无流式更新），
+  // 点击响应后 markSubmitting 产生新引用即触发重算。无待批请求时首行短路，
+  // 流式更新期间不会做全量扫描。
+  const activeElicitationRequest = useMemo(() => {
+    if (!elicitationRequest) {
+      return null;
+    }
+    const isSubmitting = messages.some(
+      (message) =>
+        message.elicitationRequestId === elicitationRequest.requestId &&
+        message.elicitationStatus === 'submitting',
+    );
+    return isSubmitting ? null : elicitationRequest;
+  }, [elicitationRequest, messages]);
 
   // 把消息流按「回合」分组：每个 user 消息开启一个回合，直到下一个 user 消息前都属于该回合。
   // 回合内包含 agent 思考过程（tool / 非最终 agent 输出）和最终 agent 回答。
@@ -1321,10 +1409,10 @@ export function ChatWorkspace({
   }, []);
 
   return (
-    <ElicitationActionContext.Provider value={elicitationActionValue}>
+    <ApprovalRequestContext.Provider value={activeApprovalRequestId}>
       <section className="chat-workspace">
         <MemoizedMessageStream
-          planMessages={planMessages}
+          activePlanMessages={activePlanMessages}
           conversationMessages={conversationMessages}
           messageItems={messageItems}
           selectedProject={selectedProject}
@@ -1335,6 +1423,16 @@ export function ChatWorkspace({
           onLocatePlan={handleLocatePlan}
           onMessageListScroll={handleMessageListScroll}
           onScrollToBottom={handleScrollToBottom}
+        />
+        <ApprovalDock
+          permissionRequest={permissionRequest}
+          elicitationRequest={activeElicitationRequest}
+          questionnaireRequest={questionnaireRequest}
+          questionnaireRequests={questionnaireRequests}
+          onPermissionRespond={onPermissionRespond}
+          onElicitationRespond={onElicitationRespond}
+          onSelectQuestionnaire={onSelectQuestionnaire}
+          onQuestionnaireRespond={onQuestionnaireRespond}
         />
 
         <form ref={formRef} className="composer" onSubmit={onSubmit}>
@@ -1606,6 +1704,6 @@ export function ChatWorkspace({
           )}
         </form>
       </section>
-    </ElicitationActionContext.Provider>
+    </ApprovalRequestContext.Provider>
   );
 }

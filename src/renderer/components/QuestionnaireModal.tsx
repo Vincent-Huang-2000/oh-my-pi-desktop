@@ -54,11 +54,11 @@ export function QuestionnaireModal({
   };
 
   return (
-    <div className="approval-float-layer" role="presentation">
+    <div className="approval-dock-panel" role="presentation">
       <section
         className="approval-modal questionnaire-modal"
         role="dialog"
-        aria-modal="true"
+        aria-modal="false"
         aria-labelledby="questionnaire-title"
       >
         <header className="questionnaire-modal-header">

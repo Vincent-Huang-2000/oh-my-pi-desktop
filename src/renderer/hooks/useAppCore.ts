@@ -132,9 +132,9 @@ export function useAppCore() {
   const [questionnaireRequest, setQuestionnaireRequest] = useState<QuestionnaireRequest | null>(
     null,
   );
-  // 三类审批共用同一右下角浮层位置；并发到达时按优先级互斥展示，
-  // 避免完全重叠导致被遮挡的浮层无法点击。问卷最具体优先，permission 次之，
-  // elicitation 最后。未入选的仍在各自队列中，当前浮层处理完后自动弹下一个。
+  // 三类审批共用对话工作区的审批坞；并发到达时按优先级互斥展示。
+  // 问卷最具体优先，permission 次之，elicitation 最后；未入选请求留在各自队列中，
+  // 当前请求处理完后自动展示下一项，避免同一时刻出现多组可执行操作。
   const activeApprovalKind: 'questionnaire' | 'permission' | 'elicitation' | null =
     questionnaireRequest
       ? 'questionnaire'
@@ -155,6 +155,16 @@ export function useAppCore() {
     delete permissionBySession.current[sessionId];
     delete elicitationBySession.current[sessionId];
     delete questionnaireBySession.current[sessionId];
+    // 同步将缓存中该 session 的 pending elicitation 消息标记为 cancelled，
+    // 避免切回时恢复出"等待审批"的误导状态（队列已清空，审批坞永远不会出现）。
+    const cached = messageCache.current[sessionId];
+    if (cached) {
+      messageCache.current[sessionId] = cached.map((msg) =>
+        msg.elicitationStatus === 'pending'
+          ? { ...msg, elicitationStatus: 'cancelled' as const, elicitationResult: '已取消' }
+          : msg,
+      );
+    }
     if (alsoClearActive && selectedSessionRef.current?.id === sessionId) {
       setPermissionRequest(null);
       setElicitationRequest(null);
