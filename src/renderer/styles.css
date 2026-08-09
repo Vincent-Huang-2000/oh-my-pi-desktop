@@ -42,6 +42,7 @@
 
   /* —— 中性色（文字 / 背景 / 边框） —— */
   --color-bg: #f7f7f3;
+  --color-workspace-bg: rgb(255 255 255 / 88%); /* 对话区背景：半透明白透出渐变 */
   --color-surface: #fff;
   --color-surface-alt: #f2f4f0; /* 次级背景：介于 bg 与 sunken 之间 */
   --color-surface-sunken: #eef0ec; /* 凹陷区/工具卡片头部 */
@@ -69,7 +70,7 @@
   --glass-shadow: 0 8px 32px rgb(31 38 135 / 12%);
 
   /* —— 功能色 —— */
-  --color-tool: #f4f2e9;
+  --color-tool: #f3f1fd; /* 工具卡片底色：极浅蓝紫 */
   --color-pin: #d99b2c; /* 置顶星标金 */
   --color-error: #fff1ee;
   --color-error-border: #efc9c2;
@@ -690,6 +691,7 @@ summary:focus-visible {
   );
 
   /* ── 语义层：中性色 ── */
+  --color-workspace-bg: #111318;
   --color-bg: #111318;
   --color-surface: #1a1e25;
   --color-surface-alt: #21252f;
@@ -718,7 +720,7 @@ summary:focus-visible {
   --glass-shadow: 0 8px 32px rgb(0 0 0 / 40%);
 
   /* ── 功能色 ── */
-  --color-tool: #2a2a22;
+  --color-tool: #24223a;
   --color-pin: #e0a83a;
   --color-error: #2d1a18;
   --color-error-border: #4a2d2a;
@@ -734,7 +736,6 @@ summary:focus-visible {
 /* ── 组件级硬编码色值覆盖（暗色主题） ──
    这些选择器覆盖因各组件内写了 hex/rgba 等非变量色值而需要。
    后续可逐步将这些色值迁移到 :root 变量中以消除此区块。 */
-
 
 [data-theme='dark'] .scroll-to-bottom-btn {
   background: var(--color-surface);

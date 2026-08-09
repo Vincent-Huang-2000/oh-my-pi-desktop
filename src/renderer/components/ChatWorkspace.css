@@ -8,13 +8,13 @@
   position: relative;
   display: grid;
 
+  /* 对话区背景：半透明白让底层渐变透出（light）/ 深色半透明（dark），
+     由 --color-workspace-bg 控制 */
+
   /* 中间对话区只有消息流 + 输入区两行。 */
   grid-template-rows: minmax(0, 1fr) minmax(100px, auto);
-  min-width: 0;
+  background: var(--color-workspace-bg);
   min-height: 0;
-
-  /* 使用主题背景，确保透明 Composer 在深浅主题下均与对话区连贯。 */
-  background: var(--color-bg);
 }
 
 /* ── 消息列表 ── */
@@ -784,8 +784,7 @@
 .tool-output {
   border-top: 1px solid var(--color-border-subtle);
   padding: 8px 14px;
-  background: var(--color-surface-sunken);
-  font-size: 12px;
+  background: var(--color-tool);
 }
 
 .tool-output summary {
@@ -799,9 +798,8 @@
   padding: 10px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-sunken);
   font-size: 11px;
-  line-height: 1.45;
+  background: var(--color-tool);
   max-height: 320px;
   overflow: auto;
   white-space: pre-wrap;
