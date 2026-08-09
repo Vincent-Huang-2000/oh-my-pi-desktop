@@ -13,8 +13,8 @@
   min-width: 0;
   min-height: 0;
 
-  /* 对话区保持近实色以保证文字可读性，仅微微透出底层渐变统一观感 */
-  background: rgb(255 255 255 / 88%);
+  /* 使用主题背景，确保透明 Composer 在深浅主题下均与对话区连贯。 */
+  background: var(--color-bg);
 }
 
 /* ── 消息列表 ── */
@@ -1126,30 +1126,80 @@
 }
 
 /* ── 待发送附件 ── */
+
+/* 附件预览位于输入卡片内、textarea 上方；多附件按添加顺序换行排列，不产生滚动条。 */
 .pending-images {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
-  padding: 8px 18px 0;
-  background: var(--color-surface-sunken);
-  border-top: 1px solid var(--color-border-subtle);
+  padding: 8px 12px 0;
 }
 
 .image-chip {
   position: relative;
-  display: inline-block;
+  display: block;
+  flex: 0 0 auto;
 }
 
+/* 图片附件以小方形缩略气泡呈现，不改变实际发送的原图数据。 */
+.image-chip img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+/* 图片 chip 底部叠加文件名条：深底白字遮罩固定在图片内侧，浅色/深色主题下都可读。 */
+.image-chip-filename {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  left: 1px;
+  overflow: hidden;
+  padding: 1px 5px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #fff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgb(0 0 0 / 55%);
+  border-radius: 0 0 11px 11px;
+}
+
+/* 移除按钮：中性描边小圆，默认隐藏，hover / 键盘聚焦 chip 时出现，避免警示红喧宾夺主。 */
 .image-chip button {
   position: absolute;
   top: -6px;
   right: -6px;
-  padding: 1px 6px;
-  font-size: 11px;
-  border-radius: 10px;
-  background: var(--color-error);
-  border-color: var(--color-error-border);
-  color: var(--color-error-text);
+  display: grid;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+}
+
+.image-chip:hover button,
+.image-chip:focus-within button {
+  opacity: 1;
+}
+
+.image-chip button:hover {
+  color: var(--color-text);
 }
 
 /* 非图片附件 chip：用文件名 + 标签替代缩略图。 */

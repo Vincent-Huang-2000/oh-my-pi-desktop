@@ -735,9 +735,6 @@ summary:focus-visible {
    这些选择器覆盖因各组件内写了 hex/rgba 等非变量色值而需要。
    后续可逐步将这些色值迁移到 :root 变量中以消除此区块。 */
 
-[data-theme='dark'] .message-list {
-  background: rgb(26 30 37 / 88%);
-}
 
 [data-theme='dark'] .scroll-to-bottom-btn {
   background: var(--color-surface);

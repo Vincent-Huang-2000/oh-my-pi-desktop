@@ -1337,36 +1337,6 @@ export function ChatWorkspace({
           onScrollToBottom={handleScrollToBottom}
         />
 
-        {/* 待发送附件预览：每个附件一个 chip + 移除按钮。dataURL 保留在 React state 里，
-          发送时随 text 一起走 sendAgentMessage。
-          - image：缩略图
-          - text：文件名 + 「文本」标签（omp 能让模型读到内容）
-          - unsupported：文件名 + 「不支持」橙色警告（omp 会兜底成占位符，模型读不到内容） */}
-        {pendingAttachments.length > 0 && (
-          <div className="pending-images">
-            {pendingAttachments.map((att, index) => (
-              <span
-                className={`image-chip${att.kind === 'unsupported' ? ' is-unsupported' : ''}`}
-                key={`${index}-${att.dataUrl.slice(0, 16)}`}
-                title={att.kind === 'unsupported' ? '该类型 agent 可能无法读取内容' : att.fileName}
-              >
-                {att.kind === 'image' ? (
-                  <img src={att.dataUrl} alt={att.fileName} />
-                ) : (
-                  <span className="image-chip-file">
-                    <span className="image-chip-name">{att.fileName}</span>
-                    {att.kind === 'unsupported' && <span className="image-chip-warn">不支持</span>}
-                    {att.kind === 'text' && <span className="image-chip-tag">文本</span>}
-                  </span>
-                )}
-                <button type="button" onClick={() => onRemovePendingAttachment(index)}>
-                  移除
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-
         <form ref={formRef} className="composer" onSubmit={onSubmit}>
           <div className="composer-input">
             {/* 命令面板：在输入框输入以 "/" 开头的命令名时自动弹出（实时过滤 + 描述），
@@ -1575,6 +1545,47 @@ export function ChatWorkspace({
                 </button>
               </div>
             </div>
+            {/* 待发送附件预览：位于输入卡片内、textarea 上方，每个附件一个 chip + 移除按钮。
+              dataURL 保留在 React state 里，发送时随 text 一起走 sendAgentMessage。
+              - image：缩略图 + 底部文件名条
+              - text：文件名 + 「文本」标签（omp 能让模型读到内容）
+              - unsupported：文件名 + 「不支持」橙色警告（omp 会兜底成占位符，模型读不到内容） */}
+            {pendingAttachments.length > 0 && (
+              <div className="pending-images">
+                {pendingAttachments.map((att, index) => (
+                  <span
+                    className={`image-chip${att.kind === 'unsupported' ? ' is-unsupported' : ''}`}
+                    key={`${index}-${att.dataUrl.slice(0, 16)}`}
+                    title={
+                      att.kind === 'unsupported' ? '该类型 agent 可能无法读取内容' : att.fileName
+                    }
+                  >
+                    {att.kind === 'image' ? (
+                      <>
+                        <img src={att.dataUrl} alt={att.fileName} />
+                        <span className="image-chip-filename">{att.fileName}</span>
+                      </>
+                    ) : (
+                      <span className="image-chip-file">
+                        <span className="image-chip-name">{att.fileName}</span>
+                        {att.kind === 'unsupported' && (
+                          <span className="image-chip-warn">不支持</span>
+                        )}
+                        {att.kind === 'text' && <span className="image-chip-tag">文本</span>}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      aria-label={`移除附件 ${att.fileName}`}
+                      title="移除附件"
+                      onClick={() => onRemovePendingAttachment(index)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               value={prompt}
