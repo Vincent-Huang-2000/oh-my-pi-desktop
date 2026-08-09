@@ -282,7 +282,12 @@ function PlanCard({ message }: { message: ChatMessage }) {
 
   if (message.planContentType === 'markdown') {
     return (
-      <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+      <details
+        id={`plan-message-${message.id}`}
+        className="message plan"
+        key={message.id}
+        open={message.planPreview || message.planActive || undefined}
+      >
         <summary className="plan-header">
           <span className="plan-heading">
             <span className="plan-caret" aria-hidden="true">
@@ -310,7 +315,12 @@ function PlanCard({ message }: { message: ChatMessage }) {
 
   if (message.planContentType === 'file') {
     return (
-      <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+      <details
+        id={`plan-message-${message.id}`}
+        className="message plan"
+        key={message.id}
+        open={message.planPreview || message.planActive || undefined}
+      >
         <summary className="plan-header">
           <span className="plan-heading">
             <span className="plan-caret" aria-hidden="true">
@@ -624,12 +634,10 @@ function ApprovalDock({
 }: ApprovalDockProps) {
   const hasRequest = Boolean(permissionRequest || elicitationRequest || questionnaireRequest);
 
+  if (!hasRequest) return null;
+
   return (
-    <aside
-      className={`approval-dock${hasRequest ? ' has-request' : ''}`}
-      aria-label={hasRequest ? '审批坞' : undefined}
-      aria-hidden={hasRequest ? undefined : true}
-    >
+    <aside className="approval-dock" aria-label="审批坞">
       {permissionRequest ? (
         <PermissionModal request={permissionRequest} onRespond={onPermissionRespond} />
       ) : elicitationRequest ? (

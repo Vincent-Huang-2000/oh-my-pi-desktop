@@ -38,9 +38,11 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
     setCustomInputOpen(false);
   }, [request.requestId]);
 
-  // 文本输入场景自动聚焦。
+  // 文本输入场景自动聚焦；若用户正在输入框中打字则不抢焦点。
   useEffect(() => {
     if (!isSelect && !isBoolean) {
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
       inputRef.current?.focus();
     }
   }, [isSelect, isBoolean]);

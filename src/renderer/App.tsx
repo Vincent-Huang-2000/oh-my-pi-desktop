@@ -7,13 +7,14 @@
  * ## 渲染隔离策略
  * - 工具组折叠回调（onSetToolGroupCollapsed）通过 useCallback 稳定引用，
  *   避免输入时 messageItems useMemo 失效。
- * - elicitation 空队列复用常量引用，避免每次渲染创建新数组。
+ * - questionnaire 空队列复用模块级常量引用，避免每次渲染创建新数组。
  *
  * ## 维护
  * - 新增 state 必须先加到 useAppCore，不在 App 中内联 useState。
  * - 修改 UI 结构前先读 docs/UI/ui-layout-reference.md。
  * - IPC 通道新增/修改必须同步 ipc.ts + preload.ts + vite-env.d.ts。
  */
+import type { QuestionnaireRequest } from './types';
 import { useEffect } from 'react';
 
 import { ChatWorkspace } from './components/ChatWorkspace';
@@ -35,6 +36,8 @@ import { useSessionLifecycle } from './hooks/useSessionLifecycle';
 import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
 import { applyTheme, toggleTheme } from './theme';
+// 空 questionnaire 队列复用常量引用，避免每次渲染创建新数组触发下游 memo 失效。
+const EMPTY_QUESTIONNAIRE_REQUESTS: QuestionnaireRequest[] = [];
 
 export default function App() {
   const app = useAppCore();
@@ -170,7 +173,8 @@ export default function App() {
             app.activeApprovalKind === 'questionnaire' ? app.questionnaireRequest : null
           }
           questionnaireRequests={
-            app.questionnaireBySession.current[app.selectedSession?.id ?? ''] ?? []
+            app.questionnaireBySession.current[app.selectedSession?.id ?? ''] ??
+            EMPTY_QUESTIONNAIRE_REQUESTS
           }
           modelConfig={app.modelConfig}
           modeConfig={app.modeConfig}
