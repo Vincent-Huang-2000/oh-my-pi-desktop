@@ -1,17 +1,23 @@
 /**
- * messageMerge — Agent 事件消息合流核心逻辑。
+ * messageMerge — Agent 事件流 → UI 消息列表的合流核心。
  *
- * mergeAgentEventIntoMessages(event, messages, plansPath, toolGroups) 是
- * agent 事件流与 UI 消息列表之间的核心桥接函数（~170 行）。处理：
- * - 按 messageId 查找现有消息行进行增量更新（plan/tool_call/tool_result/elicitation）
- * - 新消息追加（assistant 文本、计划摘要卡、usage 行等）
- * - tool 组折叠状态联动（回合开始时展开、done 后折叠）
+ * mergeAgentEventIntoMessages(event, messages, …) 是唯一入口（~170 行），
+ * 负责将 ACP 子进程发来的每条事件转换为消息列表的增删改。处理的事件类型：
+ * - assistant 文本 → 原地追加或新建消息行
+ * - tool_call / tool_result → 增量更新工具卡片的标题、状态、输出
+ * - plan / plan_update → 按 planId 替换旧 plan 消息，同时清理 planPending
+ *   占位、planPreview 预览卡、旧协议无 id 的 items 列表（详见 plan 分支注释）
+ * - elicitation → 按 requestId 原地更新审批结果
+ * - done / error → 清理未收到正式 plan 的占位卡，收敛未终结的工具卡
  *
- * isPlanToolCall(toolCall)：判断某 tool_call 是否为 plan 工具调用。
+ * 注意：本函数只做“我知道谁替换谁”的精确去重（planId 相同 / pending→正式 /
+ * preview→正式）。它不负责“同类型多条消息只保留最后一条”的去重——那是
+ * TurnBlock 渲染层的职责，因为历史恢复 / 多回合 replay 产生的同类型残留没有
+ * planId 可追溯，只能在渲染时按 contentType 收敛。
  *
  * ## 维护
- * - 本函数是渲染进程中对 agent 事件格式最敏感的部分，修改前需逐一确认各种 payload 结构。
- * - 所有事件类型的分支应保持防御性：未知 payload 只打印日志，不抛异常。
+ * - 本函数对 agent 事件格式最敏感，修改前需逐一确认各 payload 结构。
+ * - 所有事件分支保持防御性：未知 payload 只打印日志，不抛异常。
  */
 import type { ChatMessage } from '../types';
 import {
@@ -120,8 +126,11 @@ export const mergeAgentEventIntoMessages = (
     ]);
   }
 
-  /* 旧 plan 只替换无 ID 的结构化执行清单；方案文档与执行进度是两类信息，必须并存。
-     plan_update / plan_removed 仍按 planId 精确更新对应计划。 */
+  /* 这里的去重是“一条消息替换另一条”的精确替换，因为事件携带了 planId 能确认身份：
+     planId 匹配 → 直接替换；planPending 占位 → 正式版替代；planPreview 预览 → 正式版替代；
+     旧协议无 id 的 items → 新协议替代。
+     不处理“同 content 类型多条但你不替换我”的重复——那种跨来源重复没有 planId 可查，
+     留到 TurnBlock 渲染时按 contentType 只保留最后一条。 */
   if (event.type === 'plan') {
     const change = getPayloadPlanChange(event.payload);
     if (!change) return current;

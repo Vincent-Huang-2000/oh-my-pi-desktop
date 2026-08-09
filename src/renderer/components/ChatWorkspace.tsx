@@ -4,6 +4,15 @@
  * 渲染消息流（按回合分组、工具组折叠、Markdown 渲染）和底部输入区（textarea、
  * slash 命令面板、附件预览、模型/模式/推理强度/审批档位配置入口、加号菜单）。
  *
+ * ## Plan 展示分工
+ * - PlanStatusBar（顶部可折叠面板）：只展示 items 执行计划（todo 列表 + 进度），
+ *   且仅在仍有未完成步骤时出现。折叠态只显示 "执行计划 · N/M" 标签，展开态列出
+ *   全部条目及状态。
+ * - TurnBlock 消息流：展示 markdown 方案文档、file 文件链接、planPending 占位。
+ *   同 contentType 只保留最后一条，作为 messageMerge 身份级去重之后的渲染层兜底。
+ * - markdown 方案文档不会同时出现在状态栏和消息流中，由 activePlanMessages 过滤
+ *   条件（仅 planContentType === 'items' + 未完成）保证。
+ *
  * ## 渲染隔离设计
  * - MemoizedMessageStream 将消息历史区与受控输入区隔离；prompt 变化时仅更新 composer，
  *   不重新渲染历史消息 DOM。
@@ -986,9 +995,12 @@ function TurnBlock({
           )}
         </div>
       )}
-      {/* items 类执行计划改由顶部 PlanStatusBar 折叠面板展示；同 contentType 只保留最后一条，
-          避免 elicitation 预览 / plan_update / 历史恢复多个生产者造成重复卡片。
-          planPending 占位没有 contentType，不参与去重，始终在消息流显示。 */}
+
+      {/* items 类执行计划由顶部 PlanStatusBar 折叠面板展示，消息流中不再渲染。
+          剩下的 markdown / file 类，messageMerge 已做了“同 planId / preview→正式”的
+          精确替换，不会出现身份明确的重复。但历史恢复和多回合 replay 可能产生
+          “内容不同、类型相同”的残留（id 不同、无替换关系），这里按 contentType
+          倒序扫描，同类型只保留最后一条作为兜底。planPending 是占位，不参与去重。 */}
       {planMessages
         .filter((message) => message.planContentType !== 'items')
         .filter((message, index, arr) => {
