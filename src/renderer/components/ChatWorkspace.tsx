@@ -11,7 +11,7 @@
  *   ElicitationMessage / MessageRenderer）均通过 React.memo 包裹，同一消息 props
  *   不变时跳过渲染。
  * - Markdown 插件数组和组件映射提升为模块级常量，避免每次渲染重建。
- * - 审批响应、计划定位、滚动回调通过 useCallback + ref 稳定化，不破坏 memo 链。
+ * - 审批响应、滚动回调通过 useCallback + ref 稳定化，不破坏 memo 链。
  *
  * ## 维护
  * - 新增消息角色时更新 MessageRenderer 分发分支。
@@ -266,11 +266,7 @@ const MemoizedToolCallCard = React.memo(ToolCallCard);
 function PlanCard({ message }: { message: ChatMessage }) {
   if (message.planPending) {
     return (
-      <article
-        id={`plan-message-${message.id}`}
-        className="message plan plan-loading"
-        key={message.id}
-      >
+      <article className="message plan plan-loading" key={message.id}>
         <div className="plan-header">
           <span className="plan-loading-dot" aria-hidden="true" />
           正在创建计划
@@ -283,7 +279,6 @@ function PlanCard({ message }: { message: ChatMessage }) {
   if (message.planContentType === 'markdown') {
     return (
       <details
-        id={`plan-message-${message.id}`}
         className="message plan"
         key={message.id}
         open={message.planPreview || message.planActive || undefined}
@@ -316,7 +311,6 @@ function PlanCard({ message }: { message: ChatMessage }) {
   if (message.planContentType === 'file') {
     return (
       <details
-        id={`plan-message-${message.id}`}
         className="message plan"
         key={message.id}
         open={message.planPreview || message.planActive || undefined}
@@ -339,11 +333,7 @@ function PlanCard({ message }: { message: ChatMessage }) {
   const entries = message.planEntries;
   if (!entries || entries.length === 0) {
     return (
-      <article
-        id={`plan-message-${message.id}`}
-        className="message plan plan-empty"
-        key={message.id}
-      >
+      <article className="message plan plan-empty" key={message.id}>
         <div className="plan-header">{'\u{1F4CB}'} 计划已清空</div>
       </article>
     );
@@ -353,7 +343,7 @@ function PlanCard({ message }: { message: ChatMessage }) {
   const total = entries.length;
 
   return (
-    <details id={`plan-message-${message.id}`} className="message plan" key={message.id}>
+    <details className="message plan" key={message.id}>
       <summary className="plan-header">
         <span className="plan-heading">
           <span className="plan-caret" aria-hidden="true">
@@ -381,43 +371,58 @@ const MemoizedPlanCard = React.memo(PlanCard);
 
 type PlanStatusBarProps = {
   messages: ChatMessage[];
-  onLocate: (messageId: string) => void;
 };
 
 const ApprovalRequestContext = React.createContext<string | null>(null);
-/* 计划状态行占据消息流顶部的真实布局空间，不覆盖右对齐的用户消息。 */
-function PlanStatusBar({ messages, onLocate }: PlanStatusBarProps) {
-  const latest = messages[messages.length - 1];
-  const entries = latest.planEntries ?? [];
-  const completed = entries.filter((entry) => entry.status === 'completed').length;
-  const label = latest.planPending
-    ? '正在创建计划'
-    : latest.planActive
-      ? '当前未完成方案'
-      : latest.planPreview
-        ? '待确认方案'
-        : latest.planContentType === 'markdown'
-          ? '方案文档'
-          : `执行计划${entries.length > 0 ? ` · ${completed}/${entries.length}` : ''}`;
+/* 计划状态行占据消息流顶部的真实布局空间，不覆盖右对齐的用户消息。
+   仅展示 items 执行计划的 todo 进度：折叠时只显示进度标签，展开后在下方浮层
+   列出全部条目。markdown 方案文档只在消息流中保留一份，不在此重复展示。 */
+function PlanStatusBar({ messages }: PlanStatusBarProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  const { itemsPlan, entries, completed } = useMemo(() => {
+    // 只取最后一条有条目的 items 执行计划，与消息流的同类型去重策略一致。
+    const itemsPlan = [...messages]
+      .reverse()
+      .find((m) => m.planContentType === 'items' && (m.planEntries?.length ?? 0) > 0);
+    const entries = itemsPlan?.planEntries ?? [];
+    const completed = entries.filter((entry) => entry.status === 'completed').length;
+    return { itemsPlan, entries, completed };
+  }, [messages]);
+
+  if (!itemsPlan) return null;
 
   return (
     <aside className="plan-status-slot">
-      {latest.planPending ? (
-        <div className="plan-status-control plan-status-pending" aria-live="polite">
-          <span className="plan-loading-dot" aria-hidden="true" />
-          <span>{label}</span>
-        </div>
-      ) : (
+      <div className="plan-status-wrapper">
         <button
           type="button"
-          className="plan-status-control"
-          onClick={() => onLocate(latest.id)}
-          title="定位到消息流中的计划摘要"
+          className={`plan-status-control${expanded ? ' plan-status-expanded' : ''}`}
+          onClick={() => setExpanded((value) => !value)}
+          aria-expanded={expanded}
+          title={expanded ? '收起计划详情' : '展开计划详情'}
         >
-          <span>{label}</span>
-          <span className="plan-status-locate">查看</span>
+          <span className="plan-status-caret" aria-hidden="true">
+            {expanded ? '▼' : '▶'}
+          </span>
+          <span>
+            执行计划 · {completed}/{entries.length}
+          </span>
+          {!expanded && <span className="plan-status-locate">展开</span>}
         </button>
-      )}
+        {expanded && (
+          <div className="plan-status-panel">
+            <ol className="plan-panel-entries">
+              {entries.map((entry, i) => (
+                <li key={i} className={`plan-entry plan-${entry.status}`}>
+                  <span className="plan-status-icon">{PLAN_STATUS_LABEL[entry.status]}</span>
+                  <span className="plan-entry-content">{entry.content}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }
@@ -981,9 +986,24 @@ function TurnBlock({
           )}
         </div>
       )}
-      {planMessages.map((message) => (
-        <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
-      ))}
+      {/* items 类执行计划改由顶部 PlanStatusBar 折叠面板展示；同 contentType 只保留最后一条，
+          避免 elicitation 预览 / plan_update / 历史恢复多个生产者造成重复卡片。
+          planPending 占位没有 contentType，不参与去重，始终在消息流显示。 */}
+      {planMessages
+        .filter((message) => message.planContentType !== 'items')
+        .filter((message, index, arr) => {
+          if (message.planPending) return true;
+          // 同 planContentType 只保留最后一条（ES2020 无 findLastIndex，倒序扫描）
+          for (let i = arr.length - 1; i > index; i--) {
+            if (!arr[i].planPending && arr[i].planContentType === message.planContentType) {
+              return false;
+            }
+          }
+          return true;
+        })
+        .map((message) => (
+          <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
+        ))}
 
       {statusMessages.map((message) => (
         <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
@@ -1030,7 +1050,6 @@ type MessageStreamProps = {
   isHistoryLoading: boolean;
   messageListRef: React.RefObject<HTMLDivElement | null>;
   showScrollToBottom: boolean;
-  onLocatePlan: (messageId: string) => void;
   onMessageListScroll: () => void;
   onScrollToBottom: () => void;
 };
@@ -1045,15 +1064,12 @@ function MessageStream({
   isHistoryLoading,
   messageListRef,
   showScrollToBottom,
-  onLocatePlan,
   onMessageListScroll,
   onScrollToBottom,
 }: MessageStreamProps) {
   return (
     <div className="message-stream">
-      {activePlanMessages.length > 0 && (
-        <PlanStatusBar messages={activePlanMessages} onLocate={onLocatePlan} />
-      )}
+      {activePlanMessages.length > 0 && <PlanStatusBar messages={activePlanMessages} />}
       <div
         ref={messageListRef}
         className="message-list"
@@ -1197,13 +1213,6 @@ export function ChatWorkspace({
     setShowScrollToBottom(!nearBottom);
   }, []);
 
-  const handleLocatePlan = useCallback((messageId: string) => {
-    document.getElementById(`plan-message-${messageId}`)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    });
-  }, []);
-
   // 命令触发：输入框内容形如 `/<token>`（以 / 开头、尚未输入空格）时，
   // 认为用户正在打命令名，token 即作为搜索词；一旦输入空格（开始填参数）则收起。
   const commandToken = useMemo(() => {
@@ -1281,16 +1290,15 @@ export function ChatWorkspace({
     });
   };
 
-  // 仅在创建中、待确认或仍有未完成步骤时显示顶部计划状态槽。
+  // 顶部状态槽只接收有条目且仍有未完成步骤的 items 执行计划；
+  // markdown 方案文档与 planPending 占位只留在消息流，不再触发状态槽。
   const { activePlanMessages, conversationMessages } = useMemo(
     () => ({
       activePlanMessages: messages.filter(
         (message) =>
           message.role === 'plan' &&
-          (message.planPending ||
-            message.planPreview ||
-            message.planActive ||
-            message.planEntries?.some((entry) => entry.status !== 'completed') === true),
+          message.planContentType === 'items' &&
+          (message.planEntries?.some((entry) => entry.status !== 'completed') ?? false),
       ),
       conversationMessages: messages,
     }),
@@ -1428,7 +1436,6 @@ export function ChatWorkspace({
           isHistoryLoading={isHistoryLoading}
           messageListRef={messageListRef}
           showScrollToBottom={showScrollToBottom}
-          onLocatePlan={handleLocatePlan}
           onMessageListScroll={handleMessageListScroll}
           onScrollToBottom={handleScrollToBottom}
         />

@@ -50,7 +50,17 @@ export const getHistoryLoadedPlans = (payload: unknown): HistoricalSessionPlan[]
 export const insertHistoricalPlans = (messages: ChatMessage[], plans: HistoricalSessionPlan[]) => {
   const next = [...messages];
   for (const plan of plans) {
-    if (next.some((message) => message.id === plan.id)) continue;
+    // 同 id 精确去重；planFilePath 兜底——历史恢复卡与回放流中 plan_update
+    // 产生的同文件路径消息不应重复出现。
+    if (
+      next.some(
+        (message) =>
+          message.id === plan.id ||
+          (message.planFilePath !== undefined && message.planFilePath === plan.planFilePath),
+      )
+    ) {
+      continue;
+    }
     const planMessage: ChatMessage = {
       id: plan.id,
       role: 'plan',

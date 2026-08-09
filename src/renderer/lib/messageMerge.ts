@@ -132,8 +132,22 @@ export const mergeAgentEventIntoMessages = (
     }
     const withoutReplacedPlan = current.filter((message) => {
       if (message.role !== 'plan') return true;
+      // 始终移除 planPending 占位——它们会被正式 plan 替代
       if (message.planPending) return false;
-      if (change.planId) return message.planId !== change.planId;
+      if (change.planId) {
+        // 同 planId 的卡被精确替换
+        if (message.planId === change.planId) return false;
+        // markdown 正式 plan 到达时，清除所有 planPreview 残留预览卡
+        //（它们是同一审批流程的中间产物，正式版已替代预览版）
+        if (change.contentType === 'markdown' && message.planPreview) return false;
+        // items 类正式 plan 到达时，清除无 id 的旧版 items 卡
+        //（这些是 agent 用旧协议发出的临时列表，新版带 planId 的已替代它们）
+        if (change.contentType === 'items' && message.planContentType === 'items' && !message.planId) {
+          return false;
+        }
+        return true;
+      }
+      // change 无 planId：保持旧版行为，只替换无 id 的 items 卡
       return message.planContentType !== 'items' || !!message.planId;
     });
     return [

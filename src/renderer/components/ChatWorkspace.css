@@ -939,16 +939,6 @@
   background: var(--color-accent-hover);
 }
 
-.plan-status-pending {
-  justify-content: flex-start;
-  color: var(--color-text-muted);
-  cursor: default;
-}
-
-.plan-status-pending:hover {
-  background: transparent;
-}
-
 .plan-status-control:active {
   transform: translateY(1px);
 }
@@ -965,12 +955,52 @@
   white-space: nowrap;
 }
 
+/* plan-status-control 展开面板容器：相对定位供面板绝对定位对齐 */
+.plan-status-wrapper {
+  position: relative;
+  flex: 0 0 auto;
+  max-width: 100%;
+}
+
+/* PlanStatusBar 展开态 caret */
+.plan-status-caret {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.plan-status-expanded,
+.plan-status-expanded:hover {
+  background: var(--color-accent-hover);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+/* 展开面板：右对齐 plan-status-control，浮于消息流上方 */
+.plan-status-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  min-width: 360px;
+  max-width: min(600px, calc(100vw - 48px));
+  max-height: 480px;
+  padding: 12px 16px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm) 0 var(--radius-sm) var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+}
+
+/* 条目样式复用 .plan-entry / .plan-status-icon / .plan-entry-content */
+.plan-panel-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .message.plan {
   max-width: 100%;
   margin: 6px 0 10px;
-
-  /* 顶部计划状态槽不覆盖消息流，定位时仅保留正常阅读留白。 */
-  scroll-margin-top: 12px;
   padding: 0;
   border: 0;
   border-left: 2px solid var(--color-accent);
