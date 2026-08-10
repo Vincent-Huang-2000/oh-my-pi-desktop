@@ -31,11 +31,13 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
   const isBoolean = field.type === 'boolean';
   const [textValue, setTextValue] = useState('');
   const [customInputOpen, setCustomInputOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setTextValue('');
     setCustomInputOpen(false);
+    setCollapsed(false);
   }, [request.requestId]);
 
   // 文本输入场景自动聚焦；若用户正在输入框中打字则不抢焦点。
@@ -62,115 +64,133 @@ export function ElicitationModal({ request, onRespond }: ElicitationModalProps) 
   return (
     <div className="approval-dock-panel" role="presentation">
       <section
-        className="approval-modal"
+        className={`approval-modal${collapsed ? ' is-collapsed' : ''}`}
         role="dialog"
         aria-modal="false"
         aria-labelledby="elicitation-title"
       >
-        <h2 id="elicitation-title">
-          {request.kind === 'question' ? 'Agent 需要你的回答' : '需要确认'}
-        </h2>
-        <p>
-          {request.hasPlanPreview
-            ? 'Agent 已完成方案，请在消息流的「待确认方案」卡片中查看完整内容，确认是否执行。'
-            : message}
-        </p>
-        {field.description && (
+        <div className="approval-modal-header">
+          <h2 id="elicitation-title">
+            {request.kind === 'question' ? 'Agent 需要你的回答' : '需要确认'}
+          </h2>
+          <button
+            type="button"
+            className="approval-collapse-btn"
+            aria-label={collapsed ? '展开审批面板' : '折叠审批面板'}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((c) => !c)}
+          >
+            {collapsed ? '▶' : '▼'}
+          </button>
+        </div>
+        {!collapsed &&
+          (request.kind === 'approval' && !request.hasPlanPreview ? (
+            <div className="approval-message">{message}</div>
+          ) : (
+            <p>
+              {request.hasPlanPreview
+                ? 'Agent 已完成方案，请在消息流的「待确认方案」卡片中查看完整内容，确认是否执行。'
+                : message}
+            </p>
+          ))}
+        {!collapsed && field.description && (
           <p style={{ fontSize: '12px', marginTop: '-10px' }}>{field.description}</p>
         )}
-        <div className="modal-actions">
-          {isSelect ? (
-            <>
-              {field.options!.map((option) => {
-                // approval 场景：拒绝=Danger，其余=Primary；
-                // question 场景：仅 (Recommended) 标注为 Primary，其余默认。
-                const className =
-                  request.kind === 'approval'
-                    ? approvalOptionClass(option)
-                    : option.endsWith(' (Recommended)')
-                      ? 'primary-action'
-                      : '';
-                return (
-                  <button
-                    className={className}
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      if (request.kind === 'question' && isElicitationOtherOption(option)) {
-                        setTextValue('');
-                        setCustomInputOpen(true);
-                        return;
-                      }
-                      onRespond('accept', { value: option });
-                    }}
-                  >
-                    <span>{formatElicitationOptionLabel(option)}</span>
+        {!collapsed && (
+          <div className="modal-actions">
+            {isSelect ? (
+              <>
+                {field.options!.map((option) => {
+                  // approval 场景：拒绝=Danger，其余=Primary；
+                  // question 场景：仅 (Recommended) 标注为 Primary，其余默认。
+                  const className =
+                    request.kind === 'approval'
+                      ? approvalOptionClass(option)
+                      : option.endsWith(' (Recommended)')
+                        ? 'primary-action'
+                        : '';
+                  return (
+                    <button
+                      className={className}
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        if (request.kind === 'question' && isElicitationOtherOption(option)) {
+                          setTextValue('');
+                          setCustomInputOpen(true);
+                          return;
+                        }
+                        onRespond('accept', { value: option });
+                      }}
+                    >
+                      <span>{formatElicitationOptionLabel(option)}</span>
+                    </button>
+                  );
+                })}
+                {request.kind === 'question' && (
+                  <button type="button" onClick={() => onRespond('cancel')}>
+                    <span>取消回答</span>
                   </button>
-                );
-              })}
-              {request.kind === 'question' && (
-                <button type="button" onClick={() => onRespond('cancel')}>
-                  <span>取消回答</span>
+                )}
+                {customInputOpen && (
+                  <div className="elicitation-custom-answer">
+                    <input
+                      autoFocus
+                      className="elicitation-input"
+                      placeholder="输入自定义回答"
+                      value={textValue}
+                      onChange={(event) => setTextValue(event.target.value)}
+                    />
+                    <button
+                      className="primary-action"
+                      type="button"
+                      disabled={!textValue.trim()}
+                      onClick={() => onRespond('accept', { value: textValue.trim() })}
+                    >
+                      <span>提交自定义回答</span>
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : isBoolean ? (
+              <>
+                <button
+                  className="primary-action"
+                  type="button"
+                  onClick={() => onRespond('accept', { value: true })}
+                >
+                  <span>确认</span>
                 </button>
-              )}
-              {customInputOpen && (
-                <div className="elicitation-custom-answer">
-                  <input
-                    autoFocus
-                    className="elicitation-input"
-                    placeholder="输入自定义回答"
-                    value={textValue}
-                    onChange={(event) => setTextValue(event.target.value)}
-                  />
-                  <button
-                    className="primary-action"
-                    type="button"
-                    disabled={!textValue.trim()}
-                    onClick={() => onRespond('accept', { value: textValue.trim() })}
-                  >
-                    <span>提交自定义回答</span>
-                  </button>
-                </div>
-              )}
-            </>
-          ) : isBoolean ? (
-            <>
-              <button
-                className="primary-action"
-                type="button"
-                onClick={() => onRespond('accept', { value: true })}
-              >
-                <span>确认</span>
-              </button>
-              <button type="button" onClick={() => onRespond('decline')}>
-                <span>取消</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <input
-                ref={inputRef}
-                className="elicitation-input"
-                type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'}
-                value={textValue}
-                onChange={(event) => setTextValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') {
-                    handleSubmit();
-                  }
-                }}
-              />
-              <div className="modal-actions-horizontal">
-                <button className="primary-action" type="button" onClick={handleSubmit}>
-                  <span>提交</span>
-                </button>
-                <button type="button" onClick={() => onRespond('cancel')}>
+                <button type="button" onClick={() => onRespond('decline')}>
                   <span>取消</span>
                 </button>
-              </div>
-            </>
-          )}
-        </div>
+              </>
+            ) : (
+              <>
+                <input
+                  ref={inputRef}
+                  className="elicitation-input"
+                  type={field.type === 'number' || field.type === 'integer' ? 'number' : 'text'}
+                  value={textValue}
+                  onChange={(event) => setTextValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      handleSubmit();
+                    }
+                  }}
+                />
+                <div className="modal-actions-horizontal">
+                  <button className="primary-action" type="button" onClick={handleSubmit}>
+                    <span>提交</span>
+                  </button>
+                  <button type="button" onClick={() => onRespond('cancel')}>
+                    <span>取消</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

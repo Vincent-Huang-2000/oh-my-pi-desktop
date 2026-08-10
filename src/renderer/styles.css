@@ -525,6 +525,44 @@ textarea:disabled {
   font-size: 15px;
 }
 
+/* 折叠按钮与标题同行，折叠态下标题行紧凑 */
+.approval-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.approval-modal-header h2 {
+  margin: 0; /* 覆盖 .approval-modal h2 的 margin: 0 0 4px，折叠态下标题行紧凑 */
+}
+
+/* 折叠/展开按钮：中性小圆钮，hover 高亮与项目其它图标按钮一致 */
+.approval-collapse-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.approval-collapse-btn:hover {
+  background: var(--color-accent-hover);
+  color: var(--color-accent-strong);
+}
+
+.approval-collapse-btn:focus-visible {
+  outline: 2px solid var(--color-text-muted);
+  outline-offset: 2px;
+}
+
 /* 审批坞内的请求面板由工作区正常布局承载，不再覆盖输入区。 */
 .approval-dock-panel {
   position: relative;
@@ -542,7 +580,9 @@ textarea:disabled {
 .approval-modal {
   width: 100%;
   max-height: min(420px, 40vh);
+  /* stylelint-disable-next-line declaration-block-no-redundant-longhand-properties */
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 20px;
   border: 1px solid var(--glass-border);
   border-radius: 8px;
@@ -556,6 +596,29 @@ textarea:disabled {
   margin: 10px 0 18px;
   color: var(--color-text-muted);
   line-height: 1.6;
+}
+
+/* 折叠态：仅保留标题行，收窄垂直内边距让面板不显得空洞 */
+.approval-modal.is-collapsed {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.approval-message {
+  max-height: min(200px, 26vh);
+  margin: 10px 0 18px;
+  padding: 10px 12px;
+  /* stylelint-disable-next-line declaration-block-no-redundant-longhand-properties */
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-code-block-bg);
+  font-family: SFMono-Regular, 'Cascadia Code', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .modal-actions {
@@ -636,6 +699,8 @@ summary:focus-visible {
 .message-list::-webkit-scrollbar,
 .project-list::-webkit-scrollbar,
 .context-panel::-webkit-scrollbar,
+.approval-message::-webkit-scrollbar,
+.approval-modal::-webkit-scrollbar,
 .review-diff-files::-webkit-scrollbar,
 .review-diff-code::-webkit-scrollbar,
 .review-diff-hunk-nav::-webkit-scrollbar,
@@ -647,6 +712,8 @@ summary:focus-visible {
 .message-list::-webkit-scrollbar-thumb,
 .project-list::-webkit-scrollbar-thumb,
 .context-panel::-webkit-scrollbar-thumb,
+.approval-message::-webkit-scrollbar-thumb,
+.approval-modal::-webkit-scrollbar-thumb,
 .review-diff-files::-webkit-scrollbar-thumb,
 .review-diff-code::-webkit-scrollbar-thumb,
 .review-diff-hunk-nav::-webkit-scrollbar-thumb,
@@ -655,9 +722,16 @@ summary:focus-visible {
   border-radius: 3px;
 }
 
+/* 审批指令区滚动条：比默认边框色更醒目，提示该区域可滚动 */
+.approval-message::-webkit-scrollbar-thumb {
+  background: var(--color-text-tertiary);
+}
+
 .message-list::-webkit-scrollbar-track,
 .project-list::-webkit-scrollbar-track,
 .context-panel::-webkit-scrollbar-track,
+.approval-message::-webkit-scrollbar-track,
+.approval-modal::-webkit-scrollbar-track,
 .review-diff-files::-webkit-scrollbar-track,
 .review-diff-code::-webkit-scrollbar-track,
 .review-diff-hunk-nav::-webkit-scrollbar-track,
@@ -856,6 +930,8 @@ summary:focus-visible {
 [data-theme='dark'] .message-list::-webkit-scrollbar-thumb,
 [data-theme='dark'] .project-list::-webkit-scrollbar-thumb,
 [data-theme='dark'] .context-panel::-webkit-scrollbar-thumb,
+[data-theme='dark'] .approval-message::-webkit-scrollbar-thumb,
+[data-theme='dark'] .approval-modal::-webkit-scrollbar-thumb,
 [data-theme='dark'] .review-diff-files::-webkit-scrollbar-thumb,
 [data-theme='dark'] .review-diff-code::-webkit-scrollbar-thumb,
 [data-theme='dark'] .review-diff-hunk-nav::-webkit-scrollbar-thumb,
@@ -865,6 +941,10 @@ summary:focus-visible {
 [data-theme='dark'] .diff-content::-webkit-scrollbar-thumb,
 [data-theme='dark'] .composer textarea::-webkit-scrollbar-thumb {
   background: rgb(255 255 255 / 15%);
+}
+
+[data-theme='dark'] .approval-message::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 25%);
 }
 
 [data-theme='dark'] .message-list:hover::-webkit-scrollbar-thumb,

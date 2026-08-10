@@ -20,10 +20,12 @@ export function PermissionModal({ request, onRespond }: PermissionModalProps) {
   const title = isPermissionRequest ? '权限审批' : '选择下一步';
   const emptyText = isPermissionRequest ? '暂无可用审批选项' : '暂无可用选项';
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
-  // 切换 request 时重置提交态（新请求可正常操作）
+  // 切换 request 时重置提交态并展开面板（新请求可正常操作、不遗漏审批）
   useEffect(() => {
     setIsSubmitting(false);
+    setCollapsed(false);
   }, [request.requestId]);
 
   const handleClick = async (optionId: string) => {
@@ -39,31 +41,44 @@ export function PermissionModal({ request, onRespond }: PermissionModalProps) {
   return (
     <div className="approval-dock-panel" role="presentation">
       <section
-        className="approval-modal"
+        className={`approval-modal${collapsed ? ' is-collapsed' : ''}`}
         role="dialog"
         aria-modal="false"
         aria-labelledby="approval-title"
       >
-        <h2 id="approval-title">{title}</h2>
-        <p>{request.message}</p>
-        <div className="modal-actions">
-          {request.options.length === 0 ? (
-            <span>{emptyText}</span>
-          ) : (
-            request.options.map((option) => (
-              <button
-                className={optionActionClass(option)}
-                key={option.optionId}
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => void handleClick(option.optionId)}
-              >
-                <span>{option.name}</span>
-                {option.description && <small>{option.description}</small>}
-              </button>
-            ))
-          )}
+        <div className="approval-modal-header">
+          <h2 id="approval-title">{title}</h2>
+          <button
+            type="button"
+            className="approval-collapse-btn"
+            aria-label={collapsed ? '展开审批面板' : '折叠审批面板'}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((c) => !c)}
+          >
+            {collapsed ? '▶' : '▼'}
+          </button>
         </div>
+        {!collapsed && <div className="approval-message">{request.message}</div>}
+        {!collapsed && (
+          <div className="modal-actions">
+            {request.options.length === 0 ? (
+              <span>{emptyText}</span>
+            ) : (
+              request.options.map((option) => (
+                <button
+                  className={optionActionClass(option)}
+                  key={option.optionId}
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => void handleClick(option.optionId)}
+                >
+                  <span>{option.name}</span>
+                  {option.description && <small>{option.description}</small>}
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </section>
     </div>
   );
