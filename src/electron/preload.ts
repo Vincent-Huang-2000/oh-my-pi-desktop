@@ -39,6 +39,7 @@ type AgentEvent = {
     | 'history_loaded';
   message: string;
   payload?: unknown;
+  settlesPrompt?: boolean;
 };
 
 type DiffSource = 'unstaged' | 'staged';

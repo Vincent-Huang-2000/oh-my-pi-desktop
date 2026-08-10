@@ -53,7 +53,7 @@ export const isProcessIdle = (
   pendingPermissions: Map<string, { process: AcpProcessState }>,
   pendingElicitations: Map<string, { process: AcpProcessState }>,
 ): boolean =>
-  !process.turnActive &&
+  process.turnInFlightCount === 0 &&
   !hasPendingForProcess(pendingPermissions, process) &&
   !hasPendingForProcess(pendingElicitations, process) &&
   process.questionnaireFollowUps.length === 0;

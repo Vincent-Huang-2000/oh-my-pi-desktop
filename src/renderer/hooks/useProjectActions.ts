@@ -40,7 +40,7 @@ export function useProjectActions(
     app.selectSession(null);
     app.setMessages([]);
     app.setLoadingHistorySessionId(null);
-    app.setIsAgentBusy(false);
+    app.resetAgentBusyCount(previousSessionId ?? '');
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -73,7 +73,7 @@ export function useProjectActions(
     app.selectSession(null);
     app.setMessages([]);
     app.setLoadingHistorySessionId(null);
-    app.setIsAgentBusy(false);
+    app.resetAgentBusyCount(previousSessionId ?? '');
     toolGroups.resetCollapsedToolGroupsForSession(previousSessionId);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -89,7 +89,7 @@ export function useProjectActions(
   };
 
   const handleSelectOmpPath = async () => {
-    if (app.isAgentBusy) {
+    if (app.canCancel) {
       const confirmed = window.confirm('当前有正在运行的对话，切换 omp 会中断该对话，是否继续？');
       if (!confirmed) {
         return;

@@ -394,7 +394,6 @@ export function useAgentEvents(
         if (app.selectedSessionRef.current?.id === event.sessionId) {
           app.setMessages(nextMessages);
           app.setAgentStatus('历史加载完成');
-          app.setIsAgentBusy(false);
           app.setHistoryScrollResetToken((value) => value + 1);
         }
         return;
@@ -427,6 +426,11 @@ export function useAgentEvents(
         event.payload && typeof event.payload === 'object'
           ? (event.payload as Record<string, unknown>).questionnaireRequestId
           : undefined;
+      if (typeof questionnaireRequestId === 'string' && event.type === 'user_message') {
+        // 问卷续发的 user_message 在 sendAgentMessage 之前发出——在此处 increment
+        // 确保后续 done/error 能正确 decrement，避免 race。
+        app.incrementAgentBusyCount(event.sessionId);
+      }
       if (
         typeof questionnaireRequestId === 'string' &&
         (event.type === 'status_update' || event.type === 'error')
@@ -443,12 +447,6 @@ export function useAgentEvents(
               : message,
           ),
         );
-        if (
-          event.type === 'status_update' &&
-          app.selectedSessionRef.current?.id === event.sessionId
-        ) {
-          app.setIsAgentBusy(true);
-        }
       }
 
       if (event.type === 'diff' && app.selectedSessionRef.current?.id === event.sessionId) {
@@ -456,22 +454,28 @@ export function useAgentEvents(
         app.setDiffStatus('agent 返回了 diff');
       }
 
+      // 计数器操作无条件（session 可能非选中，但其 in-flight turn 仍需结算）。
+      // done 事件仅来自 RPC 结算，始终安全；error 可能来自 stderr/启动/配置等
+      // 非 prompt 结算来源——仅 settlesPrompt 标记的 error 才对应一个 in-flight prompt。
+      if (event.type === 'done') {
+        app.decrementAgentBusyCount(event.sessionId);
+      } else if (event.type === 'error' && event.settlesPrompt) {
+        app.decrementAgentBusyCount(event.sessionId);
+      }
+
+      // UI 状态更新仅对当前选中 session
       if (event.type === 'done' && app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('完成');
-        app.setIsAgentBusy(false);
-        // 回合结束时自动收拢本轮工具组：扫描当前 session 消息流，找到最后一条 tool 消息的 id 作为 groupId。
-        // 用户可在执行期间临时展开；收到 done 后统一折叠，让已完成回合保持紧凑。
+        // 回合结束时自动收拢本轮工具组
         const list = app.messageCache.current[event.sessionId];
         const groupId = list ? toolGroups.findLatestToolGroupId(list) : undefined;
         if (groupId) {
           toolGroups.setGroupCollapsed(event.sessionId, groupId, true);
         }
-        // agent 可能刚写完文件或创建/切换了分支；回合结束时同步 Git 状态，让审查面板保持最新。
         void refreshGitBranches(app.selectedProjectRef.current);
         void refreshDiff(app.reviewSourceRef.current, app.selectedProjectRef.current);
       } else if (event.type === 'error' && app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('错误');
-        app.setIsAgentBusy(false);
       } else if (
         event.type === 'tool_call' &&
         app.selectedSessionRef.current?.id === event.sessionId
@@ -487,9 +491,6 @@ export function useAgentEvents(
       } else if (app.selectedSessionRef.current?.id === event.sessionId) {
         app.setAgentStatus('运行中');
       }
-
-      // omp 真正开始回包：收到 output / tool_call / plan / done / error 任一事件就清掉 pending 卡片，
-      // 让位给真正的回复流。即便 omp 直接 done/error 没输出 chunk，pending 也会一并清理，不会卡死。
       if (
         event.type === 'output' ||
         event.type === 'tool_call' ||

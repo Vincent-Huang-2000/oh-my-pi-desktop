@@ -96,8 +96,8 @@ export type AcpProcessState = {
   // buffer 用于 session/load 与 fork，suppress 用于只恢复配置的 session/resume。
   replayMode?: 'buffer' | 'suppress';
   replayEvents: AgentEvent[];
-  // 当前是否有 session/prompt 尚未结束；审批档位切换在回合结束前不得取消该请求。
-  turnActive: boolean;
+  // 当前未 settle 的 session/prompt RPC 计数；减到 0 才视为进程空闲。
+  turnInFlightCount: number;
   // 问卷提交后必须等当前 ACP 回合结束再续发，避免新 prompt 中断仍在执行的 eval。
   questionnaireFollowUps: QuestionnaireFollowUp[];
   // 活跃回合期间暂存目标档位；当前回合自然结束后，下一次 prompt 前重建运行环境。

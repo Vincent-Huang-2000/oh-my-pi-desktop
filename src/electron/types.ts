@@ -80,6 +80,8 @@ export type AgentEvent = {
     | 'history_loaded';
   message: string;
   payload?: unknown;
+  /** 标记此事件结算了一个 in-flight prompt（done/RPC error/问卷续发失败）。渲染层用于递减 agentBusyCount。 */
+  settlesPrompt?: boolean;
 };
 
 export type AcpAvailableCommand = {

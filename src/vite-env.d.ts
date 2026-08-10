@@ -104,6 +104,8 @@ type AgentEvent = {
     | 'history_loaded';
   message: string;
   payload?: unknown;
+  /** 标记此事件结算了一个 in-flight prompt。 */
+  settlesPrompt?: boolean;
 };
 
 type DiffSource = 'unstaged' | 'staged';

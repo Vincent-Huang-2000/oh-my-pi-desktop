@@ -41,7 +41,7 @@ const makeProcessState = (overrides: Partial<AcpProcessState> = {}): AcpProcessS
     closed: false,
     isReplaying: false,
     replayEvents: [],
-    turnActive: false,
+    turnInFlightCount: 0,
     questionnaireFollowUps: [],
     ...overrides,
   }) as AcpProcessState;
@@ -130,8 +130,8 @@ describe('isProcessIdle', () => {
     expect(isProcessIdle(process, permMap, elicMap)).toBe(true);
   });
 
-  it('turnActive: true → false', () => {
-    const busy = makeProcessState({ turnActive: true });
+  it('turnInFlightCount > 0 → false', () => {
+    const busy = makeProcessState({ turnInFlightCount: 1 });
     expect(isProcessIdle(busy, permMap, elicMap)).toBe(false);
   });
 
@@ -155,7 +155,7 @@ describe('isProcessIdle', () => {
   it('多个忙条件同时满足 → false', () => {
     const permWithProc = new Map([['r1', { process }]]);
     const busy = makeProcessState({
-      turnActive: true,
+      turnInFlightCount: 1,
       questionnaireFollowUps: [{ requestId: 'q1', text: 'follow-up' }],
     });
     expect(isProcessIdle(busy, permWithProc, elicMap)).toBe(false);
@@ -198,7 +198,7 @@ describe('decideApprovalProfileAction', () => {
     const session = makeStoredSession({ approvalProfile: 'write' });
     const action = decideApprovalProfileAction(
       session,
-      makeProcessState({ turnActive: true }),
+      makeProcessState({ turnInFlightCount: 1 }),
     ) as Extract<ApprovalProfileAction, { kind: 'defer' }>;
     expect(action).toEqual({ kind: 'defer', approvalProfile: 'write' });
   });

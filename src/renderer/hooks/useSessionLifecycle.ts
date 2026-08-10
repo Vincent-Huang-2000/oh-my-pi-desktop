@@ -96,7 +96,6 @@ export function useSessionLifecycle(
     app.selectSession(session);
     const cached = app.messageCache.current[session.id] ?? [];
     app.setMessages(cached);
-    app.setIsAgentBusy(false);
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -231,7 +230,7 @@ export function useSessionLifecycle(
       app.selectSession(null);
       app.setMessages([]);
       app.setLoadingHistorySessionId(null);
-      app.setIsAgentBusy(false);
+      app.resetAgentBusyCount(session.id);
       app.setAcpConfigOptions([]);
       app.setDraftConfigValues({});
       app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -284,7 +283,6 @@ export function useSessionLifecycle(
     app.setMessages([]);
     app.setLoadingHistorySessionId(newLocalId);
     app.setAgentStatus('Fork 中，正在加载历史');
-    app.setIsAgentBusy(false);
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
@@ -372,7 +370,6 @@ export function useSessionLifecycle(
     app.setMessages([]);
     app.setLoadingHistorySessionId(null);
     app.setAgentStatus('空闲');
-    app.setIsAgentBusy(false);
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);

@@ -131,7 +131,13 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
     if (result.ok) {
       if (isCurrentSession) {
         app.setApprovalRestoreFailed(false);
-        app.setAgentStatus('审批档位已保存');
+        if (result.deferred) {
+          app.setApprovalProfileNotice(result.message ?? '审批档位将在下次发送消息后生效');
+          app.setAgentStatus('审批档位已保存（待生效）');
+        } else {
+          app.setApprovalProfileNotice('');
+          app.setAgentStatus('审批档位已保存');
+        }
       }
       return;
     }

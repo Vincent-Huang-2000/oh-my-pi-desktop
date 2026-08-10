@@ -106,7 +106,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     // 从缓存+草稿覆盖切换到空的 app.acpConfigOptions，导致顶栏选择器短暂显示"模型未加载"。
     app.selectSession(session);
     app.setAgentStatus('运行中');
-    app.setIsAgentBusy(true);
+    app.incrementAgentBusyCount(session.id);
     // 立即在底部插入「正在执行 slash 命令」卡片：仅当用户输入是合法 slash 命令时设置，
     // 由 onAgentEvent 收到首个 output/tool_call/plan/done/error 时清掉。
     const parsed = parseSlashCommand(text);
@@ -156,7 +156,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
       },
     );
     if (!result.ok) {
-      app.setIsAgentBusy(false);
+      app.decrementAgentBusyCount(session.id);
       app.setAgentStatus(result.message ?? '错误');
     }
     await app.reloadState();
@@ -212,7 +212,6 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     if (result.ok) {
       app.clearApprovalStateForSession(app.selectedSession.id, { alsoClearActive: true });
       app.setAgentStatus('正在取消');
-      app.setIsAgentBusy(false);
     } else {
       app.setAgentStatus('取消失败');
     }

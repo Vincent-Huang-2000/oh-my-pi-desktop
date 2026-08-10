@@ -99,7 +99,39 @@ export function useAppCore() {
   // 用户指定的 omp 可执行文件路径；空字符串表示使用 PATH 中的 'omp'。
   const [ompPath, setOmpPath] = useState('');
   const [, setAgentStatus] = useState('空闲');
-  const [isAgentBusy, setIsAgentBusy] = useState(false);
+  // 按 sessionId 分桶的 in-flight prompt 计数；减到 0 该 session 视为空闲。
+  const [agentBusyCountBySession, setAgentBusyCountBySession] = useState<Record<string, number>>(
+    {},
+  );
+
+  // 当前选中 session 是否有 in-flight turn；驱动停止按钮和全局忙判定。
+  const canCancel = selectedSession
+    ? (agentBusyCountBySession[selectedSession.id] ?? 0) > 0
+    : false;
+
+  const incrementAgentBusyCount = (sessionId: string) => {
+    setAgentBusyCountBySession((prev) => ({
+      ...prev,
+      [sessionId]: (prev[sessionId] ?? 0) + 1,
+    }));
+  };
+
+  const decrementAgentBusyCount = (sessionId: string) => {
+    setAgentBusyCountBySession((prev) => {
+      const current = prev[sessionId] ?? 0;
+      if (current <= 0) return prev;
+      return { ...prev, [sessionId]: current - 1 };
+    });
+  };
+
+  const resetAgentBusyCount = (sessionId: string) => {
+    if (!sessionId) return;
+    setAgentBusyCountBySession((prev) => {
+      if (!(sessionId in prev)) return prev;
+      const { [sessionId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
   // 项目展开态独立于选中态：允许多个项目同时展开，且点击项目不再改变最近项目排序。
   const [expandedProjectPaths, setExpandedProjectPaths] = useState<string[]>([]);
@@ -419,7 +451,7 @@ export function useAppCore() {
     pendingAttachments,
     ompStatus,
     ompPath,
-    isAgentBusy,
+    canCancel,
     sessionSearchOpen,
     expandedProjectPaths,
     acpConfigOptions,
@@ -451,7 +483,9 @@ export function useAppCore() {
     setOmpStatus,
     setOmpPath,
     setAgentStatus,
-    setIsAgentBusy,
+    incrementAgentBusyCount,
+    decrementAgentBusyCount,
+    resetAgentBusyCount,
     setSessionSearchOpen,
     setExpandedProjectPaths,
     setAcpConfigOptions,

@@ -85,7 +85,7 @@ import {
 } from './agentPlan.js';
 
 // ── 审批档位切换的判定辅助 ──
-import { decideApprovalProfileAction, isProcessIdle } from './approvalProfile.js';
+import { decideApprovalProfileAction } from './approvalProfile.js';
 // ── 重导出公共类型，保持向后兼容 ──
 
 export type {
@@ -133,8 +133,6 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     return normalizeApprovalProfile(session?.approvalProfile);
   };
 
-  const isProcessIdleForSession = (process: AcpProcessState) =>
-    isProcessIdle(process, pendingPermissions, pendingElicitations);
   const clearPendingPermissionsForProcess = (process: AcpProcessState) => {
     pendingPermissions.forEach((pending, requestId) => {
       if (pending.process === process) {
@@ -875,7 +873,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       closed: false,
       isReplaying: false,
       replayEvents: [],
-      turnActive: false,
+      turnInFlightCount: 0,
       questionnaireFollowUps: [],
     };
     agentProcesses.set(sessionId, processState);
@@ -992,11 +990,15 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       processState =
         (await restartAgentForWorkspace(sessionId, workspacePath, cwdSwitchProfile)) ?? undefined;
     }
-    // 活跃回合中切换的档位会在当前回合自然结束后、下一次 prompt 前生效。
-    if (processState && !processState.closed && processState.pendingApprovalProfile) {
-      if (!isProcessIdleForSession(processState)) {
-        return { ok: false, message: '当前回合尚未结束，审批档位将在结束后生效' };
-      }
+    // 活跃回合中切换的档位延迟到所有 in-flight turn settle 后、下一次 prompt 前生效。
+    // 仅以 turnInFlightCount 判定——permissions/elicitations/问卷续发不阻塞档位应用。
+    // 无论进程当前是否空闲，消息照常发送——不拒绝、不丢消息。
+    if (
+      processState &&
+      !processState.closed &&
+      processState.pendingApprovalProfile &&
+      processState.turnInFlightCount === 0
+    ) {
       const pendingProfile = processState.pendingApprovalProfile;
       processState.pendingApprovalProfile = undefined;
       const session = readState().recentSessions.find(
@@ -1039,23 +1041,20 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       acpSessionId = await ensureAcpSession(processState);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ACP session 创建失败';
-      if (!processState.suppressCloseEvent) {
-        emitEvent({ sessionId, type: 'error', message });
-      }
       return { ok: false, message };
     }
     const promptBlocks = buildPromptBlocks(content);
     if (promptBlocks.length === 0) {
       return { ok: false, message: '没有可发送的内容' };
     }
-    processState.turnActive = true;
+    processState.turnInFlightCount++;
     const promptRequest = sendRequest(processState, 'session/prompt', {
       sessionId: acpSessionId,
       prompt: promptBlocks,
     });
     promptRequest.then(
       (response) => {
-        processState.turnActive = false;
+        processState.turnInFlightCount = Math.max(0, processState.turnInFlightCount - 1);
         if (processState.suppressCloseEvent) {
           return;
         }
@@ -1068,15 +1067,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           type: 'done',
           message: `agent 回合结束：${stopReason}`,
           payload: response,
+          settlesPrompt: true,
         });
         void dispatchQuestionnaireFollowUp(processState);
       },
       (error: Error) => {
-        processState.turnActive = false;
+        processState.turnInFlightCount = Math.max(0, processState.turnInFlightCount - 1);
         if (processState.suppressCloseEvent) {
           return;
         }
-        emitEvent({ sessionId, type: 'error', message: error.message });
+        emitEvent({ sessionId, type: 'error', message: error.message, settlesPrompt: true });
       },
     );
 
@@ -1125,6 +1125,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         type: 'error',
         message: result.message ?? '问卷答案续发失败',
         payload: { questionnaireRequestId: followUp.requestId },
+        settlesPrompt: true,
       });
       return;
     }

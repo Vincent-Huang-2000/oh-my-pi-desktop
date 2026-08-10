@@ -158,7 +158,7 @@ export default function App() {
           pendingAttachments={app.pendingAttachments}
           selectedProject={app.selectedProject}
           selectedSession={app.selectedSession}
-          canCancel={app.isAgentBusy}
+          canCancel={app.canCancel}
           availableCommands={app.displayedCommands}
           pendingSlashCommand={app.pendingSlashCommand}
           collapsedToolGroups={toolGroups.collapsedToolGroups}
