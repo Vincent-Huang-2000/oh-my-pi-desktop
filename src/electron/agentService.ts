@@ -9,8 +9,8 @@
  *   config 读写、session 列表/加载/恢复/fork/关闭、审批档位切换）。
  *
  * 实现：
- * - 闭包内持有 agentProcesses / pendingPermissions / pendingElicitations
- *   三张状态表，所有内部函数通过闭包共享这些状态。
+ * - 闭包内持有 agentProcesses / pendingPermissions / pendingElicitations /
+ *   approvalProfileOperationTails 四张状态表，所有内部函数通过闭包共享这些状态。
  * - 类型定义 → agentTypes；纯工具函数 → agentUtils；
  *   问卷解析 → agentQuestionnaire；方案操作 → agentPlan。
  * - 通过 re-export 保持对 ipc.ts / main.ts 的向后兼容。

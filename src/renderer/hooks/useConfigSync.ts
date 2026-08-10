@@ -4,7 +4,7 @@
  * 处理四个 config 选项的切换逻辑：
  * - model / mode / thinking：无选中 session 时更新 draftConfigValues（占位草稿），
  *   有 session 时走 IPC setAgentConfigOption 实时生效。
- * - approvalProfile：活跃回合只暂存新档位并保留当前审批；空闲会话立即重建 ACP。
+ * - approvalProfile：暂存新档位并标记 pendingApprovalProfile；进程重建统一推迟到下次消息发送前执行。
  */
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
 import type { useAppCore } from './useAppCore';
