@@ -20,7 +20,9 @@
     "lint": "npm run typecheck && npm run eslint && npm run stylelint && npm run format:check",
     "dist:win": "npm run build && electron-builder --win portable",
     "start": "electron .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
@@ -48,6 +50,7 @@
     "globals": "^17.9.0",
     "stylelint": "^17.14.1",
     "stylelint-config-standard": "^40.0.0",
+    "vitest": "^4.1.10",
     "typescript-eslint": "^8.66.0",
     "wait-on": "^8.0.0"
   },

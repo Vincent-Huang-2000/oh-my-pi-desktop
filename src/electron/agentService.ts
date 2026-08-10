@@ -54,7 +54,6 @@ import type {
   SessionActionResult,
   SessionNotification,
 } from './agentTypes.js';
-import { APPROVAL_SWITCH_CANCEL_TIMEOUT_MS } from './agentTypes.js';
 import {
   getLogLevel,
   isJsonRpcRequest,
@@ -85,6 +84,8 @@ import {
   getAcpActivePlan,
 } from './agentPlan.js';
 
+// ── 审批档位切换的判定辅助 ──
+import { decideApprovalProfileAction, isProcessIdle } from './approvalProfile.js';
 // ── 重导出公共类型，保持向后兼容 ──
 
 export type {
@@ -101,26 +102,39 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const agentProcesses = new Map<string, AcpProcessState>();
   const pendingPermissions = new Map<string, PendingPermissionRequest>();
   const pendingElicitations = new Map<string, PendingElicitationRequest>();
+  // 同一 session 的审批档位更新必须串行：后一更新等待前一更新的
+  // stopSessionProcess / attachToAcpSession 或其失败分支完成后才执行，
+  // 防止旧失败路径删除或停止新启动的子进程。
+  const approvalProfileOperationTails = new Map<string, Promise<void>>();
+  const runSessionApprovalProfileOperation = async <T>(
+    sessionId: string,
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    const previous = approvalProfileOperationTails.get(sessionId) ?? Promise.resolve();
+    let releaseCurrent: () => void = () => {};
+    const currentGate = new Promise<void>((resolve) => {
+      releaseCurrent = resolve;
+    });
+    const currentTail = previous.catch(() => undefined).then(() => currentGate);
+    approvalProfileOperationTails.set(sessionId, currentTail);
+    await previous.catch(() => undefined);
+    try {
+      return await operation();
+    } finally {
+      releaseCurrent();
+      if (approvalProfileOperationTails.get(sessionId) === currentTail) {
+        approvalProfileOperationTails.delete(sessionId);
+      }
+    }
+  };
 
   const getStoredApprovalProfile = (sessionId: string) => {
     const session = readState().recentSessions.find((item) => item.id === sessionId);
     return normalizeApprovalProfile(session?.approvalProfile);
   };
 
-  const hasPendingPermissionsForProcess = (process: AcpProcessState) => {
-    return Array.from(pendingPermissions.values()).some((pending) => pending.process === process);
-  };
-
-  const waitForTurnToSettle = async (
-    process: AcpProcessState,
-    timeoutMs = APPROVAL_SWITCH_CANCEL_TIMEOUT_MS,
-  ) => {
-    const startedAt = Date.now();
-    while (process.turnActive && Date.now() - startedAt < timeoutMs) {
-      await new Promise<void>((resolve) => setTimeout(resolve, 50));
-    }
-  };
-
+  const isProcessIdleForSession = (process: AcpProcessState) =>
+    isProcessIdle(process, pendingPermissions, pendingElicitations);
   const clearPendingPermissionsForProcess = (process: AcpProcessState) => {
     pendingPermissions.forEach((pending, requestId) => {
       if (pending.process === process) {
@@ -802,7 +816,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
     process.child.on('close', (code) => {
       process.closed = true;
-      agentProcesses.delete(process.localSessionId);
+      // 旧进程退出可能晚于同 session 的新进程启动；只能移除自身，不能误删新映射。
+      if (agentProcesses.get(process.localSessionId) === process) {
+        agentProcesses.delete(process.localSessionId);
+      }
       process.questionnaireFollowUps = [];
       clearPendingPermissionsForProcess(process);
       clearPendingElicitationsForProcess(process);
@@ -874,10 +891,15 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       await processState.ready;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'ACP 初始化失败';
-      agentProcesses.delete(sessionId);
+      // 仅在当前 session 映射仍指向本进程时清理映射并发出错误事件；
+      // 若在 await processState.ready 期间进程已被替换，只杀掉旧子进程自身。
+      const isCurrentProcess = agentProcesses.get(sessionId) === processState;
       processState.suppressCloseEvent = true;
       processState.child.kill();
-      emitEvent({ sessionId, type: 'error', message });
+      if (isCurrentProcess) {
+        agentProcesses.delete(sessionId);
+        emitEvent({ sessionId, type: 'error', message });
+      }
       return { ok: false, message };
     }
 
@@ -962,12 +984,39 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         'info',
         `执行目录切换（${processState.workspacePath} → ${workspacePath}），重启 agent 子进程`,
       );
+      const cwdSwitchProfile =
+        processState.pendingApprovalProfile ??
+        processState.approvalProfile ??
+        getStoredApprovalProfile(sessionId);
+      processState.pendingApprovalProfile = undefined;
       processState =
-        (await restartAgentForWorkspace(
+        (await restartAgentForWorkspace(sessionId, workspacePath, cwdSwitchProfile)) ?? undefined;
+    }
+    // 活跃回合中切换的档位会在当前回合自然结束后、下一次 prompt 前生效。
+    if (processState && !processState.closed && processState.pendingApprovalProfile) {
+      if (!isProcessIdleForSession(processState)) {
+        return { ok: false, message: '当前回合尚未结束，审批档位将在结束后生效' };
+      }
+      const pendingProfile = processState.pendingApprovalProfile;
+      processState.pendingApprovalProfile = undefined;
+      const session = readState().recentSessions.find(
+        (s) => s.id === sessionId && s.projectPath === workspacePath,
+      );
+      if (session?.acpSessionId) {
+        addLog(sessionId, 'info', `应用延迟审批档位：${pendingProfile}`);
+        stopSessionProcess(sessionId);
+        const restored = await attachToAcpSession(
           sessionId,
           workspacePath,
-          processState.approvalProfile ?? getStoredApprovalProfile(sessionId),
-        )) ?? undefined;
+          session.acpSessionId,
+          'session/resume',
+          pendingProfile,
+        );
+        if (!restored.ok) {
+          return { ok: false, message: `审批档位切换失败：${restored.message}` };
+        }
+        processState = agentProcesses.get(sessionId);
+      }
     }
     if (!processState) {
       const result = await startAgent(
@@ -1176,6 +1225,30 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return { ok: false, message };
     }
   };
+  const cancelActiveTurnForProcess = (
+    processState: AcpProcessState,
+    statusMessage: string,
+  ): void => {
+    cancelPendingPermissionsForProcess(processState);
+    cancelPendingElicitationsForProcess(processState);
+    processState.questionnaireFollowUps = [];
+    try {
+      writeMessage(processState, {
+        jsonrpc: '2.0',
+        method: 'session/cancel',
+        params: { sessionId: processState.acpSessionId },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '发送取消请求失败';
+      addLog(processState.localSessionId, 'error', `${statusMessage}：${message}`);
+    }
+    emitEvent({
+      sessionId: processState.localSessionId,
+      type: 'status_update',
+      message: statusMessage,
+    });
+  };
+
   // eslint-disable-next-line @typescript-eslint/require-await -- AgentService 接口要求返回 Promise
   const cancelTurn = async (sessionId: string) => {
     const processState = agentProcesses.get(sessionId);
@@ -1183,15 +1256,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return { ok: false, message: '没有可取消的 ACP 回合' };
     }
 
-    cancelPendingPermissionsForProcess(processState);
-    cancelPendingElicitationsForProcess(processState);
-    processState.questionnaireFollowUps = [];
-    writeMessage(processState, {
-      jsonrpc: '2.0',
-      method: 'session/cancel',
-      params: { sessionId: processState.acpSessionId },
-    });
-    emitEvent({ sessionId, type: 'status_update', message: '已请求取消当前回合' });
+    cancelActiveTurnForProcess(processState, '已请求取消当前回合');
     return { ok: true };
   };
 
@@ -1501,74 +1566,50 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     }
   };
 
-  // 切换审批档位会重建该会话的 omp acp 进程；ACP mode/config 与消息缓存保持不变。
+  // 切换审批档位时永远只做持久化 + 标记 pendingApprovalProfile，
+  // 真正的进程重建统一推迟到 sendAgentMessage 发送消息那一刻执行。
   const updateApprovalProfile = async (
     sessionId: string,
     workspacePath: string,
     approvalProfile: ApprovalProfile,
   ) => {
-    const storedSession = readState().recentSessions.find(
-      (session) => session.id === sessionId && session.projectPath === workspacePath,
-    );
-    if (!storedSession) {
-      return { ok: false, message: '当前会话不存在，请重新打开后再试' };
-    }
-    let interruptionMessage = '';
-    const processState = agentProcesses.get(sessionId);
-    if (
-      processState &&
-      (processState.turnActive || hasPendingPermissionsForProcess(processState))
-    ) {
-      try {
-        const cancelled = await cancelTurn(sessionId);
-        if (cancelled.ok) {
-          await waitForTurnToSettle(processState);
-          if (processState.turnActive) {
-            interruptionMessage = '当前回合未能及时结束，已终止旧运行环境并完成切换';
-          }
-        } else {
-          interruptionMessage = '当前回合未能正常取消，已终止旧运行环境并完成切换';
-        }
-      } catch (error) {
-        addLog(
-          sessionId,
-          'error',
-          `切换审批档位前取消回合失败：${error instanceof Error ? error.message : '未知原因'}`,
-        );
-        interruptionMessage = '当前回合未能正常取消，已终止旧运行环境并完成切换';
+    // eslint-disable-next-line @typescript-eslint/require-await -- FIFO 队列契约要求返回 Promise
+    return runSessionApprovalProfileOperation(sessionId, async () => {
+      const storedSession = readState().recentSessions.find(
+        (session) => session.id === sessionId && session.projectPath === workspacePath,
+      );
+      if (!storedSession) {
+        return { ok: false, message: '当前会话不存在，请重新打开后再试' };
       }
-    }
-    stopSessionProcess(sessionId);
 
-    const session = updateSessionApprovalProfile(sessionId, approvalProfile);
-    if (!session) {
-      return { ok: false, message: '审批档位保存失败，请重试' };
-    }
-    if (!session.acpSessionId) {
-      return { ok: true, session, message: interruptionMessage || undefined };
-    }
+      // 先持久化并同步进程内存态，避免旧进程的 session_info_update 覆盖目标档位。
+      const session = updateSessionApprovalProfile(sessionId, approvalProfile);
+      if (!session) {
+        return { ok: false, message: '审批档位保存失败，请重试' };
+      }
 
-    const restored = await attachToAcpSession(
-      sessionId,
-      workspacePath,
-      session.acpSessionId,
-      'session/resume',
-      approvalProfile,
-    );
-    if (!restored.ok) {
+      const processState = agentProcesses.get(sessionId);
+      const action = decideApprovalProfileAction(session, processState);
+      if (action.kind === 'noop') {
+        // 无进程或无 acpSessionId：下次 sendAgentMessage 自然会读取持久化档位
+        return { ok: true, session };
+      }
+
+      // action.kind === 'defer'：进程存在且未关闭，暂存档位等待下次发送时应用
+      processState!.approvalProfile = action.approvalProfile;
+      processState!.pendingApprovalProfile = action.approvalProfile;
       addLog(
         sessionId,
-        'error',
-        `审批档位已保存，但运行环境恢复失败：${restored.message ?? '未知原因'}`,
+        'info',
+        `审批档位切换已暂存：${action.approvalProfile}（将在下次对话时生效）`,
       );
-      stopSessionProcess(sessionId);
       return {
-        ok: false,
+        ok: true,
         session,
-        message: '审批档位已保存，但运行环境恢复失败，可重试',
+        deferred: true,
+        message: '审批档位已保存，将在下次对话中生效',
       };
-    }
-    return { ok: true, session, message: interruptionMessage || undefined };
+    });
   };
 
   // 关闭 session（向 agent 发 session/close），并杀掉本地子进程释放资源。

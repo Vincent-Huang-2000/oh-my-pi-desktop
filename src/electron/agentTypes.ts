@@ -96,11 +96,12 @@ export type AcpProcessState = {
   // buffer 用于 session/load 与 fork，suppress 用于只恢复配置的 session/resume。
   replayMode?: 'buffer' | 'suppress';
   replayEvents: AgentEvent[];
-  // 当前是否有 session/prompt 尚未结束，用于切换审批档位前受控取消。
+  // 当前是否有 session/prompt 尚未结束；审批档位切换在回合结束前不得取消该请求。
   turnActive: boolean;
   // 问卷提交后必须等当前 ACP 回合结束再续发，避免新 prompt 中断仍在执行的 eval。
   questionnaireFollowUps: QuestionnaireFollowUp[];
-  // 主动停止子进程后不再向渲染端广播后续进程事件，避免污染对应 session 的消息缓存。
+  // 活跃回合期间暂存目标档位；当前回合自然结束后，下一次 prompt 前重建运行环境。
+  pendingApprovalProfile?: ApprovalProfile;
   suppressCloseEvent?: boolean;
 };
 
@@ -255,7 +256,7 @@ export type AgentService = {
     sessionId: string,
     workspacePath: string,
     approvalProfile: ApprovalProfile,
-  ) => Promise<{ ok: boolean; session?: StoredSession; message?: string }>;
+  ) => Promise<{ ok: boolean; session?: StoredSession; deferred?: boolean; message?: string }>;
   cancelTurn: (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
   respondPermissionOption: (
     requestId: string,

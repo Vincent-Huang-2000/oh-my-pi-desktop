@@ -4,17 +4,10 @@
  * 处理四个 config 选项的切换逻辑：
  * - model / mode / thinking：无选中 session 时更新 draftConfigValues（占位草稿），
  *   有 session 时走 IPC setAgentConfigOption 实时生效。
- * - approvalProfile：切换审批档位会重启 agent 子进程，
- *   需弹 confirm 确认（繁忙时额外警告"会取消当前回合"）。
- *
- * ## 维护
- * - handleApprovalProfileChange 切换前后各调一次 clearApprovalStateForSession，
- *   覆盖取消/终止窗口内可能到达的旧审批事件。
- * - 审批档位切换失败设 approvalRestoreFailed=true，UI 显示红色错误提示。
+ * - approvalProfile：活跃回合只暂存新档位并保留当前审批；空闲会话立即重建 ACP。
  */
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
 import type { useAppCore } from './useAppCore';
-
 export function useConfigSync(app: ReturnType<typeof useAppCore>) {
   const handleModelChange = async (modelId: string) => {
     if (!app.selectedProject || !modelId) {
@@ -100,37 +93,28 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
     if (existingProfile === approvalProfile && !app.approvalRestoreFailed) {
       return;
     }
-    const willInterrupt =
-      app.isAgentBusy ||
-      Boolean(app.permissionRequest) ||
-      Boolean(app.elicitationRequest) ||
-      Boolean(app.questionnaireRequest);
-    const confirmed = window.confirm(
-      willInterrupt
-        ? '切换审批档位会取消当前回合，未完成的操作可能中断，并重启当前会话的 agent 运行环境。是否继续？'
-        : '切换审批档位会重启当前会话的 agent 运行环境。是否继续？',
-    );
-    if (!confirmed) {
-      return;
-    }
 
-    // 旧进程的审批请求即将失效，先清理当前会话的渲染缓存，避免留下可操作弹窗。
-    app.clearApprovalStateForSession(app.selectedSession.id, { alsoClearActive: true });
-    app.setIsAgentBusy(false);
-    app.setAgentStatus('正在切换审批档位');
+    const sessionId = app.selectedSession.id;
+    const workspacePath = app.selectedProject.path;
+
+    // 乐观更新本地状态，用户立即看到 UI 变化。
+    app.updateSelectedSession((current) =>
+      current?.id === sessionId ? { ...current, approvalProfile } : current,
+    );
     app.setApprovalProfileNotice('');
+    app.setAgentStatus('正在切换审批档位');
+
     const result = await window.ohMyPiDesktop
-      .updateSessionApprovalProfile(
-        app.selectedSession.id,
-        app.selectedProject.path,
-        approvalProfile,
-      )
+      .updateSessionApprovalProfile(sessionId, workspacePath, approvalProfile)
       .catch((error: unknown) => {
         console.error('updateSessionApprovalProfile failed:', error);
-        return { ok: false, session: undefined, message: '审批档位切换失败，请重试' };
+        return {
+          ok: false,
+          deferred: false,
+          session: undefined,
+          message: '审批档位切换失败，请重试',
+        };
       });
-    // IPC 完成后再清一次，覆盖取消与终止窗口内可能刚到达的旧 permission 事件。
-    app.clearApprovalStateForSession(app.selectedSession.id, { alsoClearActive: true });
 
     const updatedSession = result.session;
     if (updatedSession) {
@@ -140,19 +124,22 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
           session.id === updatedSession.id ? updatedSession : session,
         ),
       }));
-      app.updateSelectedSession((current) =>
-        current?.id === updatedSession.id ? updatedSession : current,
-      );
     }
+
+    const isCurrentSession =
+      app.selectedSession?.id === sessionId && app.selectedProject?.path === workspacePath;
     if (result.ok) {
-      app.setApprovalRestoreFailed(false);
-      app.setApprovalProfileNotice(result.message ?? '');
-      app.setAgentStatus('审批档位已切换');
+      if (isCurrentSession) {
+        app.setApprovalRestoreFailed(false);
+        app.setAgentStatus('审批档位已保存');
+      }
       return;
     }
-    app.setApprovalRestoreFailed(Boolean(result.session));
-    app.setApprovalProfileNotice(result.message ?? '审批档位切换失败，请重试');
-    app.setAgentStatus('审批档位切换失败');
+    if (isCurrentSession) {
+      app.setApprovalRestoreFailed(Boolean(result.session));
+      app.setApprovalProfileNotice(result.message ?? '审批档位切换失败，请重试');
+      app.setAgentStatus('审批档位切换失败');
+    }
   };
 
   return { handleModelChange, handleModeChange, handleThinkingChange, handleApprovalProfileChange };

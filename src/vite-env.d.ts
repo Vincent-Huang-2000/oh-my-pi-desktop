@@ -196,7 +196,7 @@ interface Window {
       sessionId: string,
       workspacePath: string,
       approvalProfile: ApprovalProfile,
-    ) => Promise<{ ok: boolean; session?: StoredSession; message?: string }>;
+    ) => Promise<{ ok: boolean; session?: StoredSession; deferred?: boolean; message?: string }>;
     cancelAgentTurn: (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
     permissionResponse: (
       requestId: string,
