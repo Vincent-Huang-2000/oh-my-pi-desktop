@@ -79,6 +79,8 @@ export default function App() {
           selectedSession={app.selectedSession}
           sessionsForProject={app.sessionsForProject}
           expandedProjectPaths={app.expandedProjectPaths}
+          agentBusyCountBySession={app.agentBusyCountBySession}
+          recentlyCompletedSessions={app.recentlyCompletedSessions}
           onSelectWorkspace={() => void projectActions.handleSelectWorkspace()}
           onToggleProjectExpanded={projectActions.toggleProjectExpanded}
           onNewSession={() => void sessionLifecycle.handleNewSession()}
@@ -280,6 +282,8 @@ export default function App() {
             selectedSession={app.selectedSession}
             sessionsForProject={app.sessionsForProject}
             expandedProjectPaths={app.expandedProjectPaths}
+            agentBusyCountBySession={app.agentBusyCountBySession}
+            recentlyCompletedSessions={app.recentlyCompletedSessions}
             onSelectWorkspace={() => {
               paneLayout.closeLeftPreview();
               void projectActions.handleSelectWorkspace();

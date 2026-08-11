@@ -458,7 +458,7 @@ export function useAgentEvents(
       // done 事件仅来自 RPC 结算，始终安全；error 可能来自 stderr/启动/配置等
       // 非 prompt 结算来源——仅 settlesPrompt 标记的 error 才对应一个 in-flight prompt。
       if (event.type === 'done') {
-        app.decrementAgentBusyCount(event.sessionId);
+        app.settlePromptTurn(event.sessionId);
       } else if (event.type === 'error' && event.settlesPrompt) {
         app.decrementAgentBusyCount(event.sessionId);
       }

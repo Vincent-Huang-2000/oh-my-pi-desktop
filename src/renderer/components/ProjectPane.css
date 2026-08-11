@@ -335,12 +335,11 @@
   content: '';
 }
 
-/* session 行主体（标题 + 时间）：点击切换会话，撑满左侧剩余空间。 */
+/* session 行主体（标题 + 指示器 + 时间）：点击切换会话，撑满左侧剩余空间。 */
 .session-item-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-height: 32px;
   padding: 6px 4px;
   background: transparent;
@@ -353,6 +352,42 @@
 
 .session-item-main:hover {
   color: var(--color-text);
+}
+
+/* ── session 运行中指示器：脉动圆点 ── */
+.session-busy-indicator {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent-strong);
+  animation: session-busy-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes session-busy-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+/* ── session 刚完成指示器：绿色勾 ── */
+.session-completed-indicator {
+  flex: 0 0 auto;
+  color: var(--color-accent-strong);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── 运行中的 session 行微调 ── */
+.session-item.session-busy .session-title {
+  color: var(--color-accent-strong);
 }
 
 /* session 行右侧 ⋯ 操作区：与项目行一致，默认半透明可见，hover/选中/菜单展开时全不透明。
@@ -409,6 +444,7 @@
 }
 
 .session-title {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

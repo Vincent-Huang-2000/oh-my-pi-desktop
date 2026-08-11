@@ -85,6 +85,10 @@ type ProjectPaneProps = {
   selectedSession: StoredSession | null;
   sessionsForProject: StoredSession[];
   expandedProjectPaths: string[];
+  // 按 sessionId 分桶的 in-flight prompt 计数；减到 0 该 session 视为空闲。
+  agentBusyCountBySession: Record<string, number>;
+  // 最近完成（done 事件触发）的 session ID 集合；UI 短暂显示完成标记。
+  recentlyCompletedSessions: Set<string>;
   onSelectWorkspace: () => void;
   onToggleProjectExpanded: (projectPath: string) => void;
   // 顶部操作区：作用于当前执行目录（selectedProject）。
@@ -135,6 +139,8 @@ type ProjectGroupItemProps = {
   isExpanded: boolean;
   sessions: StoredSession[];
   selectedSession: StoredSession | null;
+  agentBusyCountBySession: Record<string, number>;
+  recentlyCompletedSessions: Set<string>;
   onToggleExpanded: (path: string) => void;
   onSelectSession: (project: StoredProject, session: StoredSession) => void;
   onTogglePinned: (project: StoredProject) => void;
@@ -167,6 +173,10 @@ type SessionItemProps = {
   project: StoredProject;
   session: StoredSession;
   isSelected: boolean;
+  // session 正在运行中（in-flight prompt 计数 > 0）
+  isBusy: boolean;
+  // session 刚刚完成，短暂显示完成标记
+  isJustCompleted: boolean;
   isMenuOpen: boolean;
   onToggleMenu: () => void;
   onCloseMenu: () => void;
@@ -175,11 +185,12 @@ type SessionItemProps = {
   onClose: (project: StoredProject, session: StoredSession) => void;
   onReveal: (project: StoredProject) => void;
 };
-
 function SessionItem({
   project,
   session,
   isSelected,
+  isBusy,
+  isJustCompleted,
   isMenuOpen,
   onToggleMenu,
   onCloseMenu,
@@ -189,8 +200,16 @@ function SessionItem({
   onReveal,
 }: SessionItemProps) {
   const canFork = Boolean(session.acpSessionId);
+  const sessionClassName = [
+    'session-item',
+    isSelected && 'active',
+    isBusy && 'session-busy',
+    isJustCompleted && 'session-just-completed',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
-    <div className={isSelected ? 'session-item active' : 'session-item'}>
+    <div className={sessionClassName}>
       <button
         className="session-item-main"
         type="button"
@@ -198,6 +217,12 @@ function SessionItem({
         title={session.title}
       >
         <span className="session-title">{session.title}</span>
+        {isBusy && <span className="session-busy-indicator" aria-label="运行中" />}
+        {!isBusy && isJustCompleted && (
+          <span className="session-completed-indicator" aria-label="已完成">
+            &#10003;
+          </span>
+        )}
         <span className="session-time">{formatSessionTime(session.updatedAt)}</span>
       </button>
       <div className="session-actions">
@@ -265,6 +290,8 @@ function ProjectGroupItem({
   isExpanded,
   sessions,
   selectedSession,
+  agentBusyCountBySession,
+  recentlyCompletedSessions,
   onToggleExpanded,
   onSelectSession,
   onTogglePinned,
@@ -448,6 +475,8 @@ function ProjectGroupItem({
               project={project}
               session={session}
               isSelected={selectedSession?.id === session.id}
+              isBusy={(agentBusyCountBySession[session.id] ?? 0) > 0}
+              isJustCompleted={recentlyCompletedSessions.has(session.id)}
               isMenuOpen={openSessionMenuId === session.id}
               onToggleMenu={() => onToggleSessionMenu(session.id)}
               onCloseMenu={onCloseSessionMenu}
@@ -498,6 +527,8 @@ export function ProjectPane({
   selectedSession,
   sessionsForProject,
   expandedProjectPaths,
+  agentBusyCountBySession,
+  recentlyCompletedSessions,
   onSelectWorkspace,
   onToggleProjectExpanded,
   onNewSession,
@@ -728,6 +759,8 @@ export function ProjectPane({
                   isExpanded={isExpanded}
                   sessions={projectSessions}
                   selectedSession={selectedSession}
+                  agentBusyCountBySession={agentBusyCountBySession}
+                  recentlyCompletedSessions={recentlyCompletedSessions}
                   onToggleExpanded={handleToggleExpanded}
                   onSelectSession={onSelectProjectSession}
                   onTogglePinned={onToggleProjectPinned}

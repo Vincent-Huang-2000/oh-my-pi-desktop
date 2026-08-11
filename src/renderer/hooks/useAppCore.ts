@@ -103,6 +103,14 @@ export function useAppCore() {
   const [agentBusyCountBySession, setAgentBusyCountBySession] = useState<Record<string, number>>(
     {},
   );
+  // 按 sessionId 跟踪完成提示的自动清除定时器；重新完成时先清旧定时器防止竞态。
+  const completionTimerBySession = useRef<Record<string, number>>({});
+  // agentBusyCountBySession 的同步镜像 ref；用于 settlePromptTurn 中可靠判断 1→0 转换。
+  const agentBusyCountRef = useRef<Record<string, number>>({});
+  // 最近完成（done 事件触发且计数归零）的 session ID 集合；UI 短暂显示完成标记。
+  const [recentlyCompletedSessions, setRecentlyCompletedSessions] = useState<Set<string>>(
+    new Set(),
+  );
 
   // 当前选中 session 是否有 in-flight turn；驱动停止按钮和全局忙判定。
   const canCancel = selectedSession
@@ -110,22 +118,77 @@ export function useAppCore() {
     : false;
 
   const incrementAgentBusyCount = (sessionId: string) => {
+    agentBusyCountRef.current[sessionId] = (agentBusyCountRef.current[sessionId] ?? 0) + 1;
     setAgentBusyCountBySession((prev) => ({
       ...prev,
       [sessionId]: (prev[sessionId] ?? 0) + 1,
     }));
+    // 新 prompt 发出时清除该 session 的完成标记（又忙起来了，不再"刚完成"）
+    setRecentlyCompletedSessions((prev) => {
+      if (!prev.has(sessionId)) return prev;
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
+    // 同时取消待执行的自动清除定时器
+    clearTimeout(completionTimerBySession.current[sessionId]);
+    delete completionTimerBySession.current[sessionId];
   };
 
   const decrementAgentBusyCount = (sessionId: string) => {
+    const ref = agentBusyCountRef.current;
+    const current = ref[sessionId] ?? 0;
+    if (current <= 0) return;
+    ref[sessionId] = current - 1;
     setAgentBusyCountBySession((prev) => {
-      const current = prev[sessionId] ?? 0;
-      if (current <= 0) return prev;
-      return { ...prev, [sessionId]: current - 1 };
+      const cur = prev[sessionId] ?? 0;
+      if (cur <= 0) return prev;
+      return { ...prev, [sessionId]: cur - 1 };
     });
+  };
+
+  // 结算一个 prompt turn：递减计数，仅当从 1 减到 0 时触发完成标记。
+  // done 事件调用此方法；error 事件仅调用 decrementAgentBusyCount 不触发完成。
+  const settlePromptTurn = (sessionId: string) => {
+    const ref = agentBusyCountRef.current;
+    const current = ref[sessionId] ?? 0;
+    if (current <= 0) return;
+    const reachedZero = current === 1;
+    ref[sessionId] = current - 1;
+    setAgentBusyCountBySession((prev) => {
+      const cur = prev[sessionId] ?? 0;
+      if (cur <= 0) return prev;
+      return { ...prev, [sessionId]: cur - 1 };
+    });
+    if (reachedZero) {
+      clearTimeout(completionTimerBySession.current[sessionId]);
+      setRecentlyCompletedSessions((prev) => {
+        const next = new Set(prev);
+        next.add(sessionId);
+        return next;
+      });
+      completionTimerBySession.current[sessionId] = window.setTimeout(() => {
+        delete completionTimerBySession.current[sessionId];
+        setRecentlyCompletedSessions((prev) => {
+          const next = new Set(prev);
+          next.delete(sessionId);
+          return next;
+        });
+      }, 3000);
+    }
   };
 
   const resetAgentBusyCount = (sessionId: string) => {
     if (!sessionId) return;
+    clearTimeout(completionTimerBySession.current[sessionId]);
+    delete completionTimerBySession.current[sessionId];
+    delete agentBusyCountRef.current[sessionId];
+    setRecentlyCompletedSessions((prev) => {
+      if (!prev.has(sessionId)) return prev;
+      const next = new Set(prev);
+      next.delete(sessionId);
+      return next;
+    });
     setAgentBusyCountBySession((prev) => {
       if (!(sessionId in prev)) return prev;
       const { [sessionId]: _, ...rest } = prev;
@@ -452,6 +515,8 @@ export function useAppCore() {
     ompStatus,
     ompPath,
     canCancel,
+    agentBusyCountBySession,
+    recentlyCompletedSessions,
     sessionSearchOpen,
     expandedProjectPaths,
     acpConfigOptions,
@@ -486,6 +551,7 @@ export function useAppCore() {
     incrementAgentBusyCount,
     decrementAgentBusyCount,
     resetAgentBusyCount,
+    settlePromptTurn,
     setSessionSearchOpen,
     setExpandedProjectPaths,
     setAcpConfigOptions,
