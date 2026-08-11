@@ -217,9 +217,9 @@ function SessionItem({
         title={session.title}
       >
         <span className="session-title">{session.title}</span>
-        {isBusy && <span className="session-busy-indicator" aria-label="运行中" />}
+        {isBusy && <span className="session-busy-indicator" role="img" aria-label="运行中" />}
         {!isBusy && isJustCompleted && (
-          <span className="session-completed-indicator" aria-label="已完成">
+          <span className="session-completed-indicator" role="img" aria-label="已完成">
             &#10003;
           </span>
         )}
