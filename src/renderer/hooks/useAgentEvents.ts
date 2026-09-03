@@ -21,7 +21,7 @@
  * - 不再在每个事件上更新 desktopState.logs——主进程 agentService 已通过 addLog 写盘，
  *   渲染端不需重复构建 120 条日志数组来触发整棵 App 重渲染。
  */
-// TODO: utils.ts functions (getPayloadPermissionOptions, getPayloadElicitationField, etc.)
+// TODO: utils.ts functions (getPayloadPermissionOptions, getPayloadElicitationFields, etc.)
 // need explicit return type annotations to eliminate no-unsafe-* warnings.
 
 import { useEffect } from 'react';
@@ -36,7 +36,7 @@ import {
   getElicitationKind,
   getPayloadAvailableCommands,
   getPayloadConfigOptions,
-  getPayloadElicitationField,
+  getPayloadElicitationFields,
   getPayloadFullPlan,
   getPayloadQuestionnaire,
   getPayloadPermissionOptions,
@@ -161,7 +161,7 @@ export function useAgentEvents(
         const req: ElicitationRequest = {
           requestId: getPayloadRequestId(event.payload),
           message: event.message,
-          field: getPayloadElicitationField(event.payload),
+          fields: getPayloadElicitationFields(event.payload),
           kind: getElicitationKind(event.message),
           // 消息流已有对应的方案预览卡时，弹窗只显示简短提示。
           hasPlanPreview: !!planContent,

@@ -572,7 +572,8 @@ textarea:disabled {
   pointer-events: none;
 }
 
-.approval-dock-panel:has(.questionnaire-modal) {
+.approval-dock-panel:has(.questionnaire-modal),
+.approval-dock-panel:has(.elicitation-form-modal) {
   width: min(620px, 100%);
 }
 

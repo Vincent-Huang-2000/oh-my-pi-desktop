@@ -1303,8 +1303,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     return { ok: true };
   };
 
-  // elicitation 响应：action 为 'accept'（携带 content）/ 'decline' / 'cancel'。
-  // content 形如 { value: <用户输入> }，对应 requestedSchema.properties.value。
+  // elicitation 响应：action 为 'accept'（携带 requestedSchema 对应的 content）/ 'decline' / 'cancel'。
+  // 旧版审批为 { value: <用户输入> }；v18 Ask 表单可同时回传 qN 与 qN__other。
   const respondElicitation = (
     requestId: string,
     action: 'accept' | 'decline' | 'cancel',

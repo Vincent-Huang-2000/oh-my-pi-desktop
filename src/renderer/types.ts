@@ -86,25 +86,37 @@ export type PermissionOption = {
   description?: string;
 };
 
-/* ACP elicitation 请求：omp 第2层审批门控通过表单向用户请求输入/确认。 */
+/* ACP elicitation 请求：omp 第2层审批门控和 Ask 表单都通过这一通道响应。 */
 export type ElicitationRequest = {
   requestId: string;
   message: string;
-  field: ElicitationField;
+  fields: ElicitationField[];
   /* 工具/计划审批与 AskTool 提问共用 ACP elicitation，通过消息格式区分展示语义。 */
   kind: 'approval' | 'question';
   /* plan 审批且消息流已存在对应预览卡时为 true：弹窗只显示简短提示，方案全文交给卡片。 */
   hasPlanPreview?: boolean;
 };
 
-/* 表单字段描述：omp 当前只发单字段 value，这里按其 type 归一化。 */
+/* ACP schema 中的可选项保留显示文案与描述，提交时始终回传 value。 */
+export type ElicitationOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+/* 表单字段描述：兼容旧版单字段 value 与 v18 Ask 的 qN / qN__other 表单。 */
 export type ElicitationField = {
+  name: string;
   /* 字段类型：string（含 enum 为下拉选择）/ boolean（确认）/ number / integer / array */
   type: 'string' | 'boolean' | 'number' | 'integer' | 'array';
-  /* string + enum 时的可选值列表（omp 工具审批场景为 ['Approve', 'Deny']）。 */
-  options?: string[];
-  /* 字段标题/描述（ACP schema 的 description）。 */
+  /* string + enum 或 array + items.anyOf 时的可选值列表。 */
+  options?: ElicitationOption[];
+  /* ACP schema 的 title、description 与默认推荐项。 */
+  title?: string;
   description?: string;
+  defaultValue?: string;
+  /* Ask 表单的自由输入字段，例如 q0 对应的 q0__other。 */
+  otherFieldName?: string;
 };
 
 export type QuestionnaireOption = {

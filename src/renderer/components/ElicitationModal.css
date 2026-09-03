@@ -29,3 +29,69 @@
   flex: 1 1 220px;
   width: auto;
 }
+
+.elicitation-field-description {
+  margin-top: calc(var(--space-2) * -1);
+  color: var(--color-text-muted);
+}
+
+.elicitation-form-modal {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.elicitation-form-fields {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.elicitation-form-field {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--glass-border);
+}
+
+.elicitation-form-field legend {
+  padding: 0 var(--space-1);
+  color: var(--color-text);
+}
+
+.elicitation-form-options {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.elicitation-form-option,
+.elicitation-form-other {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.elicitation-form-option.selected {
+  border-color: var(--color-accent);
+  background: var(--glass-bg);
+}
+
+.elicitation-form-option input {
+  margin-top: var(--space-1);
+}
+
+.elicitation-form-option small {
+  display: block;
+  color: var(--color-text-muted);
+}
+
+.elicitation-form-other {
+  align-items: center;
+}
+
+.elicitation-form-other .elicitation-input {
+  flex: 1;
+}

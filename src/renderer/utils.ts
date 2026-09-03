@@ -80,52 +80,86 @@ export const getPayloadPermissionOptions = (payload: unknown) => {
 };
 
 // 从 elicitation_request 事件 payload 提取表单字段信息。
-// omp 的 elicitation 总是单字段 value，schema 结构为
-// { requestedSchema: { properties: { value: { type, enum?, oneOf?, description? } } } }。
-export const getPayloadElicitationField = (payload: unknown): ElicitationField => {
-  const fallback: ElicitationField = { type: 'string' };
+// 旧版 omp 使用单字段 value；v18 Ask 使用 qN（选项）和 qN__other（自定义回答）。
+const ELICITATION_FIELD_TYPES: Record<string, true> = {
+  string: true,
+  boolean: true,
+  number: true,
+  integer: true,
+  array: true,
+};
+
+const getElicitationOptions = (field: Record<string, unknown>) => {
+  let rawCandidates: unknown = field.enum;
+  if (!Array.isArray(rawCandidates)) {
+    rawCandidates = field.oneOf;
+  }
+  if (!Array.isArray(rawCandidates)) {
+    const items = field.items;
+    rawCandidates =
+      items && typeof items === 'object' ? (items as Record<string, unknown>).anyOf : undefined;
+  }
+  if (!Array.isArray(rawCandidates)) return [];
+
+  return (rawCandidates as unknown[]).flatMap((candidate) => {
+    if (typeof candidate === 'string') {
+      return [{ value: candidate, label: candidate }];
+    }
+    if (!candidate || typeof candidate !== 'object') return [];
+    const option = candidate as Record<string, unknown>;
+    const value = option.const;
+    if (typeof value !== 'string') return [];
+    return [
+      {
+        value,
+        label: typeof option.title === 'string' ? option.title : value,
+        ...(typeof option.description === 'string' ? { description: option.description } : {}),
+      },
+    ];
+  });
+};
+
+export const getPayloadElicitationFields = (payload: unknown): ElicitationField[] => {
+  const fallback: ElicitationField = { name: 'value', type: 'string' };
   if (!payload || typeof payload !== 'object') {
-    return fallback;
+    return [fallback];
   }
   const record = payload as Record<string, unknown>;
   const schema = record.requestedSchema;
   if (!schema || typeof schema !== 'object') {
-    return fallback;
+    return [fallback];
   }
   const properties = (schema as Record<string, unknown>).properties;
   if (!properties || typeof properties !== 'object') {
-    return fallback;
+    return [fallback];
   }
-  const valueProp = (properties as Record<string, unknown>).value;
-  if (!valueProp || typeof valueProp !== 'object') {
-    return fallback;
-  }
-  const field = valueProp as Record<string, unknown>;
-  const type = typeof field.type === 'string' ? field.type : 'string';
-  // enum（无标题选项）或 oneOf（带标题选项）都映射为 options 列表。
-  const options: string[] = [];
-  if (Array.isArray(field.enum)) {
-    field.enum.forEach((item) => {
-      if (typeof item === 'string') {
-        options.push(item);
-      }
-    });
-  } else if (Array.isArray(field.oneOf)) {
-    field.oneOf.forEach((item) => {
-      if (item && typeof item === 'object') {
-        const constValue = (item as Record<string, unknown>).const;
-        if (typeof constValue === 'string') {
-          options.push(constValue);
-        }
-      }
-    });
-  }
-  const description = typeof field.description === 'string' ? field.description : undefined;
-  return {
-    type: type as ElicitationField['type'],
-    options: options.length > 0 ? options : undefined,
-    description,
-  };
+
+  const entries = Object.entries(properties).filter(
+    ([, value]) => value && typeof value === 'object',
+  ) as Array<[string, Record<string, unknown>]>;
+  const names = new Set(entries.map(([name]) => name));
+  const fields = entries.flatMap(([name, field]) => {
+    const baseName = name.endsWith('__other') ? name.slice(0, -'__other'.length) : undefined;
+    // qN__other 由 qN 的 otherFieldName 绑定；无 qN 的自由回答则保留为独立字段。
+    if (baseName && names.has(baseName)) return [];
+
+    const rawType = typeof field.type === 'string' ? field.type : 'string';
+    const type = ELICITATION_FIELD_TYPES[rawType] ? rawType : 'string';
+    const options = getElicitationOptions(field);
+    const otherFieldName = `${name}__other`;
+    return [
+      {
+        name,
+        type: type as ElicitationField['type'],
+        ...(options.length > 0 ? { options } : {}),
+        ...(typeof field.title === 'string' ? { title: field.title } : {}),
+        ...(typeof field.description === 'string' ? { description: field.description } : {}),
+        ...(typeof field.default === 'string' ? { defaultValue: field.default } : {}),
+        ...(names.has(otherFieldName) ? { otherFieldName } : {}),
+      },
+    ];
+  });
+  return fields.length > 0 ? fields : [fallback];
 };
 
 // AskTool 与工具/计划审批共用 elicitation/create；审批消息由 omp 使用固定前缀生成，
