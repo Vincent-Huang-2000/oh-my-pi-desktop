@@ -8,8 +8,13 @@ type ElicitationModalProps = {
   onRespond: (action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown>) => void;
 };
 
-type AskFieldValues = Record<string, string | string[]>;
+type AskFieldValues = Record<string, string | boolean | string[]>;
 type AskOtherValues = Record<string, string>;
+
+const BOOLEAN_ASK_OPTIONS = [
+  { label: '是', value: true },
+  { label: '否', value: false },
+] as const;
 
 // 多选可同时提交候选项与自定义回答；单选自定义回答保持优先且互斥。
 export function buildAskElicitationContent(
@@ -42,6 +47,32 @@ export function buildAskElicitationContent(
     }
   });
   return content;
+}
+
+export function getInitialAskElicitationValues(fields: ElicitationField[]): AskFieldValues {
+  const values: AskFieldValues = {};
+  fields.forEach((field) => {
+    const defaultValue = field.defaultValue;
+    if (field.type === 'boolean' && typeof defaultValue === 'boolean') {
+      values[field.name] = defaultValue;
+      return;
+    }
+    if (
+      typeof defaultValue === 'string' &&
+      field.options?.some((option) => option.value === defaultValue)
+    ) {
+      values[field.name] = defaultValue;
+      return;
+    }
+    if (
+      Array.isArray(defaultValue) &&
+      field.options &&
+      defaultValue.every((value) => field.options!.some((option) => option.value === value))
+    ) {
+      values[field.name] = defaultValue;
+    }
+  });
+  return values;
 }
 
 // 审批场景下识别"拒绝"选项（原始值 Deny / Reject），其余选项（Approve、Approve and execute、
@@ -254,17 +285,11 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
   const [otherValues, setOtherValues] = useState<AskOtherValues>({});
 
   useEffect(() => {
-    setValues(
-      Object.fromEntries(
-        request.fields.flatMap((field) =>
-          field.defaultValue && field.options?.some((option) => option.value === field.defaultValue)
-            ? [[field.name, field.defaultValue]]
-            : [],
-        ),
-      ),
-    );
+    setValues(getInitialAskElicitationValues(request.fields));
     setOtherValues({});
   }, [request.fields, request.requestId]);
+  const content = buildAskElicitationContent(request.fields, values, otherValues);
+  const canSubmit = Object.keys(content).length > 0;
 
   const toggleMultiValue = (field: ElicitationField, value: string) => {
     setValues((current) => {
@@ -279,7 +304,7 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
     });
   };
 
-  const selectSingleValue = (field: ElicitationField, value: string) => {
+  const selectSingleValue = (field: ElicitationField, value: string | boolean) => {
     setValues((current) => ({ ...current, [field.name]: value }));
     const otherFieldName = field.otherFieldName;
     if (!otherFieldName) return;
@@ -303,7 +328,8 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
   };
 
   const submit = () => {
-    onRespond('accept', buildAskElicitationContent(request.fields, values, otherValues));
+    if (!canSubmit) return;
+    onRespond('accept', content);
   };
 
   return (
@@ -331,7 +357,29 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
                 {field.description && (
                   <p className="elicitation-field-description">{field.description}</p>
                 )}
-                {hasOptions ? (
+                {field.type === 'boolean' ? (
+                  <div className="elicitation-form-options">
+                    {BOOLEAN_ASK_OPTIONS.map((option) => {
+                      const checked = selected === option.value;
+                      return (
+                        <label
+                          className={`elicitation-form-option${checked ? ' selected' : ''}`}
+                          key={option.label}
+                        >
+                          <input
+                            type="radio"
+                            name={`elicitation-${request.requestId}-${field.name}`}
+                            checked={checked}
+                            onChange={() => selectSingleValue(field, option.value)}
+                          />
+                          <span>
+                            <strong>{option.label}</strong>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : hasOptions ? (
                   <div className="elicitation-form-options">
                     {field.options!.map((option) => {
                       const checked = Array.isArray(selected)
@@ -387,7 +435,7 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
           })}
         </div>
         <div className="modal-actions-horizontal">
-          <button className="primary-action" type="button" onClick={submit}>
+          <button className="primary-action" type="button" disabled={!canSubmit} onClick={submit}>
             <span>提交选择</span>
           </button>
           <button type="button" onClick={() => onRespond('cancel')}>

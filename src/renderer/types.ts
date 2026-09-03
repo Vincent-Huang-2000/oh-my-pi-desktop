@@ -114,7 +114,7 @@ export type ElicitationField = {
   /* ACP schema 的 title、description 与默认推荐项。 */
   title?: string;
   description?: string;
-  defaultValue?: string;
+  defaultValue?: string | boolean | string[];
   /* Ask 表单的自由输入字段，例如 q0 对应的 q0__other。 */
   otherFieldName?: string;
 };

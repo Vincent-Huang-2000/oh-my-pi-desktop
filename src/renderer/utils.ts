@@ -94,10 +94,14 @@ const getElicitationOptions = (field: Record<string, unknown>) => {
   if (!Array.isArray(rawCandidates)) {
     rawCandidates = field.oneOf;
   }
+  const items = field.items;
   if (!Array.isArray(rawCandidates)) {
-    const items = field.items;
     rawCandidates =
       items && typeof items === 'object' ? (items as Record<string, unknown>).anyOf : undefined;
+  }
+  if (!Array.isArray(rawCandidates)) {
+    rawCandidates =
+      items && typeof items === 'object' ? (items as Record<string, unknown>).enum : undefined;
   }
   if (!Array.isArray(rawCandidates)) return [];
 
@@ -147,6 +151,16 @@ export const getPayloadElicitationFields = (payload: unknown): ElicitationField[
     const type = ELICITATION_FIELD_TYPES[rawType] ? rawType : 'string';
     const options = getElicitationOptions(field);
     const otherFieldName = `${name}__other`;
+    const defaultValue =
+      type === 'string' && typeof field.default === 'string'
+        ? field.default
+        : type === 'boolean' && typeof field.default === 'boolean'
+          ? field.default
+          : type === 'array' &&
+              Array.isArray(field.default) &&
+              field.default.every((value): value is string => typeof value === 'string')
+            ? field.default
+            : undefined;
     return [
       {
         name,
@@ -154,7 +168,7 @@ export const getPayloadElicitationFields = (payload: unknown): ElicitationField[
         ...(options.length > 0 ? { options } : {}),
         ...(typeof field.title === 'string' ? { title: field.title } : {}),
         ...(typeof field.description === 'string' ? { description: field.description } : {}),
-        ...(typeof field.default === 'string' ? { defaultValue: field.default } : {}),
+        ...(defaultValue !== undefined ? { defaultValue } : {}),
         ...(names.has(otherFieldName) ? { otherFieldName } : {}),
       },
     ];

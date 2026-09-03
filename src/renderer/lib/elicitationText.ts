@@ -41,10 +41,20 @@ export const getElicitationResultText = (
   }
 
   const responses = request.fields.flatMap((field, index) => {
+    const selectedValue = content?.[field.name];
+    const customValue = field.otherFieldName ? content?.[field.otherFieldName] : undefined;
+    if (
+      field.type === 'array' &&
+      Array.isArray(selectedValue) &&
+      selectedValue.length === 0 &&
+      !getElicitationValueText(customValue)
+    ) {
+      return [`${field.title ?? `回答 ${index + 1}`}：未选择任何项`];
+    }
     const rawValues =
       field.type === 'array' && field.otherFieldName
-        ? [content?.[field.name], content?.[field.otherFieldName]]
-        : [content?.[field.otherFieldName ?? field.name] ?? content?.[field.name]];
+        ? [content?.[field.name], customValue]
+        : [customValue ?? content?.[field.name]];
     const valueText = rawValues.map(getElicitationValueText).filter(Boolean).join('、');
     return valueText ? [`${field.title ?? `回答 ${index + 1}`}：${valueText}`] : [];
   });

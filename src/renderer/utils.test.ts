@@ -58,6 +58,70 @@ describe('getPayloadElicitationFields', () => {
     ]);
   });
 
+  it('兼容 items.enum 多选候选项', () => {
+    expect(
+      getPayloadElicitationFields({
+        requestedSchema: {
+          properties: {
+            q0: {
+              type: 'array',
+              title: '启用功能',
+              items: { enum: ['auth', 'search'] },
+            },
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        name: 'q0',
+        type: 'array',
+        title: '启用功能',
+        options: [
+          { value: 'auth', label: 'auth' },
+          { value: 'search', label: 'search' },
+        ],
+      },
+    ]);
+  });
+
+  it('保留元素均为字符串的数组默认值', () => {
+    expect(
+      getPayloadElicitationFields({
+        requestedSchema: {
+          properties: {
+            q0: {
+              type: 'array',
+              items: { enum: ['auth', 'search'] },
+              default: ['auth', 'search'],
+            },
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        name: 'q0',
+        type: 'array',
+        defaultValue: ['auth', 'search'],
+        options: [
+          { value: 'auth', label: 'auth' },
+          { value: 'search', label: 'search' },
+        ],
+      },
+    ]);
+  });
+
+  it('保留 boolean false 默认值', () => {
+    expect(
+      getPayloadElicitationFields({
+        requestedSchema: {
+          properties: {
+            q0: { type: 'boolean', default: false },
+          },
+        },
+      }),
+    ).toEqual([{ name: 'q0', type: 'boolean', defaultValue: false }]);
+  });
+
   it('保留没有候选项的 Ask 自定义回答字段', () => {
     expect(
       getPayloadElicitationFields({
