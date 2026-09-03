@@ -9,6 +9,17 @@
  */
 import type { ElicitationRequest } from '../types';
 
+const getElicitationValueText = (value: unknown) => {
+  if (value === undefined || value === '') return '';
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string').join('、');
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return `${value}`;
+  }
+  return JSON.stringify(value);
+};
+
 export const getElicitationResultText = (
   request: ElicitationRequest,
   action: 'accept' | 'decline' | 'cancel',
@@ -30,13 +41,11 @@ export const getElicitationResultText = (
   }
 
   const responses = request.fields.flatMap((field, index) => {
-    const raw = content?.[field.otherFieldName ?? field.name] ?? content?.[field.name];
-    if (raw === undefined || raw === '') return [];
-    const valueText = Array.isArray(raw)
-      ? raw.filter((item) => typeof item === 'string').join('、')
-      : typeof raw === 'string' || typeof raw === 'number' || typeof raw === 'boolean'
-        ? `${raw}`
-        : JSON.stringify(raw);
+    const rawValues =
+      field.type === 'array' && field.otherFieldName
+        ? [content?.[field.name], content?.[field.otherFieldName]]
+        : [content?.[field.otherFieldName ?? field.name] ?? content?.[field.name]];
+    const valueText = rawValues.map(getElicitationValueText).filter(Boolean).join('、');
     return valueText ? [`${field.title ?? `回答 ${index + 1}`}：${valueText}`] : [];
   });
   return responses.length > 0 ? `已提交：${responses.join('；')}` : '已提交';

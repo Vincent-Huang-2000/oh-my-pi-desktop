@@ -8,6 +8,42 @@ type ElicitationModalProps = {
   onRespond: (action: 'accept' | 'decline' | 'cancel', content?: Record<string, unknown>) => void;
 };
 
+type AskFieldValues = Record<string, string | string[]>;
+type AskOtherValues = Record<string, string>;
+
+// 多选可同时提交候选项与自定义回答；单选自定义回答保持优先且互斥。
+export function buildAskElicitationContent(
+  fields: ElicitationField[],
+  values: AskFieldValues,
+  otherValues: AskOtherValues,
+): Record<string, unknown> {
+  const content: Record<string, unknown> = {};
+  fields.forEach((field) => {
+    const value = values[field.name];
+    const otherFieldName = field.otherFieldName;
+    const otherValue = otherFieldName ? otherValues[otherFieldName]?.trim() : undefined;
+
+    if (field.type === 'array') {
+      if (value !== undefined && value !== '') {
+        content[field.name] = value;
+      }
+      if (otherFieldName && otherValue) {
+        content[otherFieldName] = otherValue;
+      }
+      return;
+    }
+
+    if (otherFieldName && otherValue) {
+      content[otherFieldName] = otherValue;
+      return;
+    }
+    if (value !== undefined && value !== '') {
+      content[field.name] = value;
+    }
+  });
+  return content;
+}
+
 // 审批场景下识别"拒绝"选项（原始值 Deny / Reject），其余选项（Approve、Approve and execute、
 // Refine plan 等）按主操作高亮。仅对 approval kind 生效，question kind 的选项语义由 agent 定义，不强加颜色。
 const REJECT_RAW_VALUES = new Set(['Deny', 'Reject']);
@@ -214,8 +250,8 @@ function SingleElicitationForm({ request, field, onRespond }: SingleElicitationF
 type AskElicitationFormProps = ElicitationModalProps;
 
 function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
-  const [values, setValues] = useState<Record<string, string | string[]>>({});
-  const [otherValues, setOtherValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<AskFieldValues>({});
+  const [otherValues, setOtherValues] = useState<AskOtherValues>({});
 
   useEffect(() => {
     setValues(
@@ -243,21 +279,31 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
     });
   };
 
-  const submit = () => {
-    const content: Record<string, unknown> = {};
-    request.fields.forEach((field) => {
-      const otherFieldName = field.otherFieldName;
-      const otherValue = otherFieldName ? otherValues[otherFieldName]?.trim() : undefined;
-      if (otherFieldName && otherValue) {
-        content[otherFieldName] = otherValue;
-        return;
-      }
-      const value = values[field.name];
-      if (value !== undefined && value !== '') {
-        content[field.name] = value;
-      }
+  const selectSingleValue = (field: ElicitationField, value: string) => {
+    setValues((current) => ({ ...current, [field.name]: value }));
+    const otherFieldName = field.otherFieldName;
+    if (!otherFieldName) return;
+    setOtherValues((current) => {
+      if (!(otherFieldName in current)) return current;
+      const { [otherFieldName]: _, ...remaining } = current;
+      return remaining;
     });
-    onRespond('accept', content);
+  };
+
+  const updateOtherValue = (field: ElicitationField, value: string) => {
+    const otherFieldName = field.otherFieldName;
+    if (!otherFieldName) return;
+    setOtherValues((current) => ({ ...current, [otherFieldName]: value }));
+    if (field.type === 'array' || !value) return;
+    setValues((current) => {
+      if (!(field.name in current)) return current;
+      const { [field.name]: _, ...remaining } = current;
+      return remaining;
+    });
+  };
+
+  const submit = () => {
+    onRespond('accept', buildAskElicitationContent(request.fields, values, otherValues));
   };
 
   return (
@@ -305,7 +351,7 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
                                 toggleMultiValue(field, option.value);
                                 return;
                               }
-                              setValues((current) => ({ ...current, [field.name]: option.value }));
+                              selectSingleValue(field, option.value);
                             }}
                           />
                           <span>
@@ -321,12 +367,7 @@ function AskElicitationForm({ request, onRespond }: AskElicitationFormProps) {
                         <input
                           className="elicitation-input"
                           value={otherValues[field.otherFieldName] ?? ''}
-                          onChange={(event) =>
-                            setOtherValues((current) => ({
-                              ...current,
-                              [field.otherFieldName!]: event.target.value,
-                            }))
-                          }
+                          onChange={(event) => updateOtherValue(field, event.target.value)}
                         />
                       </label>
                     )}
