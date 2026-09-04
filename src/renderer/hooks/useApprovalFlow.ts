@@ -19,7 +19,7 @@
  */
 import { useRef } from 'react';
 import type { ChatMessage, QuestionnaireAnswer } from '../types';
-import { getElicitationResultText } from '../lib/elicitationText';
+import { getElicitationResult, type ElicitationResult } from '../lib/elicitationText';
 import type { useAppCore } from './useAppCore';
 
 export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
@@ -112,12 +112,17 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     const result = await window.ohMyPiDesktop.elicitationResponse(requestId, action, content);
     const updateElicitationRecord = (
       status: NonNullable<ChatMessage['elicitationStatus']>,
-      resultText: string,
+      result: ElicitationResult,
     ) => {
       const updateMessages = (current: ChatMessage[]) =>
         current.map((message) => {
           if (message.elicitationRequestId === requestId) {
-            return { ...message, elicitationStatus: status, elicitationResult: resultText };
+            return {
+              ...message,
+              elicitationStatus: status,
+              elicitationResult: result.label,
+              elicitationAnswer: result.answer,
+            };
           }
           if (message.planPreviewRequestId === requestId && status !== 'failed') {
             return { ...message, planPreview: false, planPreviewRequestId: undefined };
@@ -141,7 +146,7 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     );
     app.elicitationBySession.current[sessionId] = remaining;
     if (!result.ok) {
-      updateElicitationRecord('failed', '确认失败：请求已失效');
+      updateElicitationRecord('failed', { label: '确认失败：请求已失效' });
       if (app.selectedSessionRef.current?.id === sessionId) {
         app.setElicitationRequest(remaining[0] ?? null);
         app.setAgentStatus(
@@ -156,7 +161,7 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
       }
       return;
     }
-    const elicitationResult = getElicitationResultText(matched, action, content);
+    const elicitationResult = getElicitationResult(matched, action, content);
     updateElicitationRecord(
       action === 'accept' ? 'accepted' : action === 'decline' ? 'declined' : 'cancelled',
       elicitationResult,

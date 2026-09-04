@@ -69,6 +69,8 @@ export type ChatMessage = {
   elicitationRequestId?: string;
   elicitationStatus?: 'pending' | 'submitting' | 'accepted' | 'declined' | 'cancelled' | 'failed';
   elicitationResult?: string;
+  /* 已提交记录的原始回答；与状态标签分离，避免展示时从文本反解析。 */
+  elicitationAnswer?: string;
   elicitationKind?: 'questionnaire' | 'question';
   createdAt?: string;
 };

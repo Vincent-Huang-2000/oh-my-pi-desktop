@@ -20,24 +20,34 @@ const getElicitationValueText = (value: unknown) => {
   return JSON.stringify(value);
 };
 
-export const getElicitationResultText = (
+/* 审批状态和用户回答分开保存；展示层不再从拼接后的文本推断或裁剪答案。 */
+export type ElicitationResult = {
+  label: string;
+  answer?: string;
+};
+
+/* 兼容历史记录：旧消息仅有完整结果文本时，answer 缺失则原样显示 label。 */
+export const formatElicitationResult = (label: string, answer?: string): string =>
+  answer ? `${label}：${answer}` : label;
+
+export const getElicitationResult = (
   request: ElicitationRequest,
   action: 'accept' | 'decline' | 'cancel',
   content?: Record<string, unknown>,
-) => {
-  if (action === 'decline') return '已拒绝';
-  if (action === 'cancel') return '已取消';
+): ElicitationResult => {
+  if (action === 'decline') return { label: '已拒绝' };
+  if (action === 'cancel') return { label: '已取消' };
   const [legacyField] = request.fields;
   const value = content?.value;
-  if (value === true) return '已确认';
+  if (value === true) return { label: '已确认' };
   if (legacyField?.name === 'value' && legacyField.options?.length && typeof value === 'string') {
-    if (value.endsWith(' Done selecting') || value === 'Done selecting') return '已完成选择';
-    return `已选择：${value.replace(/ \(Recommended\)$/, '')}`;
+    if (value.endsWith(' Done selecting') || value === 'Done selecting') {
+      return { label: '已完成选择' };
+    }
+    return { label: '已选择', answer: value.replace(/ \(Recommended\)$/, '') };
   }
   if (legacyField?.name === 'value' && value !== undefined) {
-    if (typeof value === 'string') return `已提交：${value}`;
-    if (typeof value === 'number' || typeof value === 'boolean') return `已提交：${String(value)}`;
-    return `已提交：${JSON.stringify(value)}`;
+    return { label: '已提交', answer: getElicitationValueText(value) };
   }
 
   const responses = request.fields.flatMap((field, index) => {
@@ -58,5 +68,17 @@ export const getElicitationResultText = (
     const valueText = rawValues.map(getElicitationValueText).filter(Boolean).join('、');
     return valueText ? [`${field.title ?? `回答 ${index + 1}`}：${valueText}`] : [];
   });
-  return responses.length > 0 ? `已提交：${responses.join('；')}` : '已提交';
+  return responses.length > 0
+    ? { label: '已提交', answer: responses.join('；') }
+    : { label: '已提交' };
+};
+
+/* 保留原字符串接口，供只需要单行文本的调用方和既有测试使用。 */
+export const getElicitationResultText = (
+  request: ElicitationRequest,
+  action: 'accept' | 'decline' | 'cancel',
+  content?: Record<string, unknown>,
+): string => {
+  const result = getElicitationResult(request, action, content);
+  return formatElicitationResult(result.label, result.answer);
 };

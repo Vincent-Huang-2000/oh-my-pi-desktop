@@ -42,6 +42,12 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { ElicitationModal } from './ElicitationModal';
+import {
+  getElicitationTitle,
+  groupElicitationMessages,
+  isResolvedElicitation,
+} from '../lib/elicitationGroup';
+import { formatElicitationResult } from '../lib/elicitationText';
 import { ModelPickerPopover } from './ModelPickerPopover';
 import { PermissionModal } from './PermissionModal';
 import { QuestionnaireModal } from './QuestionnaireModal';
@@ -556,7 +562,24 @@ function SimpleMessage({ message }: { message: ChatMessage }) {
 
 const MemoizedSimpleMessage = React.memo(SimpleMessage);
 
-/* elicitation 记录：审批操作统一由下方审批坞承载，消息流只保留请求与结果。 */
+/* elicitation 记录：审批操作统一由下方审批坞承载，消息流只保留请求与结果。
+   已解决记录统一为「标题行 + 问题 + 答案」两段式；连续同标题记录合并为分组档案。 */
+
+/* 记录正文：问题行 + 去重后的答案行，单条卡片与分组档案共用。 */
+function ElicitationRecordBody({ message }: { message: ChatMessage }) {
+  return (
+    <>
+      <p className="elicitation-record-question">{message.text}</p>
+      {message.elicitationResult && (
+        <p className="elicitation-record-result">
+          {formatElicitationResult(message.elicitationResult, message.elicitationAnswer)}
+        </p>
+      )}
+    </>
+  );
+}
+
+/* 单条 elicitation 消息：pending/submitting/failed 保留交互卡片，已解决收敛为状态行。 */
 function ElicitationMessage({ message }: { message: ChatMessage }) {
   const activeApprovalRequestId = React.useContext(ApprovalRequestContext);
   const time = message.createdAt
@@ -566,63 +589,67 @@ function ElicitationMessage({ message }: { message: ChatMessage }) {
       })
     : '';
   const isPending = message.elicitationStatus === 'pending';
-  const isResolved =
-    message.elicitationStatus === 'accepted' ||
-    message.elicitationStatus === 'declined' ||
-    message.elicitationStatus === 'cancelled';
-  const isQuestionnaire = message.elicitationKind === 'questionnaire';
-  const isQuestion = message.elicitationKind === 'question';
-  const title = isPending
-    ? isQuestionnaire || isQuestion
-      ? '等待选择'
-      : '等待确认'
-    : message.elicitationStatus === 'submitting'
-      ? isQuestionnaire || isQuestion
-        ? '正在提交选择'
-        : '正在提交确认'
-      : message.elicitationStatus === 'failed'
-        ? isQuestionnaire
-          ? '问卷提交失败'
-          : isQuestion
-            ? '回答提交失败'
-            : '确认失败'
-        : isQuestion
-          ? '问答记录'
-          : '确认记录';
+  const isResolved = isResolvedElicitation(message);
+  const title = getElicitationTitle(message);
   const pendingHint =
     message.elicitationRequestId === activeApprovalRequestId
       ? '请在下方审批坞处理。'
       : '已进入审批队列，等待前一项处理完成。';
 
-  return (
+  return isResolved ? (
     <article
-      className={`message elicitation elicitation-${message.elicitationStatus ?? 'pending'}${isResolved ? ' elicitation-resolved' : ''}`}
+      className={`message elicitation elicitation-resolved elicitation-${message.elicitationStatus}`}
     >
-      {isResolved ? (
-        <div className="elicitation-resolved-row">
-          <span className="elicitation-title">{title}</span>
-          <span className="elicitation-resolved-question">{message.text}</span>
-          {message.elicitationResult && (
-            <span className="elicitation-resolved-result">{message.elicitationResult}</span>
-          )}
-          {time && <time dateTime={message.createdAt}>{time}</time>}
-        </div>
-      ) : (
-        <>
-          <header className="elicitation-header">
-            <span className="elicitation-title">{title}</span>
-            {time && <time dateTime={message.createdAt}>{time}</time>}
-          </header>
-          <p className="elicitation-question">{message.text}</p>
-          {isPending && <p className="elicitation-pending-hint">{pendingHint}</p>}
-          {message.elicitationResult && (
-            <p className="elicitation-result">{message.elicitationResult}</p>
-          )}
-        </>
+      <header className="elicitation-record-header">
+        <span className="elicitation-title">{title}</span>
+        {time && <time dateTime={message.createdAt}>{time}</time>}
+      </header>
+      <ElicitationRecordBody message={message} />
+    </article>
+  ) : (
+    <article
+      className={`message elicitation elicitation-${message.elicitationStatus ?? 'pending'}`}
+    >
+      <header className="elicitation-header">
+        <span className="elicitation-title">{title}</span>
+        {time && <time dateTime={message.createdAt}>{time}</time>}
+      </header>
+      <p className="elicitation-question">{message.text}</p>
+      {isPending && <p className="elicitation-pending-hint">{pendingHint}</p>}
+      {message.elicitationResult && (
+        <p className="elicitation-result">{message.elicitationResult}</p>
       )}
     </article>
   );
 }
+
+/* 连续问答记录组：一次 Ask 的 N 个问题合并为一条档案，标题与时间只出现一次，
+   组状态（竖线/标题着色）取末条记录。 */
+function ElicitationGroup({ messages }: { messages: ChatMessage[] }) {
+  const last = messages[messages.length - 1];
+  const time = last.createdAt
+    ? new Date(last.createdAt).toLocaleTimeString('zh-CN', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+  return (
+    <div className={`elicitation-group elicitation-${last.elicitationStatus}`}>
+      <header className="elicitation-group-header">
+        <span className="elicitation-title">{getElicitationTitle(last)}</span>
+        {time && <time dateTime={last.createdAt}>{time}</time>}
+      </header>
+      {messages.map((message) => (
+        <div className="elicitation-group-record" key={getMessageRenderKey(message)}>
+          <ElicitationRecordBody message={message} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const MemoizedElicitationMessage = React.memo(ElicitationMessage);
+const MemoizedElicitationGroup = React.memo(ElicitationGroup);
 
 type ApprovalDockProps = Pick<
   ChatWorkspaceProps,
@@ -673,8 +700,6 @@ function ApprovalDock({
     </aside>
   );
 }
-
-const MemoizedElicitationMessage = React.memo(ElicitationMessage);
 
 /* 消息分发器：根据 role 和结构化字段选择渲染组件 */
 function MessageRenderer({ message }: { message: ChatMessage }) {
@@ -1020,9 +1045,13 @@ function TurnBlock({
       {statusMessages.map((message) => (
         <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
       ))}
-      {elicitationMessages.map((message) => (
-        <MemoizedMessageRenderer key={getMessageRenderKey(message)} message={message} />
-      ))}
+      {groupElicitationMessages(elicitationMessages).map((group) =>
+        group.length > 1 ? (
+          <MemoizedElicitationGroup key={getMessageRenderKey(group[0])} messages={group} />
+        ) : (
+          <MemoizedMessageRenderer key={getMessageRenderKey(group[0])} message={group[0]} />
+        ),
+      )}
       {finalAnswer && <MemoizedMessageRenderer message={finalAnswer} />}
       {tailMessages.length > 0 && (
         <MessageSequence

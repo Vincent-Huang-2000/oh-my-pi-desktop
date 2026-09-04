@@ -153,7 +153,7 @@
   font-style: normal;
 }
 
-/* elicitation 待处理时保留操作面；已处理记录收敛为消息流中的状态行。 */
+/* elicitation 待处理时保留操作面；已处理记录收敛为消息流中的两段式状态行。 */
 .message.elicitation {
   margin: 6px 0 8px;
   padding: 10px 12px;
@@ -161,15 +161,6 @@
   border-left: 3px solid var(--color-accent);
   border-radius: var(--radius-md);
   background: var(--color-surface-process);
-}
-
-.message.elicitation.elicitation-resolved {
-  margin: 4px 0 8px;
-  padding: 5px 0 5px 12px;
-  border: 0;
-  border-left: 2px solid var(--color-border);
-  border-radius: 0;
-  background: transparent;
 }
 
 .elicitation-header {
@@ -186,10 +177,45 @@
   font-weight: 600;
 }
 
-.elicitation-header time,
-.elicitation-resolved-row time {
+/* 已解决记录：单条与连续分组共用「标题行 + 问题行 + 答案行」两段式结构。 */
+.message.elicitation.elicitation-resolved {
+  margin: 4px 0 8px;
+  padding: 0 0 0 12px;
+  border: 0;
+  border-left: 2px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.elicitation-record-header,
+.elicitation-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: 2px;
+}
+
+.elicitation-record-header time,
+.elicitation-group-header time,
+.elicitation-header time {
   color: var(--color-text-muted);
   font-size: 11px;
+}
+
+.elicitation-record-question {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.elicitation-record-result {
+  margin: 2px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .message.elicitation .elicitation-question,
@@ -216,25 +242,26 @@
   font-size: 12px;
 }
 
-.elicitation-resolved-row {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px var(--space-2);
-  font-size: 12px;
-  line-height: 1.5;
+/* 连续问答记录组：左竖线贯穿，组内记录紧凑排列，标题与时间只出现一次。 */
+.elicitation-group {
+  margin: 4px 0 8px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--color-border);
 }
 
-.elicitation-resolved-question {
-  flex: 1 1 220px;
-  color: var(--color-text);
+.elicitation-group-header {
+  margin-bottom: 4px;
 }
 
-.elicitation-resolved-result {
-  color: var(--color-text-muted);
-  font-weight: 500;
+.elicitation-group-record {
+  padding: 2px 0 4px;
 }
 
+.elicitation-group-record + .elicitation-group-record {
+  margin-top: 6px;
+}
+
+/* 状态着色：成功仅标题与左竖线使用完成色，其余保持中性边框。 */
 .message.elicitation.elicitation-resolved.elicitation-accepted {
   border-left-color: var(--color-done);
 }
@@ -248,8 +275,23 @@
   border-left-color: var(--color-border);
 }
 
+.elicitation-group.elicitation-accepted {
+  border-left-color: var(--color-done);
+}
+
+.elicitation-group.elicitation-accepted .elicitation-title {
+  color: var(--color-done);
+}
+
+.elicitation-group.elicitation-declined,
+.elicitation-group.elicitation-cancelled {
+  border-left-color: var(--color-border);
+}
+
+/* 失败记录：边框与文字红色并叠加淡红底，滚动中更醒目。 */
 .message.elicitation-failed {
   border-left-color: var(--color-error-border);
+  background: var(--color-error);
 }
 
 .message.elicitation-failed .elicitation-title,
