@@ -10,6 +10,8 @@
  * 下方「语义层」全部引用这些基色派生，不写死 hex。
  * ============================================================ */
 :root {
+  --font-size-detail: 0.85rem;
+  --font-size-review-title: 1.4rem;
   --theme-accent-h: 245; /* 强调色色相 HSL（245=靛蓝） */
   --theme-accent-s: 79%; /* 饱和度 */
   --theme-accent-l: 60%; /* 亮度 */

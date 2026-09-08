@@ -70,6 +70,29 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     if (!app.selectedProject) {
       return;
     }
+    if (
+      text.trim() === '/plan-review' &&
+      attachments.length === 0 &&
+      app.selectedSession?.projectPath === app.selectedProject.path &&
+      app.planReviewBySession[app.selectedSession.id]?.supported
+    ) {
+      const sessionId = app.selectedSession.id;
+      if (app.planReviewBySession[sessionId]?.review) {
+        app.setHiddenPlanReviews((current) => ({ ...current, [sessionId]: '' }));
+      } else {
+        try {
+          const result = await window.ohMyPiDesktop.reopenPlanReview(
+            sessionId,
+            app.selectedProject.path,
+          );
+          if (result.ok) app.setHiddenPlanReviews((current) => ({ ...current, [sessionId]: '' }));
+          else app.setAgentStatus(result.message ?? '无法打开方案');
+        } catch {
+          app.setAgentStatus('无法打开方案，请重试');
+        }
+      }
+      return;
+    }
     let session = app.selectedSession;
     // 新建 session 时要把输入区当前显示的 ACP 配置（model/mode/thinking）全部应用，
     // 不再只应用用户显式改过的草稿值——否则未改动项会落到 omp 默认配置，

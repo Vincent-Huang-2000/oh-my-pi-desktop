@@ -89,6 +89,7 @@ type PendingAttachment = {
 };
 
 type ChatWorkspaceProps = {
+  planReviewControls?: React.ReactNode;
   messages: ChatMessage[];
   prompt: string;
   pendingAttachments: PendingAttachment[];
@@ -1152,6 +1153,7 @@ function MessageStream({
 const MemoizedMessageStream = React.memo(MessageStream);
 
 export function ChatWorkspace({
+  planReviewControls,
   messages,
   prompt,
   pendingAttachments,
@@ -1492,6 +1494,7 @@ export function ChatWorkspace({
         />
 
         <form ref={formRef} className="composer" onSubmit={onSubmit}>
+          {planReviewControls}
           <div className="composer-input">
             {/* 命令面板：在输入框输入以 "/" 开头的命令名时自动弹出（实时过滤 + 描述），
               选中后把 `/<name> ` 填回输入框，由用户补参数再发送。 */}

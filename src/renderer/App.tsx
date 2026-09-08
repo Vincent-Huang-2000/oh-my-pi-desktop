@@ -24,6 +24,8 @@ import { ProjectPane } from './components/ProjectPane';
 import { SessionSearchModal } from './components/SessionSearchModal';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
+import { PlanReviewOverlay } from './components/PlanReviewOverlay';
+import { usePlanReview } from './hooks/usePlanReview';
 import { useAgentEvents } from './hooks/useAgentEvents';
 import { useAppCore } from './hooks/useAppCore';
 import { useApprovalFlow } from './hooks/useApprovalFlow';
@@ -51,6 +53,7 @@ export default function App() {
   const sessionLifecycle = useSessionLifecycle(app, toolGroups, projectActions);
   const messageFlow = useMessageFlow(app);
 
+  const planReview = usePlanReview(app);
   const approvalFlow = useApprovalFlow(app);
   const configSync = useConfigSync(app);
   useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff);
@@ -155,6 +158,16 @@ export default function App() {
       />
       <section className={paneLayout.layoutClassName}>
         <ChatWorkspace
+          planReviewControls={
+            app.selectedSession && planReview.view?.supported ? (
+              <div className="plan-review-entry">
+                <button type="button" onClick={() => void planReview.open()}>
+                  {planReview.view.review ? '继续审核方案' : '审核方案'}
+                </button>
+                {planReview.notice && <span role="status">{planReview.notice}</span>}
+              </div>
+            ) : undefined
+          }
           messages={app.messages}
           prompt={app.prompt}
           pendingAttachments={app.pendingAttachments}
@@ -356,6 +369,16 @@ export default function App() {
         <GitBranchSwitchErrorModal
           error={app.gitBranchSwitchError}
           onClose={gitReview.closeGitBranchSwitchError}
+        />
+      )}
+      {planReview.visible && app.selectedSession && planReview.view?.review && (
+        <PlanReviewOverlay
+          key={`${app.selectedSession.id}:${planReview.view.review.reviewId}`}
+          sessionId={app.selectedSession.id}
+          review={planReview.view.review}
+          ready={planReview.view.ready}
+          drafts={app.planReviewDrafts}
+          onHide={planReview.hide}
         />
       )}
     </main>

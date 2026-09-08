@@ -72,6 +72,78 @@ export function useAgentEvents(
       // 1) 当前 session 的事件：直接更新当前 state；
       // 2) 其它 session 的事件：只更新对应缓存（app.messageCache / app.permissionBySession），
       //    等用户切回该 session 时由 handleSelectSession 还原。
+      if (event.type === 'plan_review_update') {
+        const view = event.payload as PlanReviewView;
+        app.setPlanReviewBySession((current) => ({ ...current, [event.sessionId]: view }));
+        if (
+          view.review &&
+          app.planReviewDrafts.current[event.sessionId]?.reviewId !== view.review.reviewId
+        ) {
+          delete app.planReviewDrafts.current[event.sessionId];
+        }
+        if (view.review?.content !== null && view.review?.content !== undefined) {
+          const review = view.review;
+          const record = (current: ChatMessage[]): ChatMessage[] => [
+            ...current.filter(
+              (message) =>
+                message.id !== `review-${review.reviewId}` &&
+                !message.planPending &&
+                !message.planActive,
+            ),
+            {
+              id: `review-${review.reviewId}`,
+              role: 'plan',
+              text: review.content ?? '',
+              planContentType: 'markdown',
+              planFilePath: review.planFilePath,
+            },
+          ];
+          if (app.selectedSessionRef.current?.id === event.sessionId)
+            app.setMessages((current) => {
+              const next = record(current);
+              app.messageCache.current[event.sessionId] = next;
+              return next;
+            });
+          else
+            app.messageCache.current[event.sessionId] = record(
+              app.messageCache.current[event.sessionId] ?? [],
+            );
+        }
+        if (view.review && app.selectedSessionRef.current?.id === event.sessionId)
+          app.setAgentStatus('等待审核方案');
+        return;
+      }
+      if (event.type === 'plan_review_action_started') {
+        app.incrementAgentBusyCount(event.sessionId);
+        return;
+      }
+      if (event.type === 'session_replaced') {
+        const { session, previousSession } = event.payload as {
+          session: StoredSession;
+          previousSession: StoredSession;
+        };
+        app.clearApprovalStateForSession(event.sessionId, { alsoClearActive: true });
+        app.messageCache.current[previousSession.id] =
+          app.messageCache.current[event.sessionId] ?? [];
+        app.messageCache.current[event.sessionId] = [];
+        delete app.usageBySession.current[event.sessionId];
+        app.setDesktopState((current) => ({
+          ...current,
+          recentSessions: [
+            session,
+            previousSession,
+            ...current.recentSessions.filter(
+              (item) => item.id !== session.id && item.id !== previousSession.id,
+            ),
+          ],
+        }));
+        if (app.selectedSessionRef.current?.id === event.sessionId) {
+          app.selectSession(session);
+          app.setMessages([]);
+          app.setUsageText('');
+        }
+        return;
+      }
       if (event.type === 'permission_request') {
         const req: PermissionRequest = {
           requestId: getPayloadRequestId(event.payload),

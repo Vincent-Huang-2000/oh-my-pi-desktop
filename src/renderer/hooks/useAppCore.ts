@@ -19,6 +19,7 @@ import type {
   PermissionRequest,
   QuestionnaireRequest,
 } from '../types';
+import type { PlanReviewDraft } from '../lib/planReview';
 import type { PendingAttachment } from '../lib/attachments';
 import {
   DEFAULT_APPROVAL_PROFILE,
@@ -50,6 +51,12 @@ export function useAppCore() {
   const elicitationBySession = useRef<Record<string, ElicitationRequest[]>>({});
   // 严格识别的 Plan 问卷独立排队，不能与普通 elicitation 的 Approve/Deny 混用。
   const questionnaireBySession = useRef<Record<string, QuestionnaireRequest[]>>({});
+  const [planReviewBySession, setPlanReviewBySession] = useState<Record<string, PlanReviewView>>(
+    {},
+  );
+  // 审核草稿按会话和审核版本隔离；收起面板或切换会话不丢失。
+  const planReviewDrafts = useRef<Record<string, PlanReviewDraft>>({});
+  const [hiddenPlanReviews, setHiddenPlanReviews] = useState<Record<string, string>>({});
   const configRefreshByProject = useRef<Record<string, string>>({});
   // 按 sessionId 缓存当前模型快照（id+展示名）。tool_call 实时事件到达时从这里读，
   // 写入 ChatMessage.toolModel，作为「这次工具调用是哪个模型做的」的快照来源。
@@ -250,6 +257,17 @@ export function useAppCore() {
     delete permissionBySession.current[sessionId];
     delete elicitationBySession.current[sessionId];
     delete questionnaireBySession.current[sessionId];
+    delete planReviewDrafts.current[sessionId];
+    setPlanReviewBySession((current) => {
+      const next = { ...current };
+      delete next[sessionId];
+      return next;
+    });
+    setHiddenPlanReviews((current) => {
+      const next = { ...current };
+      delete next[sessionId];
+      return next;
+    });
     // 同步将缓存中该 session 的 pending elicitation 消息标记为 cancelled，
     // 避免切回时恢复出"等待审批"的误导状态（队列已清空，审批坞永远不会出现）。
     const cached = messageCache.current[sessionId];
@@ -504,6 +522,11 @@ export function useAppCore() {
   }, [selectedProject]);
 
   return {
+    planReviewBySession,
+    setPlanReviewBySession,
+    planReviewDrafts,
+    hiddenPlanReviews,
+    setHiddenPlanReviews,
     desktopState,
     selectedProject,
     selectedSession,
