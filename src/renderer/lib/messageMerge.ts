@@ -27,16 +27,7 @@ import {
   getPayloadToolCall,
 } from '../utils';
 
-// ACP 没有单独的「开始创建计划」事件；通过计划工具标题识别其执行阶段，
-// 先插入可见占位卡，收到正式 plan 事件后再替换为完整计划。
-const isPlanToolCall = (title: string) => {
-  const normalized = title.trim().toLowerCase();
-  return (
-    normalized.includes('update_plan') ||
-    /\b(create|creating|update|updating|write|writing)\s+(the\s+)?plan\b/.test(normalized) ||
-    /(创建|生成|更新|编写|制定).*计划/.test(normalized)
-  );
-};
+// 主进程已按 xd://propose 的 rawInput/xdev envelope 标记方案提交；渲染层不再从工具标题猜测。
 
 export const mergeAgentEventIntoMessages = (
   current: ChatMessage[],
@@ -68,7 +59,7 @@ export const mergeAgentEventIntoMessages = (
         !toolData.status || toolData.status === 'pending' || toolData.status === 'in_progress';
       if (
         !canStartPlan ||
-        !isPlanToolCall(toolData.title || event.message) ||
+        !toolData.isPlanProposal ||
         messages.some((message) => message.planPending)
       ) {
         return messages;

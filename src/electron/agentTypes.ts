@@ -102,6 +102,8 @@ export type AcpProcessState = {
   questionnaireFollowUps: QuestionnaireFollowUp[];
   // 活跃回合期间暂存目标档位；当前回合自然结束后，下一次 prompt 前重建运行环境。
   pendingApprovalProfile?: ApprovalProfile;
+  // 正在执行的 xd://propose 工具调用；用于将随后到达的 ACP plan 审批表单精确关联到本次 proposal。
+  planProposals: Map<string, AcpPlanProposal>;
   suppressCloseEvent?: boolean;
 };
 
@@ -124,6 +126,8 @@ export type PendingElicitationRequest = {
   process: AcpProcessState;
   rpcId: JsonRpcId;
   questionnaire?: QuestionnaireDefinition;
+  // 仅 omp ACP 当前 Plan 审批表单携带；普通 elicitation 绝不关联磁盘方案。
+  planProposal?: AcpPlanProposal;
 };
 
 export type QuestionnaireOption = {
@@ -181,6 +185,13 @@ export type HistoricalSessionPlan = {
   toolCallId: string;
   planFilePath: string;
   content: string;
+};
+
+export type AcpPlanProposal = {
+  toolCallId: string;
+  title?: string;
+  planFilePath?: string;
+  planExists?: boolean;
 };
 
 export type AcpActivePlan =

@@ -4,7 +4,10 @@
  * 使用 vitest mock 提供可控的 ACP 子进程和内存 state，不依赖真实 omp 或定时等待。
  */
 import { EventEmitter } from 'node:events';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 // ── 可被测试文件顶层引用的 hoisted 状态 ──
 
@@ -181,15 +184,30 @@ vi.mock('./state.js', () => {
 // ── 导入被测模块 ──
 
 import { createAgentService } from './agentService.js';
+import type { AgentService } from './agentTypes.js';
 import type { AgentEvent } from './types.js';
 
 // ── 辅助 ──
 
-type EmittedEvent = { type: string; sessionId: string; message: string };
+type EmittedEvent = {
+  type: AgentEvent['type'];
+  sessionId: string;
+  message: string;
+  payload?: unknown;
+};
 
-const makeSender = (events: EmittedEvent[]) =>
+type AgentEventListener = (event: EmittedEvent) => void;
+
+const makeSender = (events: EmittedEvent[], onEvent?: AgentEventListener) =>
   vi.fn((event: AgentEvent) => {
-    events.push({ type: event.type, sessionId: event.sessionId, message: event.message });
+    const emitted = {
+      type: event.type,
+      sessionId: event.sessionId,
+      message: event.message,
+      payload: event.payload,
+    };
+    events.push(emitted);
+    onEvent?.(emitted);
   });
 
 beforeEach(() => {
@@ -198,6 +216,47 @@ beforeEach(() => {
   hoistedMemoryState.logs = [];
   hoistedSpawns.length = 0;
 });
+
+const originalPlanAgentDir = process.env.PI_CODING_AGENT_DIR;
+const temporaryPlanRoots: string[] = [];
+
+afterEach(async () => {
+  if (originalPlanAgentDir === undefined) {
+    delete process.env.PI_CODING_AGENT_DIR;
+  } else {
+    process.env.PI_CODING_AGENT_DIR = originalPlanAgentDir;
+  }
+  await Promise.all(
+    temporaryPlanRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+  );
+});
+
+const createPlanLocalDirectory = async (acpSessionId: string) => {
+  const agentDir = await mkdtemp(path.join(tmpdir(), 'omp-desktop-plan-'));
+  temporaryPlanRoots.push(agentDir);
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  const localDir = path.join(agentDir, 'sessions', 'project', `session_${acpSessionId}`, 'local');
+  await mkdir(localDir, { recursive: true });
+  return localDir;
+};
+
+const emitAcpMessage = (record: SpawnRecord, message: unknown) => {
+  const serialized = `${JSON.stringify(message)}\n`;
+  record.stdout.emit('data', Buffer.from(serialized));
+};
+
+const startInitializedAgent = async (
+  service: AgentService,
+  sessionId: string,
+  workspacePath: string,
+) => {
+  const starting = service.startAgent(sessionId, workspacePath, 'write');
+  const record = hoistedSpawns[0];
+  const initializeRequest = JSON.parse(record.stdinWrites[0]) as { id: string | number | null };
+  emitAcpMessage(record, { jsonrpc: '2.0', id: initializeRequest.id, result: {} });
+  await starting;
+  return record;
+};
 
 // ── 1. FIFO 排队测试 ──
 
@@ -306,5 +365,109 @@ describe('startAgent catch 身份检查', () => {
 
     // 清理
     svc.stopSessionProcess('s1');
+  });
+});
+
+describe('xd://propose Plan 审批关联', () => {
+  it('只为已关联的 Plan 审批加载完整方案，普通 elicitation 不复用旧方案', async () => {
+    const acpSessionId = 'acp-plan';
+    const localDir = await createPlanLocalDirectory(acpSessionId);
+    await writeFile(path.join(localDir, 'auth-plan.md'), '# Auth plan\n\n完整方案内容');
+    hoistedMemoryState.recentSessions = [
+      {
+        id: 'plan-session',
+        projectPath: '/tmp/test-workspace',
+        title: 'Plan',
+        acpSessionId,
+        approvalProfile: 'write',
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+
+    const events: EmittedEvent[] = [];
+    let resolvePlanPreview: ((event: EmittedEvent) => void) | undefined;
+    const planPreview = new Promise<EmittedEvent>((resolve) => {
+      resolvePlanPreview = resolve;
+    });
+    const service = createAgentService(
+      makeSender(events, (event) => {
+        if (event.type === 'elicitation_plan_preview') {
+          resolvePlanPreview?.(event);
+        }
+      }),
+    );
+    const record = await startInitializedAgent(service, 'plan-session', '/tmp/test-workspace');
+
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: {
+        sessionId: acpSessionId,
+        update: {
+          sessionUpdate: 'tool_call',
+          toolCallId: 'proposal-1',
+          title: 'xd://propose',
+          status: 'pending',
+          rawInput: { path: 'xd://propose', content: 'auth' },
+        },
+      },
+    });
+    expect(events.find((event) => event.type === 'tool_call')?.payload).toMatchObject({
+      planProposal: { toolCallId: 'proposal-1', title: 'auth' },
+    });
+
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: 'plan-request',
+      method: 'elicitation/create',
+      params: {
+        mode: 'form',
+        message: 'Approve plan "auth" and start implementation?\n\n# Auth plan\n',
+        requestedSchema: {
+          properties: {
+            value: { type: 'string', enum: ['Approve and execute', 'Refine plan'] },
+          },
+        },
+      },
+    });
+    const preview = await planPreview;
+    expect(preview.payload).toMatchObject({
+      requestId: 'plan-session-plan-request',
+      fullPlan: '# Auth plan\n\n完整方案内容',
+      planFilePath: 'local://auth-plan.md',
+    });
+
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: 'tool-request',
+      method: 'elicitation/create',
+      params: {
+        mode: 'form',
+        message: 'Allow tool: bash\n\n# 这不是方案',
+        requestedSchema: { properties: { value: { type: 'boolean' } } },
+      },
+    });
+    const genericRequest = events.find(
+      (event) =>
+        event.type === 'elicitation_request' &&
+        event.payload !== null &&
+        typeof event.payload === 'object' &&
+        (event.payload as Record<string, unknown>).requestId === 'plan-session-tool-request',
+    );
+    expect(genericRequest?.payload).not.toHaveProperty('planProposal');
+    expect(events.filter((event) => event.type === 'elicitation_plan_preview')).toHaveLength(1);
+
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: {
+        sessionId: acpSessionId,
+        update: { sessionUpdate: 'current_mode_update', currentModeId: 'default' },
+      },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: 'active_plan_update',
+      payload: { version: 1, active: false },
+    });
   });
 });

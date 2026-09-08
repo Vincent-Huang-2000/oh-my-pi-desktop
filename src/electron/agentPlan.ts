@@ -4,9 +4,9 @@
  * 职责：
  * - 将 ACP plan/plan_update 通知转换为面向用户的文本消息
  *   （getPlanMessage、getPlanUpdateMessage）。
- * - 定位并读取 ACP session 本地的 *-plan.md 方案文件
+ * - 定位并读取 ACP session 本地的 plan.md 方案文件
  *   （findSessionLocalDir、readPlanFile、readFullPlanForApproval）。
- * - 从重放历史中恢复已 resolve 的方案文件内容
+ * - 从重放历史中恢复已提交 proposal 的方案文件内容
  *   （readHistoricalSessionPlans、resolveHistoricalPlanPath）。
  * - 解析 omp.planMode 元数据以判断当前 Plan 是否激活
  *   （getAcpActivePlan）。
@@ -15,11 +15,16 @@
  * 拒绝子目录、绝对路径与目录穿越；限制文件大小上限。
  */
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { addLog } from './state.js';
 import type { AgentEvent } from './types.js';
-import type { AcpActivePlan, AcpProcessState, HistoricalSessionPlan } from './agentTypes.js';
+import type {
+  AcpActivePlan,
+  AcpPlanProposal,
+  AcpProcessState,
+  HistoricalSessionPlan,
+} from './agentTypes.js';
 import { MAX_PLAN_PREVIEW_BYTES } from './agentTypes.js';
 import { isRecord } from './agentUtils.js';
 
@@ -68,6 +73,24 @@ export const getPlanUpdateMessage = (update: Record<string, unknown>) => {
 
 // ── Plan 文件操作 ──
 
+const WINDOWS_LOCAL_ROOT_MAX_CHARS = 180;
+const PLAN_FILE_NAME_PATTERN = /plan\.md$/i;
+
+// 与 omp 的 resolveLocalRoot 对齐：Windows 长路径下 local:// 会落在临时短目录。
+export const resolveSessionLocalRoot = (
+  artifactsDir: string,
+  acpSessionId: string,
+  platform: NodeJS.Platform = globalThis.process.platform,
+  temporaryDirectory = tmpdir(),
+) => {
+  const candidate = path.resolve(artifactsDir, 'local');
+  if (platform === 'win32' && candidate.length >= WINDOWS_LOCAL_ROOT_MAX_CHARS) {
+    const safeSessionId = acpSessionId.replace(/[^a-zA-Z0-9_.-]/g, '_') || 'session';
+    return path.join(temporaryDirectory, 'omp-local', safeSessionId);
+  }
+  return candidate;
+};
+
 export const findSessionLocalDir = async (process: AcpProcessState) => {
   const sessionId = process.localSessionId;
   const acpSessionId = process.acpSessionId ?? process.restoredAcpSessionId;
@@ -88,7 +111,7 @@ export const findSessionLocalDir = async (process: AcpProcessState) => {
         (entry) => entry.isDirectory() && entry.name.endsWith(`_${acpSessionId}`),
       );
       if (!session) continue;
-      return path.join(projectRoot, session.name, 'local');
+      return resolveSessionLocalRoot(path.join(projectRoot, session.name), acpSessionId);
     }
     // 遍历完所有项目目录都没找到以 _<acpSessionId> 结尾的 session 目录。
     addLog(
@@ -124,6 +147,56 @@ export const getAcpActivePlan = (response: unknown): AcpActivePlan | null => {
     planFilePath: planMode.planFilePath,
     content: planMode.content,
   };
+};
+
+const getAcpPlanProposalDetails = (rawOutput: unknown) => {
+  if (!isRecord(rawOutput) || !isRecord(rawOutput.details) || !isRecord(rawOutput.details.xdev)) {
+    return null;
+  }
+  const xdev = rawOutput.details.xdev;
+  if (xdev.tool !== 'propose' || xdev.mode !== 'execute' || !isRecord(xdev.inner)) {
+    return null;
+  }
+  const inner = xdev.inner;
+  if (
+    typeof inner.planFilePath !== 'string' ||
+    typeof inner.title !== 'string' ||
+    typeof inner.planExists !== 'boolean'
+  ) {
+    return null;
+  }
+  return {
+    title: inner.title,
+    planFilePath: inner.planFilePath,
+    planExists: inner.planExists,
+  };
+};
+
+// ACP 将 write xd://propose 的语义封装在 rawInput 与 rawOutput.details.xdev 中。
+// 只接受当前 omp main 的完整 proposal envelope，不把旧 resolve/apply 误判为方案提交。
+export const getAcpPlanProposal = (update: Record<string, unknown>): AcpPlanProposal | null => {
+  if (typeof update.toolCallId !== 'string') {
+    return null;
+  }
+  const rawInput = isRecord(update.rawInput) ? update.rawInput : undefined;
+  const isProposalWrite = rawInput?.path === 'xd://propose';
+  const details = getAcpPlanProposalDetails(update.rawOutput);
+  if (!isProposalWrite && !details) {
+    return null;
+  }
+  const submittedTitle =
+    typeof rawInput?.content === 'string' && rawInput.content.trim()
+      ? rawInput.content.trim()
+      : undefined;
+  return {
+    toolCallId: update.toolCallId,
+    ...(submittedTitle ? { title: submittedTitle } : {}),
+    ...details,
+  };
+};
+
+export const isAcpPlanApprovalElicitation = (message: string) => {
+  return /^Approve plan "[^\r\n]+" and start implementation\?\r?\n\r?\n/.test(message);
 };
 
 export const readPlanFile = async (
@@ -165,53 +238,96 @@ export const resolveHistoricalPlanPath = (localDir: string, planFilePath: string
   }
   const fileName = planFilePath.slice('local://'.length);
   // OMP plan-mode 文件位于 local 根目录；拒绝子目录、绝对路径与目录穿越。
-  if (!fileName || path.basename(fileName) !== fileName || !/(?:^|-)plan\.md$/i.test(fileName)) {
+  if (
+    !fileName ||
+    fileName.includes('/') ||
+    fileName.includes('\\') ||
+    path.isAbsolute(fileName) ||
+    !PLAN_FILE_NAME_PATTERN.test(fileName)
+  ) {
     return null;
   }
   return path.join(localDir, fileName);
 };
 
-// 实时审批没有通过协议携带精确 planFilePath，继续扫描当前 session 的 local 目录，
-// 取 mtime 最新的 *-plan.md；历史恢复则走下方的精确路径读取，不使用这个降级。
-export const readFullPlanForApproval = async (process: AcpProcessState) => {
+const getPlanFileNameForSubmittedTitle = (title: string) => {
+  const trimmed = title.trim();
+  if (!trimmed || trimmed.includes('/') || trimmed.includes('\\') || trimmed.includes('..')) {
+    return null;
+  }
+  const normalized = trimmed
+    .replace(/\.md$/i, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^A-Za-z0-9_-]/g, '')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!normalized) {
+    return null;
+  }
+  const slug = normalized.replace(/-plan$/i, '') || normalized;
+  return `${slug}-plan.md`;
+};
+
+// ACP 的 Plan 审批表单不携带完整方案路径。优先按本次 xd://propose 的标题复原
+// canonical 文件名；仅在该路径不存在时，以当前 session 的最新 plan.md 作为降级。
+export const readFullPlanForApproval = async (
+  process: AcpProcessState,
+  proposal: AcpPlanProposal,
+) => {
   const localDir = await findSessionLocalDir(process);
   if (!localDir) return null;
+
+  const candidateFileName = proposal.title
+    ? getPlanFileNameForSubmittedTitle(proposal.title)
+    : null;
+  if (candidateFileName) {
+    const candidatePath = path.join(localDir, candidateFileName);
+    const content = await readPlanFile(process, localDir, candidatePath, 'plan-preview');
+    if (content !== null) {
+      addLog(
+        process.localSessionId,
+        'info',
+        `[plan-preview] 命中 proposal 标题对应的完整方案：${candidatePath}`,
+      );
+      return { planFilePath: `local://${candidateFileName}`, content };
+    }
+  }
+
   try {
     const localEntries = await readdir(localDir, { withFileTypes: true });
     const planFiles = localEntries.filter(
-      (entry) => entry.isFile() && entry.name.endsWith('-plan.md'),
+      (entry) => entry.isFile() && PLAN_FILE_NAME_PATTERN.test(entry.name),
     );
     if (planFiles.length === 0) {
-      // 无 *-plan.md 文件——可能不是 plan 审批（如普通工具审批），静默返回。
       return null;
     }
-    // 取 mtime 最新的一个；并发写入时最新的即当前方案。
-    let latest: { path: string; mtime: number; size: number } | null = null;
+    let latest: { name: string; path: string; mtime: number; size: number } | null = null;
     for (const entry of planFiles) {
       const filePath = path.join(localDir, entry.name);
-      const fileStat = await stat(filePath);
-      if (!fileStat.isFile()) continue;
+      const fileStat = await stat(filePath).catch(() => null);
+      if (!fileStat?.isFile()) continue;
       if (fileStat.mtimeMs > (latest?.mtime ?? -1)) {
-        latest = { path: filePath, mtime: fileStat.mtimeMs, size: fileStat.size };
+        latest = { name: entry.name, path: filePath, mtime: fileStat.mtimeMs, size: fileStat.size };
       }
     }
     if (!latest) {
       addLog(
         process.localSessionId,
         'info',
-        `[plan-preview] local 下 *-plan.md 均非常规文件：${localDir}`,
+        `[plan-preview] local 下 plan.md 候选均非常规文件：${localDir}`,
       );
       return null;
     }
     const content = await readPlanFile(process, localDir, latest.path, 'plan-preview');
-    if (content) {
+    if (content !== null) {
       addLog(
         process.localSessionId,
         'info',
-        `[plan-preview] 命中磁盘完整方案：${latest.path}（${latest.size} 字节）`,
+        `[plan-preview] 降级命中最新完整方案：${latest.path}（${latest.size} 字节）`,
       );
+      return { planFilePath: `local://${latest.name}`, content };
     }
-    return content;
+    return null;
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     addLog(process.localSessionId, 'info', `[plan-preview] 读取磁盘方案抛异常：${reason}`);
@@ -223,32 +339,21 @@ export const readHistoricalSessionPlans = async (
   process: AcpProcessState,
   replayEvents: AgentEvent[],
 ): Promise<HistoricalSessionPlan[]> => {
-  const applyToolCallIds = new Set<string>();
   const referencedPlans = new Map<string, { toolCallId: string; planFilePath: string }>();
   for (const event of replayEvents) {
     if (event.type !== 'tool_call' || !isRecord(event.payload)) continue;
     const update = isRecord(event.payload.update) ? event.payload.update : undefined;
-    if (!update || typeof update.toolCallId !== 'string') continue;
-    if (
-      update.title === 'resolve' &&
-      isRecord(update.rawInput) &&
-      update.rawInput.action === 'apply'
-    ) {
-      applyToolCallIds.add(update.toolCallId);
-    }
-    const rawOutput = isRecord(update.rawOutput) ? update.rawOutput : undefined;
-    const details = rawOutput && isRecord(rawOutput.details) ? rawOutput.details : undefined;
-    const planFilePath = details?.planFilePath;
-    if (
-      !applyToolCallIds.has(update.toolCallId) ||
-      details?.planExists !== true ||
-      typeof planFilePath !== 'string'
-    ) {
+    if (!update) continue;
+    const proposal = getAcpPlanProposal(update);
+    if (!proposal || proposal.planExists !== true || typeof proposal.planFilePath !== 'string') {
       continue;
     }
-    // 同一路径可能经历多次"继续完善"；只保留最后一次 resolve apply 的最终文件内容。
-    referencedPlans.delete(planFilePath);
-    referencedPlans.set(planFilePath, { toolCallId: update.toolCallId, planFilePath });
+    // 同一路径可能经历多次 refinement；只保留最后一次 xd://propose 的最终文件内容。
+    referencedPlans.delete(proposal.planFilePath);
+    referencedPlans.set(proposal.planFilePath, {
+      toolCallId: proposal.toolCallId,
+      planFilePath: proposal.planFilePath,
+    });
   }
   if (referencedPlans.size === 0) return [];
   const localDir = await findSessionLocalDir(process);
@@ -265,7 +370,7 @@ export const readHistoricalSessionPlans = async (
       continue;
     }
     const content = await readPlanFile(process, localDir, filePath, 'plan-history');
-    if (!content) {
+    if (content === null) {
       addLog(
         process.localSessionId,
         'info',

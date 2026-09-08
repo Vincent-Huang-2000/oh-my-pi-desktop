@@ -194,7 +194,7 @@ export const formatElicitationOptionLabel = (option: string) => {
     'Chat about this': '与 agent 讨论这个问题',
     'Done selecting': '完成选择',
     'Next →': '下一题 →',
-    // plan 模式审批三选项（omp ACP enum 原始英文值 → 中文按钮）
+    // plan 模式审批两选项（omp ACP enum 原始英文值 → 中文按钮）
     'Approve and execute': '批准并执行',
     'Refine plan': '继续修改方案',
     Reject: '拒绝',
@@ -266,6 +266,26 @@ export const getPayloadFullPlan = (payload: unknown) => {
   if (!payload || typeof payload !== 'object') return '';
   const fullPlan = (payload as Record<string, unknown>).fullPlan;
   return typeof fullPlan === 'string' ? fullPlan.trim() : '';
+};
+
+export const getPayloadPlanFilePath = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return '';
+  const planFilePath = (payload as Record<string, unknown>).planFilePath;
+  return typeof planFilePath === 'string' ? planFilePath : '';
+};
+
+export const getPayloadPlanProposal = (payload: unknown) => {
+  if (!payload || typeof payload !== 'object') return null;
+  const proposal = (payload as Record<string, unknown>).planProposal;
+  if (!proposal || typeof proposal !== 'object') return null;
+  const record = proposal as Record<string, unknown>;
+  if (typeof record.toolCallId !== 'string') return null;
+  return {
+    toolCallId: record.toolCallId,
+    ...(typeof record.title === 'string' ? { title: record.title } : {}),
+    ...(typeof record.planFilePath === 'string' ? { planFilePath: record.planFilePath } : {}),
+    ...(typeof record.planExists === 'boolean' ? { planExists: record.planExists } : {}),
+  };
 };
 
 // 从 `commands_update` 事件 payload 提取可用命令列表（ACP availableCommands）。
@@ -344,6 +364,7 @@ export const getPayloadToolCall = (payload: unknown) => {
     diffs: ToolCallDiffBlock[] | undefined;
     output: string | undefined;
     toolModel: { id: string; name: string } | undefined;
+    isPlanProposal: boolean;
   } = {
     toolCallId: '',
     title: '',
@@ -353,6 +374,7 @@ export const getPayloadToolCall = (payload: unknown) => {
     diffs: undefined,
     output: undefined,
     toolModel: undefined,
+    isPlanProposal: false,
   };
   if (!payload || typeof payload !== 'object') return def;
   const record = payload as Record<string, unknown>;
@@ -370,6 +392,8 @@ export const getPayloadToolCall = (payload: unknown) => {
   def.title = typeof u.title === 'string' ? u.title : '';
   def.kind = typeof u.kind === 'string' ? u.kind : undefined;
   def.status = typeof u.status === 'string' ? u.status : undefined;
+  const planProposal = getPayloadPlanProposal(payload);
+  def.isPlanProposal = planProposal?.toolCallId === def.toolCallId;
   if (Array.isArray(u.locations)) {
     def.locations = u.locations
       .filter(

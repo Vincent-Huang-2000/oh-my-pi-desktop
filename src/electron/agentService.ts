@@ -38,6 +38,7 @@ import {
 import type { AgentEvent, ApprovalProfile, AcpAvailableCommand } from './types.js';
 import { CLIENT_VERSION } from './agentTypes.js';
 import type {
+  AcpPlanProposal,
   AcpProcessState,
   AgentEventSender,
   AgentPromptContent,
@@ -79,6 +80,8 @@ import {
 import {
   getPlanMessage,
   getPlanUpdateMessage,
+  getAcpPlanProposal,
+  isAcpPlanApprovalElicitation,
   readFullPlanForApproval,
   readHistoricalSessionPlans,
   getAcpActivePlan,
@@ -323,6 +326,25 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     pending.resolve(message.result);
   };
 
+  const trackPlanProposal = (
+    process: AcpProcessState,
+    update: Record<string, unknown>,
+  ): AcpPlanProposal | undefined => {
+    const proposal = getAcpPlanProposal(update);
+    if (proposal) {
+      const existing = process.planProposals.get(proposal.toolCallId);
+      process.planProposals.set(proposal.toolCallId, { ...existing, ...proposal });
+    }
+    if (typeof update.toolCallId !== 'string') {
+      return undefined;
+    }
+    const tracked = process.planProposals.get(update.toolCallId);
+    if (update.status === 'completed' || update.status === 'failed') {
+      process.planProposals.delete(update.toolCallId);
+    }
+    return tracked;
+  };
+
   // ACP 的 session/update 是结构化通知，这里只转换桌面端当前 UI 已能展示的事件。
   const mapSessionUpdate = (
     process: AcpProcessState,
@@ -357,6 +379,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     if (sessionUpdate === 'tool_call' || sessionUpdate === 'tool_call_update') {
       // 不再把带 diff 的 update 分流成独立 diff 文本气泡：统一回流到 tool_call 事件，
       // 由渲染层按 toolCallId 原地更新同一张工具卡片（状态/diff/输出实时刷新）。
+      const planProposal = trackPlanProposal(process, update);
       const toolCallId = getToolCallId(update);
       const snapshotSessionId = getAcpSessionIdForSnapshot(process, params);
       const realtimeModel = getCurrentModelSnapshot(process.configOptions);
@@ -373,6 +396,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         ...(params as Record<string, unknown>),
         ...(process.isReplaying ? { _replay: true } : {}),
         ...(toolModel ? { toolModel } : {}),
+        ...(planProposal ? { planProposal } : {}),
       };
       return [{ sessionId, type: 'tool_call', message: getToolCallMessage(update), payload }];
     }
@@ -403,9 +427,19 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     if (sessionUpdate === 'current_mode_update') {
       updateCurrentMode(process, update.currentModeId);
       const modeId = typeof update.currentModeId === 'string' ? update.currentModeId : '未知模式';
-      return [
+      const events: AgentEvent[] = [
         { sessionId, type: 'status_update', message: `当前模式：${modeId}`, payload: params },
       ];
+      if (modeId !== 'plan') {
+        process.planProposals.clear();
+        events.push({
+          sessionId,
+          type: 'active_plan_update',
+          message: '当前没有未完成方案',
+          payload: { version: 1, active: false },
+        });
+      }
+      return events;
     }
     if (sessionUpdate === 'available_commands_update') {
       const commands = normalizeAvailableCommands(update.availableCommands);
@@ -469,30 +503,35 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   // ACP elicitation/create：omp 第2层审批门控（ExtensionToolWrapper）在 always-ask/write
   // 模式下通过此通道向客户端请求表单确认（如 Approve/Deny）。
   // params 形如 { mode: 'form', message, requestedSchema: { properties: { value: {...} }, required } }。
-  const loadElicitationPlanPreview = async (
-    process: AcpProcessState,
-    requestId: string,
-    _message: string,
-  ) => {
+  const loadElicitationPlanPreview = async (process: AcpProcessState, requestId: string) => {
+    const requested = pendingElicitations.get(requestId);
+    if (requested?.process !== process || !requested.planProposal) {
+      return;
+    }
     try {
-      const fullPlan = await readFullPlanForApproval(process);
+      const preview = await readFullPlanForApproval(process, requested.planProposal);
       const pending = pendingElicitations.get(requestId);
       // 读取期间请求可能已被响应、取消或随进程关闭；失效后不再补发预览。
       if (
-        !fullPlan ||
+        !preview ||
         pending?.process !== process ||
+        pending.planProposal?.toolCallId !== requested.planProposal.toolCallId ||
         process.closed ||
         process.suppressCloseEvent ||
         agentProcesses.get(process.localSessionId) !== process
       ) {
-        // fullPlan 为空的原因已在 readFullPlanForApproval 内部记录；这里只记录补发被丢弃的运行时失效。
-        if (fullPlan) {
+        // preview 为空的原因已在 readFullPlanForApproval 内部记录；这里只记录补发被丢弃的运行时失效。
+        if (preview) {
           const reasons: string[] = [];
           if (pending?.process !== process) reasons.push('请求已被响应或替换');
+          if (pending?.planProposal?.toolCallId !== requested.planProposal.toolCallId) {
+            reasons.push('proposal 已被替换');
+          }
           if (process.closed) reasons.push('进程已关闭');
           if (process.suppressCloseEvent) reasons.push('进程切换中');
-          if (agentProcesses.get(process.localSessionId) !== process)
+          if (agentProcesses.get(process.localSessionId) !== process) {
             reasons.push('进程已被新实例替换');
+          }
           addLog(
             process.localSessionId,
             'info',
@@ -505,7 +544,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         sessionId: process.localSessionId,
         type: 'elicitation_plan_preview',
         message: '完整方案已加载',
-        payload: { requestId, fullPlan },
+        payload: {
+          requestId,
+          fullPlan: preview.content,
+          planFilePath: preview.planFilePath,
+        },
       });
     } catch (error) {
       const message2 = error instanceof Error ? error.message : '未知原因';
@@ -523,7 +566,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     const message2 = typeof params.message === 'string' ? params.message : 'agent 请求输入';
     const requestedSchema = isRecord(params.requestedSchema) ? params.requestedSchema : {};
     const questionnaire = parseQuestionnaireEval(message2) ?? undefined;
-    pendingElicitations.set(requestId, { process, rpcId: message.id, questionnaire });
+    const proposals = !questionnaire ? [...process.planProposals.values()] : [];
+    const planProposal = isAcpPlanApprovalElicitation(message2)
+      ? proposals[proposals.length - 1]
+      : undefined;
+    pendingElicitations.set(requestId, {
+      process,
+      rpcId: message.id,
+      questionnaire,
+      ...(planProposal ? { planProposal } : {}),
+    });
     addLog(process.localSessionId, 'permission', message2);
     sendAgentEvent({
       sessionId: process.localSessionId,
@@ -535,10 +587,11 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         message: message2,
         requestedSchema,
         ...(questionnaire ? { questionnaire } : {}),
+        ...(planProposal ? { planProposal } : {}),
       },
     });
-    if (!questionnaire) {
-      void loadElicitationPlanPreview(process, requestId, message2);
+    if (planProposal) {
+      void loadElicitationPlanPreview(process, requestId);
     }
   };
 
@@ -875,6 +928,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       replayEvents: [],
       turnInFlightCount: 0,
       questionnaireFollowUps: [],
+      planProposals: new Map(),
     };
     agentProcesses.set(sessionId, processState);
     bindAgentProcess(processState);

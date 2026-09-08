@@ -38,6 +38,8 @@ import {
   getPayloadConfigOptions,
   getPayloadElicitationFields,
   getPayloadFullPlan,
+  getPayloadPlanFilePath,
+  getPayloadPlanProposal,
   getPayloadQuestionnaire,
   getPayloadPermissionOptions,
   getPayloadRequestId,
@@ -153,17 +155,23 @@ export function useAgentEvents(
 
       // ACP elicitation/create（工具/计划审批与 AskTool 原生提问）：按 sessionId 分桶排队。
       if (event.type === 'elicitation_request') {
-        const elicitationPlan = splitElicitationPlan(event.message);
-        const fullPlan = getPayloadFullPlan(event.payload);
-        // fullPlan 为空但 elicitationPlan.plan 非空时，只能展示 message 片段，标记降级。
+        // 只有主进程按 xd://propose 严格关联的请求才允许展示方案预览。
+        // 普通审批或 Ask 文本中即使含 Markdown 标题，也不能复用 session 中的旧方案。
+        const planProposal = getPayloadPlanProposal(event.payload);
+        const elicitationPlan = planProposal
+          ? splitElicitationPlan(event.message)
+          : { question: event.message, plan: '' };
+        const fullPlan = planProposal ? getPayloadFullPlan(event.payload) : '';
+        const planFilePath = planProposal ? getPayloadPlanFilePath(event.payload) : '';
+        // fullPlan 为空但 elicitationPlan.plan 非空时，只能展示 ACP 表单中的短预览，标记降级。
         const planContent = fullPlan || elicitationPlan.plan;
-        const planDegraded = !fullPlan && !!elicitationPlan.plan;
+        const planDegraded = !!planProposal && !fullPlan && !!elicitationPlan.plan;
         const req: ElicitationRequest = {
           requestId: getPayloadRequestId(event.payload),
           message: event.message,
           fields: getPayloadElicitationFields(event.payload),
           kind: getElicitationKind(event.message),
-          // 消息流已有对应的方案预览卡时，弹窗只显示简短提示。
+          // 仅在消息流已有正文时隐藏表单正文；文件读取失败时仍保留 ACP 短预览。
           hasPlanPreview: !!planContent,
         };
         const currentQueue = app.elicitationBySession.current[event.sessionId] ?? [];
@@ -181,14 +189,14 @@ export function useAgentEvents(
             return current;
           }
           // 新的实时 plan 审批会替代 `_meta` 恢复卡；后续交互只关联这次有效 requestId。
-          const baseMessages = planContent
+          const baseMessages = planProposal
             ? current.filter((message) => !message.planActive)
             : current;
-          let next = baseMessages;
           const pendingIndex = baseMessages.findIndex(
             (message) => message.role === 'plan' && message.planPending,
           );
-          if (planContent) {
+          let next = baseMessages;
+          if (planProposal && planContent) {
             const preview: ChatMessage = {
               id:
                 pendingIndex >= 0 ? baseMessages[pendingIndex].id : `plan-preview-${req.requestId}`,
@@ -198,17 +206,30 @@ export function useAgentEvents(
               planPreview: true,
               planPreviewRequestId: req.requestId,
               planPreviewDegraded: planDegraded || undefined,
+              planFilePath: planFilePath || undefined,
             };
             next =
               pendingIndex >= 0
                 ? baseMessages.map((message, index) => (index === pendingIndex ? preview : message))
                 : [...baseMessages, preview];
-          } else if (pendingIndex >= 0) {
+          } else if (planProposal && pendingIndex >= 0) {
             next = baseMessages.map((message, index) =>
               index === pendingIndex
                 ? { ...message, planPreviewRequestId: req.requestId }
                 : message,
             );
+          } else if (planProposal) {
+            next = [
+              ...baseMessages,
+              {
+                id: `plan-preview-${req.requestId}`,
+                role: 'plan' as const,
+                text: '正在加载完整方案…',
+                planContentType: 'markdown' as const,
+                planPreview: true,
+                planPreviewRequestId: req.requestId,
+              },
+            ];
           }
           return [
             ...next,
@@ -241,6 +262,7 @@ export function useAgentEvents(
       if (event.type === 'elicitation_plan_preview') {
         const requestId = getPayloadRequestId(event.payload);
         const fullPlan = getPayloadFullPlan(event.payload);
+        const planFilePath = getPayloadPlanFilePath(event.payload);
         if (!requestId || !fullPlan) {
           return;
         }
@@ -255,6 +277,7 @@ export function useAgentEvents(
             planContentType: 'markdown',
             planPreview: true,
             planPreviewRequestId: requestId,
+            planFilePath: planFilePath || undefined,
           };
           return previewIndex >= 0
             ? current.map((message, index) => (index === previewIndex ? preview : message))
