@@ -1,3 +1,4 @@
+import type { PlanReviewSubmission } from './types.js';
 /**
  * ipc — Electron 主进程 IPC 处理器注册。
  *
@@ -439,6 +440,26 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
       return agentService.respondPermissionOption(requestId, optionId);
     },
   );
+
+  ipcMain.handle('desktop:reopen-plan-review', (_event, sessionId: string, workspacePath: string) =>
+    agentService.reopenPlanReview(sessionId, workspacePath),
+  );
+  ipcMain.handle(
+    'desktop:respond-plan-review',
+    (_event, sessionId: string, reviewId: string, submission: PlanReviewSubmission) =>
+      agentService.respondPlanReview(sessionId, reviewId, submission),
+  );
+  ipcMain.handle('desktop:choose-plan-save-path', async (_event, sessionId: string) => {
+    const session = readState().recentSessions.find((item) => item.id === sessionId);
+    if (!session) return null;
+    const result = await dialog.showSaveDialog({
+      title: '保存方案',
+      buttonLabel: '选择保存位置',
+      defaultPath: path.join(session.projectPath, 'plan.md'),
+      filters: [{ name: 'Markdown 方案', extensions: ['md'] }],
+    });
+    return result.canceled ? null : (result.filePath ?? null);
+  });
 
   // ACP elicitation/create 响应：用户提交表单（accept + content）/ 拒绝 / 取消。
   ipcMain.handle(

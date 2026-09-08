@@ -1,3 +1,4 @@
+import type { PlanReviewSubmission } from './types.js';
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
 
@@ -36,7 +37,10 @@ type AgentEvent = {
     | 'session_update'
     | 'plan'
     | 'usage_update'
-    | 'history_loaded';
+    | 'history_loaded'
+    | 'plan_review_update'
+    | 'session_replaced'
+    | 'plan_review_action_started';
   message: string;
   payload?: unknown;
   settlesPrompt?: boolean;
@@ -132,6 +136,12 @@ const desktop = {
     action: 'accept' | 'decline' | 'cancel',
     content?: Record<string, unknown>,
   ) => ipcRenderer.invoke('desktop:elicitation-response', requestId, action, content),
+  reopenPlanReview: (sessionId: string, workspacePath: string) =>
+    ipcRenderer.invoke('desktop:reopen-plan-review', sessionId, workspacePath),
+  respondPlanReview: (sessionId: string, reviewId: string, submission: PlanReviewSubmission) =>
+    ipcRenderer.invoke('desktop:respond-plan-review', sessionId, reviewId, submission),
+  choosePlanSavePath: (sessionId: string) =>
+    ipcRenderer.invoke('desktop:choose-plan-save-path', sessionId),
   questionnaireResponse: (
     requestId: string,
     action: 'submit' | 'deny',

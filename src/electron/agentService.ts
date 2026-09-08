@@ -1,3 +1,9 @@
+import {
+  parsePlanReview,
+  isPlanReviewForm,
+  validatePlanReviewSubmission,
+} from './agentPlanReview.js';
+import type { PlanReviewSubmission } from './types.js';
 /**
  * agentService — ACP Agent 服务的编排层。
  *
@@ -175,6 +181,19 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   const emitEvent = (event: AgentEvent) => {
     addLog(event.sessionId, getLogLevel(event.type), event.message);
     sendAgentEvent(event);
+  };
+
+  const emitPlanReview = (process: AcpProcessState) => {
+    emitEvent({
+      sessionId: process.localSessionId,
+      type: 'plan_review_update',
+      message: process.planReview ? '方案等待审核' : '方案审核已关闭',
+      payload: {
+        review: process.planReview ?? null,
+        ready: process.planReviewReady === true,
+        supported: process.planReviewSupported === true,
+      },
+    });
   };
 
   const isReplayMessageEvent = (event: AgentEvent) =>
@@ -431,6 +450,15 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         { sessionId, type: 'status_update', message: `当前模式：${modeId}`, payload: params },
       ];
       if (modeId !== 'plan') {
+        if (process.planReviewRequestId) {
+          const pending = pendingElicitations.get(process.planReviewRequestId);
+          if (pending) sendResponse(process, pending.rpcId, { action: 'cancel' });
+          pendingElicitations.delete(process.planReviewRequestId);
+        }
+        process.planReview = undefined;
+        process.planReviewRequestId = undefined;
+        process.planReviewReady = false;
+        emitPlanReview(process);
         process.planProposals.clear();
         events.push({
           sessionId,
@@ -455,7 +483,76 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         },
       ];
     }
+    if (sessionUpdate === 'plan_review_update') {
+      if (update.review === null) {
+        if (process.planReviewRequestId) pendingElicitations.delete(process.planReviewRequestId);
+        process.planReview = undefined;
+        process.planReviewRequestId = undefined;
+      } else {
+        const review = parsePlanReview(update.review);
+        if (!review) return [];
+        if (process.planReview?.reviewId !== review.reviewId && process.planReviewRequestId) {
+          const pending = pendingElicitations.get(process.planReviewRequestId);
+          if (pending) sendResponse(process, pending.rpcId, { action: 'cancel' });
+          pendingElicitations.delete(process.planReviewRequestId);
+          process.planReviewRequestId = undefined;
+        }
+        process.planReviewReady = Boolean(
+          process.reopeningPlanReview ||
+          (process.planReview?.reviewId === review.reviewId && process.planReviewReady),
+        );
+        process.planReview = review;
+        process.planReviewSupported = true;
+      }
+      emitPlanReview(process);
+      return [];
+    }
     if (sessionUpdate === 'session_info_update') {
+      const replacement = isRecord(update._meta)
+        ? update._meta['omp.sessionReplacement']
+        : undefined;
+      if (
+        isRecord(replacement) &&
+        replacement.version === 1 &&
+        typeof replacement.sessionId === 'string' &&
+        replacement.sessionId &&
+        replacement.sessionId !== process.acpSessionId
+      ) {
+        // 保留规划记录；桌面当前会话跟随新执行会话，原请求的忙碌计数继续由原 RPC 结算。
+        const previousSession = upsertSession(
+          process.workspacePath,
+          `${process.localSessionId}-plan-${process.acpSessionId}`,
+          process.localSessionTitle,
+          process.acpSessionId,
+          undefined,
+          true,
+          process.approvalProfile,
+        );
+        process.acpSessionId = replacement.sessionId;
+        process.restoredAcpSessionId = replacement.sessionId;
+        process.planProposals.clear();
+        process.planReview = undefined;
+        process.planReviewRequestId = undefined;
+        clearPendingPermissionsForProcess(process);
+        clearPendingElicitationsForProcess(process);
+        const session = upsertSession(
+          process.workspacePath,
+          process.localSessionId,
+          '新的执行会话',
+          process.acpSessionId,
+          undefined,
+          false,
+          process.approvalProfile,
+        );
+        process.localSessionTitle = session.title;
+        emitEvent({
+          sessionId: process.localSessionId,
+          type: 'session_replaced',
+          message: '已切换到新会话，规划记录已保留',
+          payload: { session, previousSession },
+        });
+        return [];
+      }
       updateStoredSessionInfo(process, update);
       return [];
     }
@@ -475,7 +572,15 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       return;
     }
 
-    mapSessionUpdate(process, message.params as SessionNotification).forEach((event) => {
+    const notification = message.params as SessionNotification;
+    if (
+      !process.isReplaying &&
+      process.acpSessionId &&
+      typeof notification?.sessionId === 'string' &&
+      notification.sessionId !== process.acpSessionId
+    )
+      return;
+    mapSessionUpdate(process, notification).forEach((event) => {
       if (process.isReplaying && isReplayMessageEvent(event)) {
         if (process.replayMode === 'buffer') {
           process.replayEvents.push(event);
@@ -565,6 +670,18 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     const params = isRecord(message.params) ? message.params : {};
     const message2 = typeof params.message === 'string' ? params.message : 'agent 请求输入';
     const requestedSchema = isRecord(params.requestedSchema) ? params.requestedSchema : {};
+    if (
+      process.planReview &&
+      !process.planReviewRequestId &&
+      params.sessionId === process.acpSessionId &&
+      isPlanReviewForm(requestedSchema)
+    ) {
+      process.planReviewRequestId = requestId;
+      process.planReviewReady = true;
+      pendingElicitations.set(requestId, { process, rpcId: message.id });
+      emitPlanReview(process);
+      return;
+    }
     const questionnaire = parseQuestionnaireEval(message2) ?? undefined;
     const proposals = !questionnaire ? [...process.planProposals.values()] : [];
     const planProposal = isAcpPlanApprovalElicitation(message2)
@@ -695,6 +812,30 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   };
 
   const emitActivePlanUpdate = (process: AcpProcessState, response: unknown) => {
+    const reviewMeta =
+      isRecord(response) && isRecord(response._meta) ? response._meta['omp.planReview'] : undefined;
+    if (
+      isRecord(reviewMeta) &&
+      reviewMeta.version === 1 &&
+      typeof reviewMeta.active === 'boolean'
+    ) {
+      process.planReviewSupported = true;
+      emitPlanReview(process);
+      if (reviewMeta.active && !process.planReview && !process.reopeningPlanReview) {
+        process.reopeningPlanReview = true;
+        void sendRequest(process, 'omp.planReview/reopen', { sessionId: process.acpSessionId })
+          .catch(() => {
+            emitEvent({
+              sessionId: process.localSessionId,
+              type: 'status_update',
+              message: '方案尚未恢复，可点击“审核方案”重试',
+            });
+          })
+          .finally(() => {
+            process.reopeningPlanReview = false;
+          });
+      }
+    }
     const planMode = getAcpActivePlan(response);
     if (!planMode) return;
     emitEvent({
@@ -859,6 +1000,9 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
     process.child.on('error', (error) => {
       process.closed = true;
+      process.planReview = undefined;
+      process.planReviewRequestId = undefined;
+      if (!process.suppressCloseEvent) emitPlanReview(process);
       process.questionnaireFollowUps = [];
       if (process.suppressCloseEvent) {
         return;
@@ -867,6 +1011,9 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
     process.child.on('close', (code) => {
       process.closed = true;
+      process.planReview = undefined;
+      process.planReviewRequestId = undefined;
+      if (!process.suppressCloseEvent) emitPlanReview(process);
       // 旧进程退出可能晚于同 session 的新进程启动；只能移除自身，不能误删新映射。
       if (agentProcesses.get(process.localSessionId) === process) {
         agentProcesses.delete(process.localSessionId);
@@ -1109,6 +1256,14 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     promptRequest.then(
       (response) => {
         processState.turnInFlightCount = Math.max(0, processState.turnInFlightCount - 1);
+        if (
+          processState.planReview &&
+          !processState.planReviewRequestId &&
+          !processState.suppressCloseEvent
+        ) {
+          processState.planReviewReady = true;
+          emitPlanReview(processState);
+        }
         if (processState.suppressCloseEvent) {
           return;
         }
@@ -1127,6 +1282,14 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       },
       (error: Error) => {
         processState.turnInFlightCount = Math.max(0, processState.turnInFlightCount - 1);
+        if (
+          processState.planReview &&
+          !processState.planReviewRequestId &&
+          !processState.suppressCloseEvent
+        ) {
+          processState.planReviewReady = true;
+          emitPlanReview(processState);
+        }
         if (processState.suppressCloseEvent) {
           return;
         }
@@ -1376,6 +1539,110 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     return { ok: true };
   };
 
+  const reopenPlanReview: AgentService['reopenPlanReview'] = async (sessionId, workspacePath) => {
+    try {
+      const process = await getProcessWithSession(sessionId, workspacePath);
+      if (!process || process.closed || !process.planReviewSupported)
+        return { ok: false, message: '当前 OMP 不支持完整方案审核，请更新 OMP' };
+      if (process.planReviewRequestId) {
+        emitPlanReview(process);
+        return { ok: true };
+      }
+      if (process.turnInFlightCount > 0)
+        return { ok: false, message: '请等待当前任务结束后再重开方案' };
+      process.reopeningPlanReview = true;
+      try {
+        const result = await sendRequest(process, 'omp.planReview/reopen', {
+          sessionId: process.acpSessionId,
+        });
+        return isRecord(result) && result.ok === true
+          ? { ok: true }
+          : { ok: false, message: '当前没有待审核方案，请先让 AI 提交计划' };
+      } finally {
+        process.reopeningPlanReview = false;
+      }
+    } catch {
+      return { ok: false, message: '无法打开方案，请检查 OMP 是否仍在运行' };
+    }
+  };
+
+  const respondPlanReview: AgentService['respondPlanReview'] = async (
+    sessionId,
+    reviewId,
+    submission: PlanReviewSubmission,
+    // eslint-disable-next-line @typescript-eslint/require-await -- IPC 立即确认接收，执行完成由事件结算
+  ) => {
+    const process = agentProcesses.get(sessionId);
+    const review = process?.planReview;
+    if (!process || process.closed || !review || review.reviewId !== reviewId)
+      return { ok: false, message: '这份审核已失效，请重新打开方案' };
+    if (!process.planReviewReady || !validatePlanReviewSubmission(review, submission))
+      return { ok: false, message: '该选项当前不可用，请检查选择和保存位置' };
+    const content = {
+      decision: submission.decision,
+      feedback: submission.feedback,
+      editedContent: submission.editedContent,
+      executionModel: submission.executionModel,
+      savePath: submission.savePath,
+    };
+    if (process.planReviewRequestId) {
+      const result = respondElicitation(process.planReviewRequestId, 'accept', content);
+      if (result.ok) {
+        process.planReviewRequestId = undefined;
+        process.planReview = undefined;
+        emitPlanReview(process);
+      }
+      return result;
+    }
+    if (process.turnInFlightCount > 0)
+      return { ok: false, message: '请等待当前任务结束后再提交审核' };
+    process.turnInFlightCount++;
+    emitEvent({ sessionId, type: 'plan_review_action_started', message: '正在处理方案' });
+    // action 本身拥有执行回合；不再另发 prompt，以免打断正在执行的审核操作。
+    const actionSessionId = process.acpSessionId;
+    const request = sendRequest(process, 'omp.planReview/action', {
+      sessionId: process.acpSessionId,
+      reviewId,
+      ...content,
+    });
+    process.planReview = undefined;
+    emitPlanReview(process);
+    void request.then(
+      (result) => {
+        process.turnInFlightCount = Math.max(0, process.turnInFlightCount - 1);
+        if (process.suppressCloseEvent) return;
+        const ok = isRecord(result) && result.ok === true;
+        if (
+          !ok &&
+          !process.closed &&
+          process.acpSessionId === actionSessionId &&
+          !process.planReview
+        ) {
+          process.planReview = review;
+          process.planReviewReady = true;
+          emitPlanReview(process);
+        }
+        emitEvent({
+          sessionId,
+          type: ok ? 'done' : 'error',
+          message: ok ? '方案操作已完成' : '方案操作未完成，请重新打开审核后重试',
+          settlesPrompt: true,
+        });
+      },
+      () => {
+        process.turnInFlightCount = Math.max(0, process.turnInFlightCount - 1);
+        if (!process.suppressCloseEvent)
+          emitEvent({
+            sessionId,
+            type: 'error',
+            message: '方案操作失败，请重新连接 OMP 后检查结果',
+            settlesPrompt: true,
+          });
+      },
+    );
+    return { ok: true };
+  };
+
   // 问卷提交等同于批准该条严格识别的 eval；真实答案在当前回合结束后再作为用户消息续发。
   const respondQuestionnaire = (
     requestId: string,
@@ -1511,6 +1778,12 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       if (!processState) {
         return { ok: false, message: 'agent 进程不可用' };
       }
+    }
+    // 切回已运行的会话只恢复界面，不能重新 load 并中断正在等待的审核。
+    if (initMethod === 'session/resume' && processState.acpSessionId === acpSessionId) {
+      updateConfigOptions(processState, processState.configOptions);
+      emitPlanReview(processState);
+      return { ok: true, sessionId: acpSessionId };
     }
     processState.approvalProfile = approvalProfile;
     // 设好恢复槽位后立即执行：load/resume 沿用原 acpSessionId，fork 返回新的 acpSessionId。
@@ -1713,6 +1986,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     respondPermissionOption,
     respondPermission,
     respondElicitation,
+    reopenPlanReview,
+    respondPlanReview,
     respondQuestionnaire,
     listSessions,
     loadSession,

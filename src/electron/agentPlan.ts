@@ -196,7 +196,9 @@ export const getAcpPlanProposal = (update: Record<string, unknown>): AcpPlanProp
 };
 
 export const isAcpPlanApprovalElicitation = (message: string) => {
-  return /^Approve plan "[^\r\n]+" and start implementation\?\r?\n\r?\n/.test(message);
+  return /^(?:Approve plan "[^\r\n]+" and start implementation\?|Review plan "[^\r\n]+" and choose how to proceed\.)\r?\n\r?\n/.test(
+    message,
+  );
 };
 
 export const readPlanFile = async (

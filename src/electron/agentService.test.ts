@@ -471,3 +471,218 @@ describe('xd://propose Plan 审批关联', () => {
     });
   });
 });
+
+describe('P1 方案审核与新会话接续', () => {
+  const review = {
+    reviewId: 'review-1',
+    planFilePath: 'local://auth-plan.md',
+    title: 'Auth',
+    content: '# Auth\n完整计划',
+    feedback: '',
+    options: ['execute', 'compact', 'keep', 'refine', 'save'].map((id) => ({ id })),
+  };
+  const requestOf = (record: SpawnRecord, method: string) =>
+    record.stdinWrites
+      .map(
+        (line) =>
+          JSON.parse(line) as { id: string; method?: string; params?: Record<string, unknown> },
+      )
+      .filter((message) => message.method === method)
+      .at(-1)!;
+  const setup = async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const record = await startInitializedAgent(service, 's1', '/tmp/test-workspace');
+    const sending = service.sendAgentMessage('s1', '/tmp/test-workspace', { text: '请规划' });
+    await vi.waitFor(() => expect(requestOf(record, 'session/new')).toBeDefined());
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/new').id,
+      result: { sessionId: 'acp-old', _meta: { 'omp.planReview': { version: 1, active: false } } },
+    });
+    await sending;
+    const update = (value: unknown, sessionId = 'acp-old') =>
+      emitAcpMessage(record, {
+        jsonrpc: '2.0',
+        method: 'session/update',
+        params: { sessionId, update: value },
+      });
+    const form = () =>
+      emitAcpMessage(record, {
+        jsonrpc: '2.0',
+        id: 'review-form',
+        method: 'elicitation/create',
+        params: {
+          sessionId: 'acp-old',
+          mode: 'form',
+          requestedSchema: {
+            properties: {
+              decision: { oneOf: review.options.map((option) => ({ const: option.id })) },
+            },
+          },
+        },
+      });
+    return { service, record, events, update, form };
+  };
+  it('完整通知与表单合为一份审核，禁用提前提交和重复提交', async () => {
+    const { service, record, events, update, form } = await setup();
+    update({ sessionUpdate: 'plan_review_update', review });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'execute' }),
+    ).toMatchObject({ ok: false });
+    form();
+    expect(events.filter((event) => event.type === 'elicitation_request')).toHaveLength(0);
+    expect(events.at(-1)?.payload).toMatchObject({ ready: true, review });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, {
+        decision: 'refine',
+        feedback: '补充验证',
+        editedContent: '# 新方案',
+      }),
+    ).toMatchObject({ ok: true });
+    expect(JSON.parse(record.stdinWrites.at(-1)!)).toMatchObject({
+      id: 'review-form',
+      result: {
+        action: 'accept',
+        content: { decision: 'refine', feedback: '补充验证', editedContent: '# 新方案' },
+      },
+    });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'execute' }),
+    ).toMatchObject({ ok: false });
+  });
+  it('新上下文执行保留规划记录，后续消息和审批使用新会话', async () => {
+    const { service, record, events, update, form } = await setup();
+    update({ sessionUpdate: 'plan_review_update', review });
+    form();
+    await service.respondPlanReview('s1', review.reviewId, { decision: 'execute' });
+    const oldPrompt = requestOf(record, 'session/prompt');
+    update({
+      sessionUpdate: 'session_info_update',
+      _meta: { 'omp.sessionReplacement': { version: 1, sessionId: 'acp-new' } },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: 'session_replaced',
+      payload: {
+        session: { id: 's1', acpSessionId: 'acp-new' },
+        previousSession: { acpSessionId: 'acp-old' },
+      },
+    });
+    update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '旧内容' } });
+    expect(events.some((event) => event.message === '旧内容')).toBe(false);
+    update(
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '新内容' } },
+      'acp-new',
+    );
+    expect(events.at(-1)?.message).toBe('新内容');
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: oldPrompt.id,
+      result: { stopReason: 'end_turn' },
+    });
+    await service.sendAgentMessage('s1', '/tmp/test-workspace', { text: '继续' });
+    expect(requestOf(record, 'session/prompt').params?.sessionId).toBe('acp-new');
+  });
+  it('重开审核通过独立 action 执行，只产生一次忙碌开始与结束', async () => {
+    const { service, record, events, update } = await setup();
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/prompt').id,
+      result: { stopReason: 'end_turn' },
+    });
+    await Promise.resolve();
+    const reopening = service.reopenPlanReview('s1', '/tmp/test-workspace');
+    await vi.waitFor(() => expect(requestOf(record, 'omp.planReview/reopen')).toBeDefined());
+    update({ sessionUpdate: 'plan_review_update', review });
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'omp.planReview/reopen').id,
+      result: { ok: true },
+    });
+    expect(await reopening).toMatchObject({ ok: true });
+    expect(events.at(-1)?.payload).toMatchObject({ ready: true });
+    await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' });
+    const action = requestOf(record, 'omp.planReview/action');
+    expect(action.params).toMatchObject({
+      sessionId: 'acp-old',
+      reviewId: 'review-1',
+      decision: 'keep',
+    });
+    expect(events.filter((event) => event.type === 'plan_review_action_started')).toHaveLength(1);
+    emitAcpMessage(record, { jsonrpc: '2.0', id: action.id, result: { ok: false } });
+    await Promise.resolve();
+    expect(events.at(-1)?.type).toBe('error');
+    expect(
+      events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
+    ).toMatchObject({ review, ready: true });
+  });
+  it('切回运行中的会话不重新加载、不打断待审核表单', async () => {
+    const { service, record, events, update, form } = await setup();
+    update({ sessionUpdate: 'plan_review_update', review });
+    form();
+    const writes = record.stdinWrites.length;
+    expect(await service.resumeSession('s1', '/tmp/test-workspace', 'acp-old')).toMatchObject({
+      ok: true,
+    });
+    expect(record.stdinWrites).toHaveLength(writes);
+    expect(events.at(-1)?.payload).toMatchObject({ review, ready: true });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' }),
+    ).toMatchObject({ ok: true });
+  });
+  it('加载持久化待审状态后自动恢复全文，使用 action 而非旧表单', async () => {
+    const { service, record, events, update } = await setup();
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/prompt').id,
+      result: { stopReason: 'end_turn' },
+    });
+    const loading = service.loadSession('s1', '/tmp/test-workspace', 'acp-old');
+    await vi.waitFor(() => expect(requestOf(record, 'session/load')).toBeDefined());
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/load').id,
+      result: { _meta: { 'omp.planReview': { version: 1, active: true } } },
+    });
+    await loading;
+    expect(requestOf(record, 'omp.planReview/reopen').params?.sessionId).toBe('acp-old');
+    update({ sessionUpdate: 'plan_review_update', review });
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'omp.planReview/reopen').id,
+      result: { ok: true },
+    });
+    await Promise.resolve();
+    expect(
+      events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
+    ).toMatchObject({ review, ready: true });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, {
+        decision: 'save',
+        savePath: '/tmp/approved-plan.md',
+      }),
+    ).toMatchObject({ ok: true });
+    expect(requestOf(record, 'omp.planReview/action').params).toMatchObject({ decision: 'save' });
+  });
+  it('切出规划模式会关闭并结算旧表单，普通输入请求仍走原审批', async () => {
+    const { service, record, events, update, form } = await setup();
+    update({ sessionUpdate: 'plan_review_update', review });
+    form();
+    update({ sessionUpdate: 'current_mode_update', currentModeId: 'default' });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' }),
+    ).toMatchObject({ ok: false });
+    expect(record.stdinWrites.some((line) => line.includes('"action":"cancel"'))).toBe(true);
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: 'ordinary',
+      method: 'elicitation/create',
+      params: {
+        sessionId: 'acp-old',
+        message: '普通工具审批',
+        requestedSchema: { properties: { value: { type: 'boolean' } } },
+      },
+    });
+    expect(events.at(-1)?.type).toBe('elicitation_request');
+  });
+});

@@ -77,7 +77,10 @@ export type AgentEvent = {
     | 'session_update'
     | 'plan'
     | 'usage_update'
-    | 'history_loaded';
+    | 'history_loaded'
+    | 'plan_review_update'
+    | 'session_replaced'
+    | 'plan_review_action_started';
   message: string;
   payload?: unknown;
   /** 标记此事件结算了一个 in-flight prompt（done/RPC error/问卷续发失败）。渲染层用于递减 agentBusyCount。 */
@@ -120,3 +123,23 @@ export type CommandResult = {
   stderr: string;
   code: number | null;
 };
+
+export type PlanReviewDecision = 'execute' | 'compact' | 'keep' | 'refine' | 'save' | 'cancel';
+export type PlanReviewData = {
+  reviewId: string;
+  planFilePath: string;
+  title: string;
+  content: string | null;
+  feedback: string;
+  options: Array<{ id: Exclude<PlanReviewDecision, 'cancel'>; disabled?: boolean }>;
+  executionModels?: Array<{ id: string; label: string; default?: boolean }>;
+  context?: { tokens: number; contextWindow: number };
+};
+export type PlanReviewSubmission = {
+  decision: PlanReviewDecision;
+  feedback?: string;
+  editedContent?: string;
+  executionModel?: string;
+  savePath?: string;
+};
+export type PlanReviewView = { review: PlanReviewData | null; ready: boolean; supported: boolean };

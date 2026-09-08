@@ -1,3 +1,4 @@
+import type { PlanReviewData, PlanReviewSubmission } from './types.js';
 /**
  * agentTypes — Agent Service 的类型、接口与常量定义。
  *
@@ -104,6 +105,11 @@ export type AcpProcessState = {
   pendingApprovalProfile?: ApprovalProfile;
   // 正在执行的 xd://propose 工具调用；用于将随后到达的 ACP plan 审批表单精确关联到本次 proposal。
   planProposals: Map<string, AcpPlanProposal>;
+  planReview?: PlanReviewData;
+  planReviewRequestId?: string;
+  planReviewSupported?: boolean;
+  planReviewReady?: boolean;
+  reopeningPlanReview?: boolean;
   suppressCloseEvent?: boolean;
 };
 
@@ -240,6 +246,15 @@ export type SessionActionResult = {
 };
 
 export type AgentService = {
+  reopenPlanReview: (
+    sessionId: string,
+    workspacePath: string,
+  ) => Promise<{ ok: boolean; message?: string }>;
+  respondPlanReview: (
+    sessionId: string,
+    reviewId: string,
+    submission: PlanReviewSubmission,
+  ) => Promise<{ ok: boolean; message?: string }>;
   startAgent: (
     sessionId: string,
     workspacePath: string,

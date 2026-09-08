@@ -101,7 +101,10 @@ type AgentEvent = {
     | 'session_update'
     | 'plan'
     | 'usage_update'
-    | 'history_loaded';
+    | 'history_loaded'
+    | 'plan_review_update'
+    | 'session_replaced'
+    | 'plan_review_action_started';
   message: string;
   payload?: unknown;
   /** 标记此事件结算了一个 in-flight prompt。 */
@@ -146,6 +149,26 @@ type ToolModelSnapshot = {
   id: string;
   name: string;
 };
+
+type PlanReviewDecision = 'execute' | 'compact' | 'keep' | 'refine' | 'save' | 'cancel';
+type PlanReviewData = {
+  reviewId: string;
+  planFilePath: string;
+  title: string;
+  content: string | null;
+  feedback: string;
+  options: Array<{ id: Exclude<PlanReviewDecision, 'cancel'>; disabled?: boolean }>;
+  executionModels?: Array<{ id: string; label: string; default?: boolean }>;
+  context?: { tokens: number; contextWindow: number };
+};
+type PlanReviewSubmission = {
+  decision: PlanReviewDecision;
+  feedback?: string;
+  editedContent?: string;
+  executionModel?: string;
+  savePath?: string;
+};
+type PlanReviewView = { review: PlanReviewData | null; ready: boolean; supported: boolean };
 
 interface Window {
   ohMyPiDesktop: {
@@ -213,6 +236,16 @@ interface Window {
       action: 'accept' | 'decline' | 'cancel',
       content?: Record<string, unknown>,
     ) => Promise<{ ok: boolean; message?: string }>;
+    reopenPlanReview: (
+      sessionId: string,
+      workspacePath: string,
+    ) => Promise<{ ok: boolean; message?: string }>;
+    respondPlanReview: (
+      sessionId: string,
+      reviewId: string,
+      submission: PlanReviewSubmission,
+    ) => Promise<{ ok: boolean; message?: string }>;
+    choosePlanSavePath: (sessionId: string) => Promise<string | null>;
     questionnaireResponse: (
       requestId: string,
       action: 'submit' | 'deny',
