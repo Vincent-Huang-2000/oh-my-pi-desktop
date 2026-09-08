@@ -3,8 +3,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   compilePlanFeedback,
-  deletePlanSection,
+  getHiddenLineRanges,
   getPlanSections,
+  stripHiddenSections,
+  toVisibleLineStart,
+  togglePlanSectionHidden,
   type PlanReviewDraft,
 } from '../lib/planReview';
 import './PlanReviewOverlay.css';
@@ -43,6 +46,8 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
         },
   );
   const [editing, setEditing] = useState(false);
+  // 左侧目录整栏折叠状态：仅面板存续期间有效，不持久化。
+  const [tocCollapsed, setTocCollapsed] = useState(false);
   const anchor = draft.anchor ?? '';
   const note = draft.pendingNote ?? '';
   const setAnchor = (value: string) => update({ ...draft, anchor: value });
@@ -56,10 +61,46 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
   const body = useRef<HTMLDivElement>(null);
   const editor = useRef<HTMLTextAreaElement>(null);
   const sections = getPlanSections(draft.content);
+  // 隐藏语义：deleted 中的章节正文保留，仅阅读预览与提交时剔除；
+  // 被隐藏祖先覆盖的子章节在目录里一并置灰，但恢复入口只留在祖先行。
+  const hiddenRanges = getHiddenLineRanges(draft.content, draft.deleted);
+  const hiddenSectionStarts = new Set(
+    sections
+      .filter(
+        (section) =>
+          draft.deleted.includes(section.title) ||
+          hiddenRanges.some((range) => section.start > range.start && section.start < range.end),
+      )
+      .map((section) => section.start),
+  );
+  const visibleSections = sections.filter((section) => !hiddenSectionStarts.has(section.start));
+  // 全部隐藏时退回完整列表兜底，保证目录编号与激活态有合法取值。
+  const listedSections = visibleSections.length > 0 ? visibleSections : sections;
+  const [selectedSectionStart, setSelectedSectionStart] = useState<number | null>(null);
+  const primaryLevel =
+    listedSections.length === 0
+      ? 1
+      : listedSections.some((section) => section.level === 2)
+        ? 2
+        : Math.min(...listedSections.map((section) => section.level));
+  const primarySectionNumbers = new Map(
+    listedSections
+      .filter((section) => section.level === primaryLevel)
+      .map((section, index) => [section.start, index + 1]),
+  );
+  const activeSectionStart =
+    selectedSectionStart !== null &&
+    visibleSections.some((section) => section.start === selectedSectionStart)
+      ? selectedSectionStart
+      : listedSections[0]?.start;
   const update = (next: PlanReviewDraft) => {
     drafts.current[sessionId] = next;
     setDraft(next);
   };
+  // 提交用的有效正文：剔除隐藏章节；无隐藏时 stripHiddenSections 原样返回，比较开销不变。
+  const effectiveContent = stripHiddenSections(draft.content, draft.deleted);
+  // 阅读预览只渲染可见部分；编辑模式 textarea 始终展示完整原文。
+  const previewContent = hiddenRanges.length > 0 ? effectiveContent : draft.content;
   useEffect(() => {
     const previous = document.activeElement;
     dialog.current?.showModal();
@@ -68,15 +109,19 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
     };
   }, []);
   const selectSection = (start: number, title: string) => {
+    setSelectedSectionStart(start);
     setAnchor(`章节「${title}」（第 ${start + 1} 行）`);
     if (editing) {
       const offset = draft.content.split('\n').slice(0, start).join('\n').length + (start ? 1 : 0);
       editor.current?.focus();
       editor.current?.setSelectionRange(offset, offset);
-    } else
+    } else {
+      // 预览剔除了隐藏章节，data-plan-line 是过滤后的行号，先映射再定位。
+      const visibleStart = toVisibleLineStart(start, hiddenRanges);
       body.current
-        ?.querySelector(`[data-plan-line="${start + 1}"]`)
+        ?.querySelector(`[data-plan-line="${visibleStart + 1}"]`)
         ?.scrollIntoView({ block: 'start' });
+    }
   };
   const submit = async (decision: PlanReviewDecision) => {
     if (submitting.current) return;
@@ -89,7 +134,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
       if (savePath === null) return;
       const result = await window.ohMyPiDesktop.respondPlanReview(sessionId, review.reviewId, {
         decision,
-        ...(draft.content !== review.content ? { editedContent: draft.content } : {}),
+        ...(effectiveContent !== review.content ? { editedContent: effectiveContent } : {}),
         ...(decision === 'refine' ? { feedback: compilePlanFeedback(draft) } : {}),
         ...(['execute', 'compact', 'keep'].includes(decision) && draft.model
           ? { executionModel: draft.model }
@@ -119,42 +164,117 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
         onHide();
       }}
     >
-      <header className="plan-review__header">
+      <header className="plan-review-header">
         <div>
-          <span className="plan-review__eyebrow">方案审核 · 尚未执行</span>
+          <span className="plan-review-eyebrow">方案审核 · 尚未执行</span>
           <h2 id="plan-review-title">{review.title || '执行方案'}</h2>
         </div>
         <button type="button" onClick={onHide}>
           暂时收起 <span aria-hidden="true">×</span>
         </button>
       </header>
-      <div className="plan-review__layout">
-        <nav className="plan-review__toc" aria-label="方案目录">
-          <h3>目录</h3>
-          {sections.length ? (
-            sections.map((section) => (
-              <div key={section.start} className="plan-review__section">
-                <button type="button" onClick={() => selectSection(section.start, section.title)}>
-                  {section.title}
-                </button>
+      <div
+        className={`plan-review-layout${tocCollapsed ? ' plan-review-layout-toc-collapsed' : ''}`}
+      >
+        {tocCollapsed ? (
+          <div className="plan-review-toc-rail">
+            <button
+              type="button"
+              className="plan-review-toc-toggle"
+              aria-label="展开目录"
+              title="展开目录"
+              onClick={() => setTocCollapsed(false)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <nav className="plan-review-toc" aria-label="方案目录">
+            <div className="plan-review-toc-header">
+              <h3>目录</h3>
+              <div className="plan-review-toc-tools">
+                {sections.length > 0 && <span>{sections.length} 节</span>}
                 <button
                   type="button"
-                  disabled={busy}
-                  aria-label={`删除章节：${section.title}`}
-                  title="删除此章及其子章节，可撤销"
-                  onClick={() => update(deletePlanSection(draft, section))}
+                  className="plan-review-toc-toggle"
+                  aria-label="折叠目录"
+                  title="折叠目录"
+                  onClick={() => setTocCollapsed(true)}
                 >
-                  删除
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m15 6-6 6 6 6" />
+                  </svg>
                 </button>
               </div>
-            ))
-          ) : (
-            <p>当前方案没有章节标题</p>
-          )}
-          <p>点章节可跳转并选择批注位置。删除会修改正文，提交时生效。</p>
-        </nav>
-        <section className="plan-review__document" aria-label="计划正文">
-          <div className="plan-review__tools">
+            </div>
+            {sections.length ? (
+              sections.map((section) => {
+                const hidden = hiddenSectionStarts.has(section.start);
+                // 被隐藏祖先覆盖的子章节不再单独提供按钮，恢复入口只留在祖先行。
+                const selfHidden = draft.deleted.includes(section.title);
+                return (
+                  <div
+                    key={section.start}
+                    className={`plan-review-section plan-review-section-depth-${Math.min(
+                      3,
+                      Math.max(0, section.level - primaryLevel),
+                    )}${section.level < primaryLevel ? ' plan-review-section-document-title' : ''}${
+                      activeSectionStart === section.start ? ' plan-review-section-active' : ''
+                    }${hidden ? ' plan-review-section-hidden' : ''}`}
+                  >
+                    <button
+                      className="plan-review-section-link"
+                      type="button"
+                      disabled={hidden}
+                      aria-current={activeSectionStart === section.start ? 'location' : undefined}
+                      onClick={() => selectSection(section.start, section.title)}
+                    >
+                      {primarySectionNumbers.has(section.start) && (
+                        <span className="plan-review-section-number">
+                          {String(primarySectionNumbers.get(section.start)).padStart(2, '0')}
+                        </span>
+                      )}
+                      <span>{section.title}</span>
+                    </button>
+                    {(!hidden || selfHidden) && (
+                      <button
+                        className={`plan-review-section-delete${
+                          hidden ? ' plan-review-section-delete-restore' : ''
+                        }`}
+                        type="button"
+                        disabled={busy}
+                        aria-label={
+                          hidden ? `恢复章节：${section.title}` : `隐藏章节：${section.title}`
+                        }
+                        title={
+                          hidden ? '恢复此章及其子章节' : '隐藏此章及其子章节，提交时不包含，可恢复'
+                        }
+                        onClick={() => update(togglePlanSectionHidden(draft, section))}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          {hidden ? (
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+                          ) : (
+                            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 4l16 16" />
+                          )}
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <p>当前方案没有章节标题</p>
+            )}
+            <p className="plan-review-toc-hint">
+              点章节可定位批注；隐藏只影响提交内容，可随时恢复。
+            </p>
+          </nav>
+        )}
+        <section className="plan-review-document" aria-label="计划正文">
+          <div className="plan-review-tools">
             <button
               type="button"
               disabled={busy || review.content === null}
@@ -177,14 +297,14 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
             >
               {copied ? '已复制' : '复制全文'}
             </button>
-            {draft.content !== review.content && <span>正文已修改 · 提交时保存</span>}
+            {effectiveContent !== review.content && <span>正文已修改 · 提交时保存</span>}
           </div>
           {review.content === null ? (
             <p role="alert">计划文件暂不可读取，请收起面板后重新连接并打开方案。</p>
           ) : editing ? (
             <textarea
               ref={editor}
-              className="plan-review__editor"
+              className="plan-review-editor"
               aria-label="编辑计划正文"
               value={draft.content}
               disabled={busy}
@@ -213,7 +333,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
           ) : (
             <div
               ref={body}
-              className="plan-review__body"
+              className="plan-review-body"
               onMouseUp={() => {
                 const selection = window.getSelection();
                 if (
@@ -252,12 +372,12 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
                   ),
                 }}
               >
-                {draft.content}
+                {previewContent}
               </ReactMarkdown>
             </div>
           )}
         </section>
-        <aside className="plan-review__decisions" aria-label="审核意见与下一步">
+        <aside className="plan-review-decisions" aria-label="审核意见与下一步">
           <h3>修改意见</h3>
           <textarea
             aria-label="整体修改意见"
@@ -289,7 +409,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
               添加批注
             </button>
             {draft.notes.map((item, index) => (
-              <div className="plan-review__note" key={index}>
+              <div className="plan-review-note" key={index}>
                 <small>{item.anchor}</small>
                 <p>{item.text}</p>
                 <button
@@ -305,7 +425,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
             ))}
           </details>
           {(compilePlanFeedback(draft) || note.trim()) && (
-            <p className="plan-review__hint">
+            <p className="plan-review-hint">
               意见和批注仅随“让 AI 修订计划”发送。要直接执行，请先把必要要求写进正文。
               {note.trim() ? '当前批注尚未添加。' : ''}
             </p>
@@ -351,7 +471,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
               review.context.tokens / review.context.contextWindow > 0.95;
             return (
               <button
-                className="plan-review__choice"
+                className="plan-review-choice"
                 type="button"
                 key={option.id}
                 disabled={
@@ -372,7 +492,7 @@ export function PlanReviewOverlay({ sessionId, review, ready, drafts, onHide }: 
             );
           })}
           {error && (
-            <p role="alert" className="plan-review__error">
+            <p role="alert" className="plan-review-error">
               {error}
             </p>
           )}

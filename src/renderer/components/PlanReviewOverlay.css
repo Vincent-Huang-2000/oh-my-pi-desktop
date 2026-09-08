@@ -20,7 +20,7 @@
   background: var(--color-image-overlay);
 }
 
-.plan-review__header {
+.plan-review-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -29,68 +29,259 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.plan-review__header h2 {
+.plan-review-header h2 {
   margin: 4px 0 0;
   font-size: var(--font-size-review-title);
 }
 
-.plan-review__eyebrow {
+.plan-review-eyebrow {
   color: var(--color-accent);
   font-size: var(--font-size-detail);
 }
 
-.plan-review__layout {
+.plan-review-layout {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 300px;
+  grid-template-columns: 224px minmax(0, 1fr) 300px;
   flex: 1;
   min-height: 0;
 }
 
-.plan-review__toc,
-.plan-review__decisions {
-  overflow: auto;
-  padding: 20px;
+/* 目录整栏折叠：左栏收成细条，正文占满剩余宽度。 */
+.plan-review-layout-toc-collapsed {
+  grid-template-columns: 32px minmax(0, 1fr) 300px;
+}
+
+.plan-review-toc-rail {
+  display: flex;
+  justify-content: center;
+  padding: 8px 2px;
+  border-right: 1px solid var(--color-border);
   background: var(--color-surface-alt);
 }
 
-.plan-review__toc {
+.plan-review-toc,
+.plan-review-decisions {
+  overflow: auto;
+  padding: 16px 12px;
+  background: var(--color-surface-alt);
+  scrollbar-gutter: stable;
+}
+
+.plan-review-toc {
   border-right: 1px solid var(--color-border);
 }
 
-.plan-review__decisions {
+.plan-review-decisions {
   border-left: 1px solid var(--color-border);
 }
 
-.plan-review__layout h3 {
+.plan-review-layout h3 {
   margin: 0 0 12px;
 }
 
-.plan-review__section {
+.plan-review-toc-header {
+  position: sticky;
+  top: -16px;
+  z-index: 1;
   display: flex;
-  align-items: baseline;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 -12px 10px;
+  padding: 16px 12px 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-alt);
 }
 
-.plan-review__section > button:first-child {
+.plan-review-toc-header h3 {
+  margin: 0;
+}
+
+.plan-review-toc-header span {
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-detail);
+}
+
+.plan-review-toc-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 折叠/展开按钮：透明图标按钮；.plan-review 前缀用于盖过 .plan-review button 的盒状默认样式。 */
+.plan-review .plan-review-toc-toggle {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.plan-review-toc-toggle svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.plan-review .plan-review-toc-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--color-accent-hover);
+  color: var(--color-accent-strong);
+}
+
+.plan-review-section {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 34px;
+  margin: 2px 0;
+  border-radius: var(--radius-sm);
+}
+
+.plan-review-section::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: transparent;
+  content: '';
+}
+
+.plan-review-section-active {
+  background: var(--color-accent-subtle);
+}
+
+.plan-review-section-active::before {
+  background: var(--color-accent);
+}
+
+/* .plan-review 前缀盖过 .plan-review button 的盒状默认样式，恢复透明文本行原意。 */
+.plan-review .plan-review-section-link {
   flex: 1;
+  min-width: 0;
+  padding: 7px 6px 7px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
   text-align: left;
   overflow-wrap: anywhere;
 }
 
-.plan-review__section > button:last-child {
-  padding: 4px;
-  color: var(--color-text-muted);
+.plan-review-section-active .plan-review-section-link,
+.plan-review-section-link:hover {
+  color: var(--color-text);
+}
+
+.plan-review .plan-review-section-link:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.plan-review-section-number {
+  display: inline-block;
+  width: 26px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-detail);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-review-section-active .plan-review-section-number {
+  color: var(--color-accent);
+}
+
+.plan-review-section-document-title {
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-radius: 0;
+}
+
+.plan-review-section-document-title .plan-review-section-link {
+  padding-bottom: 10px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.plan-review-section-depth-1 .plan-review-section-link {
+  padding-left: 22px;
   font-size: var(--font-size-detail);
 }
 
-.plan-review__document {
+.plan-review-section-depth-2 .plan-review-section-link {
+  padding-left: 34px;
+  font-size: var(--font-size-detail);
+}
+
+.plan-review-section-depth-3 .plan-review-section-link {
+  padding-left: 46px;
+  font-size: var(--font-size-detail);
+}
+
+/* 隐藏/恢复按钮：.plan-review 前缀盖过盒状默认样式；常态低透明可见，行 hover/聚焦时显现。 */
+.plan-review .plan-review-section-delete {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-color: transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  opacity: 0.45;
+}
+
+.plan-review-section-delete svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.plan-review-section:hover .plan-review-section-delete,
+.plan-review-section:focus-within .plan-review-section-delete {
+  opacity: 1;
+}
+
+.plan-review .plan-review-section-delete:hover:not(:disabled) {
+  background: var(--color-error-bg-hover);
+  color: var(--color-error-text);
+}
+
+/* 已隐藏章节：标题置灰加删除线；恢复按钮常显，悬停改用强调色。 */
+.plan-review-section-hidden .plan-review-section-link {
+  color: var(--color-text-faint);
+  text-decoration: line-through;
+}
+
+.plan-review-section-hidden .plan-review-section-delete {
+  opacity: 0.7;
+}
+
+.plan-review .plan-review-section-delete-restore:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  color: var(--color-accent-strong);
+}
+
+.plan-review-document {
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
 }
 
-.plan-review__tools {
+.plan-review-tools {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -99,44 +290,94 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
-.plan-review__tools span,
-.plan-review__toc p,
-.plan-review__decisions p {
+.plan-review-tools span,
+.plan-review-toc p,
+.plan-review-decisions p {
   color: var(--color-text-muted);
   font-size: var(--font-size-detail);
   line-height: 1.6;
 }
 
-.plan-review__body {
+.plan-review-body {
   flex: 1;
   overflow: auto;
   padding: 12px 32px 48px;
   line-height: 1.8;
   overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
 }
 
-.plan-review__body pre {
+.plan-review-body pre {
   overflow: auto;
   padding: 12px;
   background: var(--color-code-block-bg);
 }
 
-.plan-review__body img {
+.plan-review-body img {
   max-width: 100%;
 }
 
-.plan-review__body table {
+.plan-review-body table {
   border-collapse: collapse;
 }
 
-.plan-review__body td,
-.plan-review__body th {
+.plan-review-body td,
+.plan-review-body th {
   padding: 8px;
   border: 1px solid var(--color-border);
 }
 
-.plan-review__body [data-plan-line] {
+.plan-review-body [data-plan-line] {
   scroll-margin-top: 20px;
+}
+
+.plan-review-toc-hint {
+  margin: 12px 6px 0;
+}
+
+.plan-review-toc,
+.plan-review-body,
+.plan-review-decisions,
+.plan-review-editor,
+.plan-review-body pre {
+  scrollbar-color: var(--color-scrollbar-thumb) var(--color-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.plan-review-toc::-webkit-scrollbar,
+.plan-review-body::-webkit-scrollbar,
+.plan-review-decisions::-webkit-scrollbar,
+.plan-review-editor::-webkit-scrollbar,
+.plan-review-body pre::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.plan-review-toc::-webkit-scrollbar-track,
+.plan-review-body::-webkit-scrollbar-track,
+.plan-review-decisions::-webkit-scrollbar-track,
+.plan-review-editor::-webkit-scrollbar-track,
+.plan-review-body pre::-webkit-scrollbar-track {
+  background: var(--color-scrollbar-track);
+}
+
+.plan-review-toc::-webkit-scrollbar-thumb,
+.plan-review-body::-webkit-scrollbar-thumb,
+.plan-review-decisions::-webkit-scrollbar-thumb,
+.plan-review-editor::-webkit-scrollbar-thumb,
+.plan-review-body pre::-webkit-scrollbar-thumb {
+  border: 2px solid var(--color-scrollbar-track);
+  border-radius: 999px;
+  background: var(--color-scrollbar-thumb);
+  background-clip: padding-box;
+}
+
+.plan-review-toc::-webkit-scrollbar-thumb:hover,
+.plan-review-body::-webkit-scrollbar-thumb:hover,
+.plan-review-decisions::-webkit-scrollbar-thumb:hover,
+.plan-review-editor::-webkit-scrollbar-thumb:hover,
+.plan-review-body pre::-webkit-scrollbar-thumb:hover {
+  background: var(--color-scrollbar-thumb-hover);
 }
 
 .plan-review textarea {
@@ -152,7 +393,7 @@
   resize: vertical;
 }
 
-.plan-review .plan-review__editor {
+.plan-review .plan-review-editor {
   flex: 1;
   padding: 20px;
   border: 0;
@@ -188,7 +429,7 @@
   outline-offset: 2px;
 }
 
-.plan-review .plan-review__choice {
+.plan-review .plan-review-choice {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -198,36 +439,36 @@
   text-align: left;
 }
 
-.plan-review__choice span {
+.plan-review-choice span {
   color: var(--color-text-muted);
   font-size: var(--font-size-detail);
   line-height: 1.5;
 }
 
-.plan-review__decisions details {
+.plan-review-decisions details {
   margin: 12px 0;
 }
 
-.plan-review__decisions summary {
+.plan-review-decisions summary {
   cursor: pointer;
 }
 
-.plan-review__note {
+.plan-review-note {
   margin: 12px 0;
   padding: 8px;
   border-left: 2px solid var(--color-accent);
   overflow-wrap: anywhere;
 }
 
-.plan-review__decisions .plan-review__hint {
+.plan-review-decisions .plan-review-hint {
   color: var(--color-warning-text);
 }
 
-.plan-review__decisions .plan-review__error {
+.plan-review-decisions .plan-review-error {
   color: var(--color-error-text);
 }
 
-.plan-review__decisions input[type='range'] {
+.plan-review-decisions input[type='range'] {
   width: 100%;
   accent-color: var(--color-accent);
 }
@@ -242,13 +483,25 @@
 }
 
 @media (width <= 1000px) {
-  .plan-review__layout {
+  .plan-review-layout {
     grid-template-columns: minmax(0, 1fr) 280px;
   }
 
-  .plan-review__toc {
+  .plan-review-toc {
     grid-column: 1 / -1;
     max-height: 100px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .plan-review-layout-toc-collapsed {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+
+  .plan-review-toc-rail {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    padding: 4px 12px;
+    border-right: 0;
     border-bottom: 1px solid var(--color-border);
   }
 }
@@ -259,16 +512,16 @@
     height: calc(100vh - 24px);
   }
 
-  .plan-review__layout {
+  .plan-review-layout {
     display: block;
     overflow: auto;
   }
 
-  .plan-review__document {
+  .plan-review-document {
     height: 60vh;
   }
 
-  .plan-review__decisions {
+  .plan-review-decisions {
     overflow: visible;
   }
 }

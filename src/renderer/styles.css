@@ -73,6 +73,9 @@
   --color-text-muted: #6d7873;
   --color-text-tertiary: #909a94; /* 第三级文字（列表项默认色） */
   --color-text-faint: #b8c0ba; /* 更弱的次要文字/图标 */
+  --color-scrollbar-track: rgb(30 40 37 / 7%);
+  --color-scrollbar-thumb: #b8c0ba;
+  --color-scrollbar-thumb-hover: #909a94;
 
   /* —— Markdown 代码与表格（脱离中性色的绿色倾向） —— */
   --color-code-inline-bg: #f4effc;
@@ -823,6 +826,9 @@ summary:focus-visible {
   --color-text-muted: #8e93a4;
   --color-text-tertiary: #606678;
   --color-text-faint: #434856;
+  --color-scrollbar-track: rgb(0 0 0 / 24%);
+  --color-scrollbar-thumb: rgb(255 255 255 / 22%);
+  --color-scrollbar-thumb-hover: rgb(255 255 255 / 34%);
 
   /* ── Markdown 代码与表格 ── */
   --color-code-inline-bg: #2a2238;
@@ -926,6 +932,14 @@ summary:focus-visible {
 }
 
 [data-theme='dark'] .omp-path-setting-button {
+  background: var(--color-surface);
+}
+
+/* 方案审核层：暗色下撤掉两侧栏的 surface-alt 底色，消除浅灰色块，仅靠分隔线区分区域 */
+[data-theme='dark'] .plan-review-toc,
+[data-theme='dark'] .plan-review-toc-header,
+[data-theme='dark'] .plan-review-toc-rail,
+[data-theme='dark'] .plan-review-decisions {
   background: var(--color-surface);
 }
 
