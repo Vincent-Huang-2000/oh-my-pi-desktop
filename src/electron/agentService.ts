@@ -585,6 +585,30 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
   };
 
   const handleNotification = (process: AcpProcessState, message: JsonRpcNotification) => {
+    if (message.method === '$/cancel_request') {
+      const rpcId = isRecord(message.params) ? message.params.requestId : undefined;
+      if (rpcId !== null && typeof rpcId !== 'string' && typeof rpcId !== 'number') return;
+      const requestId = `${process.localSessionId}-${String(rpcId)}`;
+      const pending = pendingPermissions.get(requestId) ?? pendingElicitations.get(requestId);
+      // 撤销只作用于发出该请求的进程；已响应、未知或重复的撤销直接忽略。
+      if (!pending || pending.process !== process || pending.rpcId !== rpcId) return;
+      pendingPermissions.delete(requestId);
+      pendingElicitations.delete(requestId);
+      sendErrorResponse(process, rpcId, -32800, 'Request cancelled');
+      if (process.planReviewRequestId === requestId) {
+        process.planReview = undefined;
+        process.planReviewRequestId = undefined;
+        process.planReviewReady = false;
+        emitPlanReview(process);
+      }
+      emitEvent({
+        sessionId: process.localSessionId,
+        type: 'request_cancelled',
+        message: '输入请求已取消',
+        payload: { requestId },
+      });
+      return;
+    }
     if (message.method !== 'session/update') {
       return;
     }

@@ -509,6 +509,32 @@ export function useAgentEvents(
         }
       };
 
+      if (event.type === 'request_cancelled') {
+        const requestId = getPayloadRequestId(event.payload);
+        // 精确移除目标请求并推进队首，不能清空同一会话中的其它审批。
+        const permissions = (app.permissionBySession.current[event.sessionId] ?? []).filter(
+          (request) => request.requestId !== requestId,
+        );
+        const elicitations = (app.elicitationBySession.current[event.sessionId] ?? []).filter(
+          (request) => request.requestId !== requestId,
+        );
+        const questionnaires = (app.questionnaireBySession.current[event.sessionId] ?? []).filter(
+          (request) => request.requestId !== requestId,
+        );
+        app.permissionBySession.current[event.sessionId] = permissions;
+        app.elicitationBySession.current[event.sessionId] = elicitations;
+        app.questionnaireBySession.current[event.sessionId] = questionnaires;
+        if (app.selectedSessionRef.current?.id === event.sessionId) {
+          app.setPermissionRequest(permissions[0] ?? null);
+          app.setElicitationRequest(elicitations[0] ?? null);
+          app.setQuestionnaireRequest(questionnaires[0] ?? null);
+          if (!permissions.length && !elicitations.length && !questionnaires.length)
+            app.setAgentStatus(event.message);
+        }
+        cacheMessages((current) => mergeAgentEventIntoMessages(current, event));
+        return;
+      }
+
       if (event.type === 'active_plan_update') {
         const activePlan = getActiveSessionPlan(event.payload);
         if (activePlan) {

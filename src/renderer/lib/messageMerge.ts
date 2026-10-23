@@ -37,6 +37,17 @@ export const mergeAgentEventIntoMessages = (
   const messageId = getPayloadMessageId(event.payload);
   const role = getMessageRole(event.type);
 
+  if (event.type === 'request_cancelled') {
+    const payload = event.payload as { requestId?: unknown } | undefined;
+    return current.map((message) =>
+      typeof payload?.requestId === 'string' &&
+      message.elicitationRequestId === payload.requestId &&
+      (message.elicitationStatus === 'pending' || message.elicitationStatus === 'submitting')
+        ? { ...message, elicitationStatus: 'cancelled', elicitationResult: '已取消' }
+        : message,
+    );
+  }
+
   /* 流式文本合并：回答、思考与用户消息按 messageId + role 分别累积，
      避免 omp 复用 messageId 时把思考过程拼进最终回答。 */
   if (messageId && (role === 'agent' || role === 'thought' || role === 'user')) {

@@ -260,6 +260,69 @@ const startInitializedAgent = async (
   return record;
 };
 
+describe('ACP 请求撤销', () => {
+  it('按进程和 RPC id 撤销审批，仅回复一次取消并拒绝迟到的用户操作', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const first = await startInitializedAgent(service, 's1', '/tmp/first');
+    const starting = service.startAgent('s2', '/tmp/second', 'write');
+    const second = hoistedSpawns[1];
+    const init = JSON.parse(second.stdinWrites[0]) as { id: string };
+    emitAcpMessage(second, { jsonrpc: '2.0', id: init.id, result: {} });
+    await starting;
+    for (const record of [first, second]) {
+      emitAcpMessage(record, {
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'session/request_permission',
+        params: { options: [{ optionId: 'allow', name: 'Allow', kind: 'allow_once' }] },
+      });
+    }
+    const cancellation = { jsonrpc: '2.0', method: '$/cancel_request', params: { requestId: 7 } };
+    emitAcpMessage(first, cancellation);
+    emitAcpMessage(first, cancellation);
+    expect(service.respondPermissionOption('s1-7', 'allow').ok).toBe(false);
+    expect(service.respondPermissionOption('s2-7', 'allow').ok).toBe(true);
+    const replies = first.stdinWrites.map(
+      (line) => JSON.parse(line) as { id: unknown; error?: { code: number } },
+    );
+    expect(replies.filter((reply) => reply.id === 7)).toEqual([
+      { jsonrpc: '2.0', id: 7, error: { code: -32800, message: 'Request cancelled' } },
+    ]);
+    expect(events.filter((event) => event.type === 'request_cancelled')).toEqual([
+      {
+        sessionId: 's1',
+        type: 'request_cancelled',
+        message: '输入请求已取消',
+        payload: { requestId: 's1-7' },
+      },
+    ]);
+  });
+
+  it('撤销输入表单后不续发问卷答案，未知或格式错误的撤销不影响其余请求', async () => {
+    const service = createAgentService(makeSender([]));
+    const record = await startInitializedAgent(service, 's1', '/tmp/first');
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: 'form',
+      method: 'elicitation/create',
+      params: { message: 'Confirm', requestedSchema: { type: 'object', properties: {} } },
+    });
+    for (const params of [{ id: 'form' }, { requestId: 'unknown' }, { requestId: {} }]) {
+      emitAcpMessage(record, { jsonrpc: '2.0', method: '$/cancel_request', params });
+    }
+    expect(record.stdinWrites).toHaveLength(1);
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      method: '$/cancel_request',
+      params: { requestId: 'form' },
+    });
+    expect(service.respondElicitation('s1-form', 'accept', { value: 'yes' }).ok).toBe(false);
+    expect(service.respondQuestionnaire('s1-form', 'submit', []).ok).toBe(false);
+    expect(record.stdinWrites).toHaveLength(2);
+  });
+});
+
 describe('ACP 双流隔离与诊断日志', () => {
   it('保留结构化 RPC 错误原因，并兼容缺失或非文本 details', async () => {
     const service = createAgentService(makeSender([]));
@@ -674,6 +737,29 @@ describe('P1 方案审核与新会话接续', () => {
     expect(
       await service.respondPlanReview('s1', review.reviewId, { decision: 'execute' }),
     ).toMatchObject({ ok: false });
+  });
+  it('服务端撤销方案表单后关闭审核，迟到提交不能重新执行方案', async () => {
+    const { service, record, events, update, form } = await setup();
+    update({ sessionUpdate: 'plan_review_update', review });
+    form();
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      method: '$/cancel_request',
+      params: { requestId: 'review-form' },
+    });
+    expect(
+      events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
+    ).toMatchObject({
+      review: null,
+      ready: false,
+    });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'execute' }),
+    ).toMatchObject({ ok: false });
+    expect(JSON.parse(record.stdinWrites.at(-1)!)).toMatchObject({
+      id: 'review-form',
+      error: { code: -32800 },
+    });
   });
   it('新上下文执行保留规划记录，后续消息和审批使用新会话', async () => {
     const { service, record, events, update, form } = await setup();

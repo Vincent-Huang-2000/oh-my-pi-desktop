@@ -91,6 +91,7 @@ type AgentEvent = {
     | 'error'
     | 'done'
     | 'permission_request'
+    | 'request_cancelled'
     | 'elicitation_request'
     | 'questionnaire_request'
     | 'elicitation_plan_preview'
