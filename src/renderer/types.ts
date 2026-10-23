@@ -43,6 +43,8 @@ export type ChatMessage = {
   toolCallId?: string;
   toolKind?: ToolKind;
   toolStatus?: ToolCallStatus;
+  /* 后台任务由后续工具通知结算，普通 end_turn 不代表任务已结束。 */
+  toolBackground?: boolean;
   toolLocations?: ToolCallLocation[];
   /* 工具调用 diff 块（role: 'tool' 时可能含 diff 内容） */
   toolDiffs?: ToolCallDiffBlock[];

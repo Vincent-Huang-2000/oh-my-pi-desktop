@@ -2,6 +2,83 @@ import { describe, expect, it } from 'vitest';
 import type { AgentEvent } from '../../electron/types.js';
 import { mergeAgentEventIntoMessages } from './messageMerge.js';
 
+describe('ACP 后台任务', () => {
+  it('回合结束后后台工具继续运行并接收最终输出，保留工具标题', () => {
+    let messages = mergeAgentEventIntoMessages([], {
+      sessionId: 's1',
+      type: 'tool_call',
+      message: 'Background bash',
+      payload: {
+        update: {
+          toolCallId: 'bg',
+          status: 'completed',
+          rawOutput: { details: { async: { state: 'running' } } },
+        },
+      },
+    });
+    messages = mergeAgentEventIntoMessages(messages, {
+      sessionId: 's1',
+      type: 'done',
+      message: 'done',
+      payload: { stopReason: 'end_turn' },
+    });
+    expect(messages[0].toolStatus).toBe('in_progress');
+    messages = mergeAgentEventIntoMessages(messages, {
+      sessionId: 's1',
+      type: 'tool_call',
+      message: '',
+      payload: {
+        update: {
+          toolCallId: 'bg',
+          status: 'completed',
+          rawOutput: { details: { async: { state: 'completed' } } },
+          content: [{ type: 'content', content: { type: 'text', text: 'finished' } }],
+        },
+      },
+    });
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      text: 'Background bash',
+      toolStatus: 'completed',
+      toolOutput: 'finished',
+    });
+  });
+
+  it('正常回合结束仍收敛前台工具，进程关闭时收敛后台工具', () => {
+    const foreground = mergeAgentEventIntoMessages([], {
+      sessionId: 's1',
+      type: 'tool_call',
+      message: 'Foreground',
+      payload: { update: { toolCallId: 'fg', status: 'in_progress' } },
+    });
+    const background = mergeAgentEventIntoMessages(foreground, {
+      sessionId: 's1',
+      type: 'tool_call',
+      message: 'Background',
+      payload: {
+        update: {
+          toolCallId: 'bg',
+          status: 'in_progress',
+          rawOutput: { details: { async: { state: 'running' } } },
+        },
+      },
+    });
+    const ended = mergeAgentEventIntoMessages(background, {
+      sessionId: 's1',
+      type: 'done',
+      message: 'done',
+      payload: { stopReason: 'end_turn' },
+    });
+    expect(ended.map((message) => message.toolStatus)).toEqual(['failed', 'in_progress']);
+    const closed = mergeAgentEventIntoMessages(ended, {
+      sessionId: 's1',
+      type: 'done',
+      message: 'Process closed',
+    });
+    expect(closed.map((message) => message.toolStatus)).toEqual(['failed', 'failed']);
+  });
+});
+
 describe('ACP 请求撤销记录', () => {
   it('仅将撤销目标的待处理记录标为取消，已提交结果与其它记录保持原状', () => {
     const messages = mergeAgentEventIntoMessages(

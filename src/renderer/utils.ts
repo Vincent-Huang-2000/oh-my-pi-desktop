@@ -369,6 +369,7 @@ export const getPayloadToolCall = (payload: unknown) => {
     title: string;
     kind: string | undefined;
     status: string | undefined;
+    background: boolean | undefined;
     locations: ToolCallLocation[] | undefined;
     diffs: ToolCallDiffBlock[] | undefined;
     output: string | undefined;
@@ -379,6 +380,7 @@ export const getPayloadToolCall = (payload: unknown) => {
     title: '',
     kind: undefined,
     status: undefined,
+    background: undefined,
     locations: undefined,
     diffs: undefined,
     output: undefined,
@@ -401,6 +403,15 @@ export const getPayloadToolCall = (payload: unknown) => {
   def.title = typeof u.title === 'string' ? u.title : '';
   def.kind = typeof u.kind === 'string' ? u.kind : undefined;
   def.status = typeof u.status === 'string' ? u.status : undefined;
+  // 新版 omp 在工具返回后仍通过 rawOutput.details.async 推送后台任务状态。
+  const rawOutput = u.rawOutput as { details?: { async?: { state?: unknown } } } | undefined;
+  const jobState = rawOutput?.details?.async?.state;
+  if (jobState === 'running') {
+    def.background = true;
+    def.status = 'in_progress';
+  } else if (jobState === 'completed' || jobState === 'failed' || jobState === 'cancelled') {
+    def.background = false;
+  }
   const planProposal = getPayloadPlanProposal(payload);
   def.isPlanProposal = planProposal?.toolCallId === def.toolCallId;
   if (Array.isArray(u.locations)) {

@@ -93,9 +93,10 @@ export const mergeAgentEventIntoMessages = (
         message.toolCallId === toolData.toolCallId
           ? {
               ...message,
-              text: event.message,
+              text: event.message || message.text,
               toolKind: (toolData.kind ?? message.toolKind) as ChatMessage['toolKind'],
               toolStatus: (toolData.status ?? message.toolStatus) as ChatMessage['toolStatus'],
+              toolBackground: toolData.background ?? message.toolBackground,
               toolLocations: toolData.locations ?? message.toolLocations,
               toolDiffs: toolData.diffs ?? message.toolDiffs,
               toolOutput: toolData.output ?? message.toolOutput,
@@ -120,6 +121,7 @@ export const mergeAgentEventIntoMessages = (
         toolCallId: toolData.toolCallId,
         toolKind: toolData.kind as ChatMessage['toolKind'],
         toolStatus: toolData.status as ChatMessage['toolStatus'],
+        toolBackground: toolData.background,
         toolLocations: toolData.locations,
         toolDiffs: toolData.diffs,
         toolOutput: toolData.output,
@@ -196,6 +198,7 @@ export const mergeAgentEventIntoMessages = (
     const settledMessages = withoutPendingPlan.map((message) => {
       if (
         message.role !== 'tool' ||
+        (message.toolBackground && event.type === 'done' && stopReason === 'end_turn') ||
         (message.toolStatus !== undefined &&
           message.toolStatus !== 'pending' &&
           message.toolStatus !== 'in_progress')
