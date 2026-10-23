@@ -1,0 +1,12 @@
+# 统一换行：仓库与工作区均使用 LF，与 Prettier 的 endOfLine: "lf" 一致，
+# 不受本机 core.autocrlf 设置影响
+* text=auto eol=lf
+
+# 图片等二进制文件：不做换行转换与文本 diff
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
