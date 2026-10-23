@@ -54,6 +54,7 @@ const createHarness = () => {
       {} as Parameters<typeof useAgentEvents>[1],
       () => Promise.resolve(null),
       () => Promise.resolve(),
+      { handleTurnSettled: vi.fn(), handleSessionReplaced: vi.fn() },
     );
     return null;
   }

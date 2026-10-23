@@ -35,6 +35,16 @@ const COMMAND_PENDING_META: Record<string, { icon: string; label: string }> = {
 };
 const COMMAND_PENDING_DEFAULT = { icon: '▶', label: '正在执行本地命令…' };
 
+// 由桌面端本地拦截的命令：omp acp 不下发（这些命令在 omp 中只有 TUI 实现），
+// 命令面板合并展示，同名时以本地条目为准。
+export const DESKTOP_LOCAL_COMMANDS: AcpAvailableCommand[] = [
+  {
+    name: 'loop',
+    description: '每轮结束后自动重复提示（桌面端实现，再次输入 /loop 关闭）',
+    input: { hint: '[次数 | 时长如 10m、1h30m] [提示词]' },
+  },
+];
+
 // 解析 `/name args` 形式的输入，返回 { name, args }；非 slash 输入返回 null。
 // 解析失败的空字符串命令不视为有效命令，避免把普通消息里的 "/" 当成命令。
 export const parseSlashCommand = (text: string): { name: string; args: string } | null => {

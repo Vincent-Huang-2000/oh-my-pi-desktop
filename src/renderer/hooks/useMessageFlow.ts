@@ -7,6 +7,7 @@
  * - handleAttachAttachment：粘贴/拖拽/文件选择器添加附件（8MB 上限，MIME + 扩展名判定 kind）
  * - handlePaste：ClipboardEvent 粘贴处理（图片走 dataURL、忽略非图片文件）
  * - applyDraftConfigValues：无 session 时先应用草稿 model/mode/thinking 再发送
+ * - /loop：由桌面端本地拦截并交给 useLoopMode（omp acp 不处理该命令），不发给 omp
  *
  * ## 维护
  * - sendContent 校验 session.projectPath === selectedProject.path，这是 cwd 不变量的一环。
@@ -22,8 +23,12 @@ import {
 } from '../lib/constants';
 import { parseSlashCommand, resolveCommandPendingMeta } from '../lib/slashCommands';
 import { useAppCore } from './useAppCore';
+import { useLoopMode } from './useLoopMode';
 
-export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
+export function useMessageFlow(
+  app: ReturnType<typeof useAppCore>,
+  loopMode: ReturnType<typeof useLoopMode>,
+) {
   const hasDraftConfigValues = (values: DraftConfigValues) => {
     return Boolean(values.model || values.mode || values.thinking);
   };
@@ -66,9 +71,24 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     return normalized.includes('plan') || normalized.includes('计划');
   };
 
-  const sendContent = async (text: string, attachments: PendingAttachment[]) => {
+  const sendContent = async (rawText: string, attachments: PendingAttachment[]) => {
     if (!app.selectedProject) {
       return;
+    }
+    let text = rawText;
+    // Loop：/loop 由桌面端拦截（omp 只在 TUI 实现该命令，转发会被当作普通文本发给模型）。
+    const loopCommand = parseSlashCommand(text);
+    if (loopCommand?.name === 'loop') {
+      const inlinePrompt = loopMode.handleLoopCommand(loopCommand.args);
+      if (!inlinePrompt) {
+        // 本次没有发送任何内容：附件放回待发送区，避免丢失。
+        if (attachments.length > 0) {
+          app.setPendingAttachments(attachments);
+        }
+        return;
+      }
+      // 内联提示立即作为首轮发送（不计入重复次数），并在下方成为 Loop 提示。
+      text = inlinePrompt;
     }
     if (
       text.trim() === '/plan-review' &&
@@ -119,6 +139,8 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
         app.draftApprovalProfile,
       );
       app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
+      // 草稿阶段开启的 Loop 迁移到新建的 session。
+      loopMode.adoptDraftLoop(session.id, app.selectedProject.path);
     }
     if (hasDraftConfigValues(configValuesToApply)) {
       app.setAgentStatus('应用会话配置');
@@ -128,6 +150,8 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     // 先应用草稿配置再切到真实 session，避免 app.selectSession 将 app.displayedConfigOptions
     // 从缓存+草稿覆盖切换到空的 app.acpConfigOptions，导致顶栏选择器短暂显示"模型未加载"。
     app.selectSession(session);
+    // Loop 开启时，手动发送的消息成为新的 Loop 提示（暂停状态随之恢复）。
+    loopMode.recordManualPrompt(session.id, text.trim());
     app.setAgentStatus('运行中');
     app.incrementAgentBusyCount(session.id);
     // 立即在底部插入「正在执行 slash 命令」卡片：仅当用户输入是合法 slash 命令时设置，
@@ -181,6 +205,7 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     if (!result.ok) {
       app.decrementAgentBusyCount(session.id);
       app.setAgentStatus(result.message ?? '错误');
+      loopMode.pauseLoop(session.id, 'Loop 已暂停：消息发送失败，发送消息即可继续。');
     }
     await app.reloadState();
   };
@@ -231,6 +256,8 @@ export function useMessageFlow(app: ReturnType<typeof useAppCore>) {
     if (!app.selectedSession) {
       return;
     }
+    // 停止回合即暂停 Loop（与 omp TUI 的 Esc 一致）：先撤销待发的自动重发，再取消回合。
+    loopMode.pauseLoop(app.selectedSession.id, 'Loop 已暂停：当前回合已停止，发送消息即可继续。');
     const result = await window.ohMyPiDesktop.cancelAgentTurn(app.selectedSession.id);
     if (result.ok) {
       app.clearApprovalStateForSession(app.selectedSession.id, { alsoClearActive: true });

@@ -1,0 +1,122 @@
+/* === Loop 开关：输入区配置行中的触发按钮 + 向上展开的设置弹层 === */
+
+.loop-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.loop-toggle-trigger {
+  min-width: 0;
+}
+
+.loop-toggle-trigger.is-active {
+  color: var(--color-accent-strong);
+}
+
+/* 已开启时在名称前显示强调色圆点。 */
+.loop-toggle-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.loop-toggle-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text);
+  font-size: var(--font-size-detail);
+}
+
+.loop-toggle-title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.loop-toggle-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.loop-toggle-error {
+  margin: 0;
+  color: var(--color-error-text);
+}
+
+/* 分段选项（限制方式 / 时长单位）。 */
+.loop-toggle-options {
+  display: inline-flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+.loop-toggle-option {
+  flex: 1;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.loop-toggle-option.is-selected {
+  background: var(--color-surface);
+  color: var(--color-accent-strong);
+  font-weight: 600;
+}
+
+.loop-toggle-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loop-toggle-field input {
+  width: 72px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: inherit;
+}
+
+.loop-toggle-field input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.loop-toggle-primary {
+  align-self: flex-end;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.loop-toggle-primary:hover {
+  background: var(--color-accent-strong);
+}

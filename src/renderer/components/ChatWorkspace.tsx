@@ -2,7 +2,7 @@
  * ChatWorkspace — 中间对话工作区组件。
  *
  * 渲染消息流（按回合分组、工具组折叠、Markdown 渲染）和底部输入区（textarea、
- * slash 命令面板、附件预览、模型/模式/推理强度/审批档位配置入口、加号菜单）。
+ * slash 命令面板、附件预览、模型/模式/推理强度/审批档位配置入口、Loop 开关、加号菜单）。
  *
  * ## Plan 展示分工
  * - PlanStatusBar（顶部可折叠面板）：只展示 items 执行计划（todo 列表 + 进度），
@@ -48,6 +48,9 @@ import {
   isResolvedElicitation,
 } from '../lib/elicitationGroup';
 import { formatElicitationResult } from '../lib/elicitationText';
+import type { LoopLimitSpec, LoopState } from '../lib/loopMode';
+import { DESKTOP_LOCAL_COMMANDS } from '../lib/slashCommands';
+import { LoopToggle } from './LoopToggle';
 import { ModelPickerPopover } from './ModelPickerPopover';
 import { PermissionModal } from './PermissionModal';
 import { QuestionnaireModal } from './QuestionnaireModal';
@@ -89,6 +92,8 @@ type PendingAttachment = {
 };
 
 type ChatWorkspaceProps = {
+  // 运行模式状态条（目前仅 Loop），渲染在输入区顶部。
+  runModeStatus?: React.ReactNode;
   planReviewControls?: React.ReactNode;
   messages: ChatMessage[];
   prompt: string;
@@ -121,6 +126,10 @@ type ChatWorkspaceProps = {
   approvalProfile: ApprovalProfile;
   approvalProfileNotice: string;
   isDraftSession: boolean;
+  // Loop 运行模式（桌面端实现）：当前会话或草稿的状态与开关回调。
+  loop: LoopState | null;
+  onLoopEnable: (spec: LoopLimitSpec | null) => void;
+  onLoopDisable: () => void;
   onModelChange: (modelId: string) => void;
   onModeChange: (modeId: string) => void;
   onThinkingChange: (thinkingId: string) => void;
@@ -1153,6 +1162,7 @@ function MessageStream({
 const MemoizedMessageStream = React.memo(MessageStream);
 
 export function ChatWorkspace({
+  runModeStatus,
   planReviewControls,
   messages,
   prompt,
@@ -1176,6 +1186,9 @@ export function ChatWorkspace({
   approvalProfile,
   approvalProfileNotice,
   isDraftSession,
+  loop,
+  onLoopEnable,
+  onLoopDisable,
   onModelChange,
   onModeChange,
   onThinkingChange,
@@ -1264,11 +1277,16 @@ export function ChatWorkspace({
   }, [prompt]);
 
   // 过滤掉已有专属入口的命令，再按当前 token 匹配 name / description。
+  // 桌面端本地拦截的命令（如 /loop）排在最前，同名的 omp 命令以本地实现为准。
   const visibleCommands = useMemo(() => {
     if (commandToken === null) {
       return [];
     }
-    return availableCommands.filter(
+    const localNames = new Set(DESKTOP_LOCAL_COMMANDS.map((command) => command.name));
+    return [
+      ...DESKTOP_LOCAL_COMMANDS,
+      ...availableCommands.filter((command) => !localNames.has(command.name)),
+    ].filter(
       (command) =>
         !HIDDEN_COMMANDS.has(command.name) &&
         (commandToken === '' ||
@@ -1494,6 +1512,7 @@ export function ChatWorkspace({
         />
 
         <form ref={formRef} className="composer" onSubmit={onSubmit}>
+          {runModeStatus}
           {planReviewControls}
           <div className="composer-input">
             {/* 命令面板：在输入框输入以 "/" 开头的命令名时自动弹出（实时过滤 + 描述），
@@ -1604,6 +1623,16 @@ export function ChatWorkspace({
                     emptyLabel="自动编辑"
                     disabled={!selectedProject}
                     onChange={(value) => onApprovalProfileChange(value as ApprovalProfile)}
+                  />
+                </div>
+                {/* Loop 开关：key 随会话变化，切换会话时重置弹层表单。 */}
+                <div className="config-segment">
+                  <LoopToggle
+                    key={selectedSession?.id ?? 'draft'}
+                    loop={loop}
+                    disabled={!selectedProject}
+                    onEnable={onLoopEnable}
+                    onDisable={onLoopDisable}
                   />
                 </div>
               </div>

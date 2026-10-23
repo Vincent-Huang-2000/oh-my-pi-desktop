@@ -99,6 +99,8 @@ export function useSessionLifecycle(
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
+    // 草稿 Loop 只属于空白会话；其它会话的 Loop 按 sessionId 保留并在后台继续。
+    app.setDraftLoop(null);
     app.setApprovalProfileNotice('');
     app.setApprovalRestoreFailed(false);
     app.setAvailableCommands([]);
@@ -213,6 +215,8 @@ export function useSessionLifecycle(
 
   const handleCloseSession = async (session: StoredSession) => {
     const isCurrent = app.selectedSessionRef.current?.id === session.id;
+    // Loop：关闭前同步撤销，避免待发的自动重发在关闭期间重新拉起已关闭会话的进程。
+    app.clearLoopForSession(session.id);
     const result = await window.ohMyPiDesktop.closeSession(session.id);
     app.setAgentStatus(result.ok ? 'session 已关闭' : (result.message ?? '关闭失败'));
     if (!result.ok) {
@@ -255,6 +259,9 @@ export function useSessionLifecycle(
     // 不走 projectActions.handleUseProject——它会 app.selectSession(null) 并清空中间栏，而下面要立即 app.selectSession(forked)。
     if (app.selectedProjectRef.current?.path !== project.path) {
       const previousSessionId = app.selectedSessionRef.current?.id;
+      // Loop：与切换项目一致，停进程前先关闭旧 session 及不属于目标项目的 Loop。
+      app.clearLoopForSession(previousSessionId);
+      app.clearLoopsOutsideProject(project.path);
       if (previousSessionId) {
         await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);
         app.clearApprovalStateForSession(previousSessionId, { alsoClearActive: true });
@@ -286,6 +293,8 @@ export function useSessionLifecycle(
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
+    // Fork 出的会话不继承 Loop；草稿 Loop 一并清空。
+    app.setDraftLoop(null);
     app.setApprovalProfileNotice('');
     app.setApprovalRestoreFailed(false);
     app.setDiffText('');
@@ -373,6 +382,8 @@ export function useSessionLifecycle(
     app.setAcpConfigOptions([]);
     app.setDraftConfigValues({});
     app.setDraftApprovalProfile(DEFAULT_APPROVAL_PROFILE);
+    // 新的空白会话从未开启 Loop 的状态开始。
+    app.setDraftLoop(null);
     app.setApprovalProfileNotice('');
     app.setApprovalRestoreFailed(false);
     app.setAvailableCommands([]);

@@ -27,6 +27,7 @@ import {
   type ReviewSource,
 } from '../lib/constants';
 import type { PendingSlashCommand } from '../lib/slashCommands';
+import type { LoopState } from '../lib/loopMode';
 import type { GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
 import { DEFAULT_THEME_ID, getTheme } from '../theme';
 
@@ -54,6 +55,11 @@ export function useAppCore() {
   const [planReviewBySession, setPlanReviewBySession] = useState<Record<string, PlanReviewView>>(
     {},
   );
+  // planReviewBySession 的镜像 ref，供 Loop 定时器等异步回调读取最新审核状态。
+  const planReviewBySessionRef = useRef<Record<string, PlanReviewView>>({});
+  useEffect(() => {
+    planReviewBySessionRef.current = planReviewBySession;
+  }, [planReviewBySession]);
   // 审核草稿按会话和审核版本隔离；收起面板或切换会话不丢失。
   const planReviewDrafts = useRef<Record<string, PlanReviewDraft>>({});
   const [hiddenPlanReviews, setHiddenPlanReviews] = useState<Record<string, string>>({});
@@ -211,6 +217,47 @@ export function useAppCore() {
   // 草稿会话尚无本地 sessionId，审批档位先随当前空白会话暂存，首次发送时一并持久化。
   const [draftApprovalProfile, setDraftApprovalProfile] =
     useState<ApprovalProfile>(DEFAULT_APPROVAL_PROFILE);
+  // Loop 运行模式：按 sessionId 分桶（存在即已开启），同步镜像 ref 供定时器与事件回调读取最新值。
+  const [loopBySession, setLoopBySession] = useState<Record<string, LoopState>>({});
+  const loopBySessionRef = useRef<Record<string, LoopState>>({});
+  // 每个 session 至多一个待发的自动重发定时器；句柄不放进 state，避免 StrictMode 双调用复制旧句柄。
+  const loopTimerBySession = useRef<Record<string, number>>({});
+  // 先写 ref 再以普通值更新 state，保证紧随其后的同步读取拿到最新状态。
+  const setLoopState = (sessionId: string, next: LoopState | null) => {
+    const map = { ...loopBySessionRef.current };
+    if (next) {
+      map[sessionId] = next;
+    } else {
+      delete map[sessionId];
+    }
+    loopBySessionRef.current = map;
+    setLoopBySession(map);
+  };
+  // 草稿会话尚无 sessionId，Loop 设置先暂存，首次发送创建会话后迁移到真实 session。
+  const [draftLoop, setDraftLoopState] = useState<LoopState | null>(null);
+  const draftLoopRef = useRef<LoopState | null>(null);
+  const setDraftLoop = (next: LoopState | null) => {
+    draftLoopRef.current = next;
+    setDraftLoopState(next);
+  };
+  // 关闭某个 session 的 Loop：撤销待发定时器并删除状态。进程被停止前必须先调用。
+  const clearLoopForSession = (sessionId: string | undefined) => {
+    if (!sessionId) return;
+    clearTimeout(loopTimerBySession.current[sessionId]);
+    delete loopTimerBySession.current[sessionId];
+    if (loopBySessionRef.current[sessionId]) {
+      setLoopState(sessionId, null);
+    }
+  };
+  // 切换 workspace：不属于新执行目录的 Loop 一律关闭（cwd 不变量），草稿 Loop 一并清空。
+  const clearLoopsOutsideProject = (projectPath: string | null) => {
+    for (const [sessionId, loop] of Object.entries(loopBySessionRef.current)) {
+      if (loop.projectPath !== projectPath) {
+        clearLoopForSession(sessionId);
+      }
+    }
+    setDraftLoop(null);
+  };
   // 当前激活的主题 ID；未持久化时使用默认浅色主题。
   const [themeId, setLocalThemeId] = useState(DEFAULT_THEME_ID);
 
@@ -445,6 +492,12 @@ export function useAppCore() {
     [displayedConfigOptions],
   );
   const currentApprovalProfile = selectedSession?.approvalProfile ?? draftApprovalProfile;
+  // 当前会话（或草稿）的 Loop 状态，驱动 Loop 开关与运行模式状态条。
+  // 选中会话不属于当前项目时视同草稿，与 sendContent / useLoopMode 的目标判定一致。
+  const currentLoop =
+    selectedSession && selectedSession.projectPath === selectedProject?.path
+      ? (loopBySession[selectedSession.id] ?? null)
+      : draftLoop;
 
   // 当前选中 session 的待执行 slash 命令：随 session 切换读对应 ref 桶，
   // pendingSlashCommandVersion 仅作依赖项用于触发重渲染（ref 写入不会触发渲染）。
@@ -523,6 +576,7 @@ export function useAppCore() {
 
   return {
     planReviewBySession,
+    planReviewBySessionRef,
     setPlanReviewBySession,
     planReviewDrafts,
     hiddenPlanReviews,
@@ -571,6 +625,7 @@ export function useAppCore() {
     setOmpStatus,
     setOmpPath,
     setAgentStatus,
+    agentBusyCountRef,
     incrementAgentBusyCount,
     decrementAgentBusyCount,
     resetAgentBusyCount,
@@ -629,6 +684,14 @@ export function useAppCore() {
     modeConfig,
     thinkingConfig,
     currentApprovalProfile,
+    currentLoop,
+    loopBySessionRef,
+    loopTimerBySession,
+    setLoopState,
+    draftLoopRef,
+    setDraftLoop,
+    clearLoopForSession,
+    clearLoopsOutsideProject,
     activeApprovalKind,
     pendingSlashCommand,
   };

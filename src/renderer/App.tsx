@@ -1,7 +1,7 @@
 /**
  * App — 渲染进程根组件。
  *
- * 薄编排层：实例化 10 个业务 hook，按 props 下传给子组件组装三栏布局。
+ * 薄编排层：实例化 11 个业务 hook，按 props 下传给子组件组装三栏布局。
  * 本身不持有任何 useState——全部下沉到 useAppCore。
  *
  * ## 渲染隔离策略
@@ -25,12 +25,14 @@ import { SessionSearchModal } from './components/SessionSearchModal';
 import { StatusBar } from './components/StatusBar';
 import { TopBar } from './components/TopBar';
 import { PlanReviewOverlay } from './components/PlanReviewOverlay';
+import { RunModeStrip } from './components/RunModeStrip';
 import { usePlanReview } from './hooks/usePlanReview';
 import { useAgentEvents } from './hooks/useAgentEvents';
 import { useAppCore } from './hooks/useAppCore';
 import { useApprovalFlow } from './hooks/useApprovalFlow';
 import { useConfigSync } from './hooks/useConfigSync';
 import { useGitReview } from './hooks/useGitReview';
+import { useLoopMode } from './hooks/useLoopMode';
 import { useMessageFlow } from './hooks/useMessageFlow';
 import { usePaneLayout } from './hooks/usePaneLayout';
 import { useProjectActions } from './hooks/useProjectActions';
@@ -38,6 +40,7 @@ import { useSessionLifecycle } from './hooks/useSessionLifecycle';
 import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
 import { applyTheme, toggleTheme } from './theme';
+import { describeLoopStatus, LOOP_ICON } from './lib/loopMode';
 // 空 questionnaire 队列复用常量引用，避免每次渲染创建新数组触发下游 memo 失效。
 const EMPTY_QUESTIONNAIRE_REQUESTS: QuestionnaireRequest[] = [];
 
@@ -51,12 +54,15 @@ export default function App() {
   const projectActions = useProjectActions(app, toolGroups);
 
   const sessionLifecycle = useSessionLifecycle(app, toolGroups, projectActions);
-  const messageFlow = useMessageFlow(app);
+  // Loop 运行模式（桌面端驱动的 /loop）：供消息发送、事件结算与输入区控件共用。
+  const loopMode = useLoopMode(app);
+  const messageFlow = useMessageFlow(app, loopMode);
 
   const planReview = usePlanReview(app);
   const approvalFlow = useApprovalFlow(app);
   const configSync = useConfigSync(app);
-  useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff);
+  useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff, loopMode);
+  const loopStatus = app.currentLoop ? describeLoopStatus(app.currentLoop, Date.now()) : null;
 
   const activeApprovalRequestId =
     app.activeApprovalKind === 'permission'
@@ -158,6 +164,19 @@ export default function App() {
       />
       <section className={paneLayout.layoutClassName}>
         <ChatWorkspace
+          runModeStatus={
+            app.currentLoop && loopStatus ? (
+              <RunModeStrip
+                icon={LOOP_ICON}
+                label="Loop"
+                status={loopStatus.status}
+                detail={loopStatus.detail}
+                tone={app.currentLoop.paused ? 'paused' : 'active'}
+                actionLabel="关闭 Loop"
+                onAction={loopMode.disableCurrentLoop}
+              />
+            ) : undefined
+          }
           planReviewControls={
             app.selectedSession && planReview.view?.supported ? (
               <div className="plan-review-entry">
@@ -197,6 +216,9 @@ export default function App() {
           approvalProfile={app.currentApprovalProfile}
           approvalProfileNotice={app.approvalProfileNotice}
           isDraftSession={!app.selectedSession}
+          loop={app.currentLoop}
+          onLoopEnable={loopMode.enableCurrentLoop}
+          onLoopDisable={loopMode.disableCurrentLoop}
           onModelChange={(modelId) => void configSync.handleModelChange(modelId)}
           onModeChange={(modeId) => void configSync.handleModeChange(modeId)}
           onThinkingChange={(thinkingId) => void configSync.handleThinkingChange(thinkingId)}

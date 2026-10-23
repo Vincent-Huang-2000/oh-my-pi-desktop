@@ -14,6 +14,7 @@
  * @param app          useAppCore 返回的状态对象
  * @param toolGroups   useToolGroups 返回的折叠管理方法
  * @param refreshGitBranches, refreshDiff  useGitReview 的刷新函数（done/error 后自动调用）
+ * @param loopMode     useLoopMode 的结算入口（prompt 结算后驱动 Loop 自动重发或暂停）
  *
  * ## 维护
  * - 新增事件类型在本文件末尾追加 else-if 分支。
@@ -55,6 +56,7 @@ import {
 import { mergeAgentEventIntoMessages, PLAN_PREVIEW_LOADING_TEXT } from '../lib/messageMerge';
 import { type ReviewSource } from '../lib/constants';
 import { useAppCore } from './useAppCore';
+import { useLoopMode } from './useLoopMode';
 import { useToolGroups } from './useToolGroups';
 
 type RefreshDiff = (source: ReviewSource, project?: StoredProject | null) => Promise<void>;
@@ -65,6 +67,7 @@ export function useAgentEvents(
   toolGroups: ReturnType<typeof useToolGroups>,
   refreshGitBranches: RefreshGitBranches,
   refreshDiff: RefreshDiff,
+  loopMode: Pick<ReturnType<typeof useLoopMode>, 'handleTurnSettled' | 'handleSessionReplaced'>,
 ): void {
   useEffect(() => {
     return window.ohMyPiDesktop.onAgentEvent((event) => {
@@ -142,6 +145,8 @@ export function useAgentEvents(
           app.setMessages([]);
           app.setUsageText('');
         }
+        // 本地 sessionId 保持不变，Loop 仍挂在该 id 上；上下文已换成执行会话，先暂停。
+        loopMode.handleSessionReplaced(event.sessionId);
         return;
       }
       if (event.type === 'permission_request') {
@@ -644,6 +649,11 @@ export function useAgentEvents(
       cacheMessages((current) =>
         mergeAgentEventIntoMessages(current, event, app.modelBySessionRef.current[event.sessionId]),
       );
+      // Loop：在忙碌计数结算与消息合并之后处理，保证状态行排在错误消息之后、计数已更新。
+      if (event.type === 'done' || event.type === 'error') {
+        loopMode.handleTurnSettled(event);
+      }
     });
+    // loopMode 的结算入口只读 ref，不加入依赖，避免每次渲染重新订阅 agent 事件。
   }, [refreshDiff, refreshGitBranches]);
 }

@@ -1,0 +1,58 @@
+/* === 运行模式状态条：输入区顶部的一行状态，与「审核方案」入口同一层级 === */
+
+.run-mode-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-accent-hover);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-detail);
+}
+
+.run-mode-strip.is-paused {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.run-mode-strip-label {
+  color: var(--color-accent-strong);
+  font-weight: 600;
+}
+
+.run-mode-strip.is-paused .run-mode-strip-label {
+  color: inherit;
+}
+
+/* 状态与说明之间用间隔点串联，说明过长时截断，不撑开输入区。 */
+.run-mode-strip-status::before,
+.run-mode-strip-detail::before {
+  content: '·';
+  margin-right: 8px;
+  opacity: 0.6;
+}
+
+.run-mode-strip-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-mode-strip-action {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.run-mode-strip-action:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-accent-strong);
+}

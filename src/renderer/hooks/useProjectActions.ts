@@ -30,6 +30,9 @@ export function useProjectActions(
 
     // 与 handleUseProject 一致：切项目前先停掉旧 session 的子进程，防止 cwd 残留。
     const previousSessionId = app.selectedSessionRef.current?.id;
+    // Loop：停进程前先关闭旧 session 及不属于新执行目录的 Loop，避免定时器把消息发进正在停止的进程。
+    app.clearLoopForSession(previousSessionId);
+    app.clearLoopsOutsideProject(project.path);
     if (previousSessionId) {
       await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);
       app.clearApprovalStateForSession(previousSessionId, { alsoClearActive: true });
@@ -61,6 +64,9 @@ export function useProjectActions(
   const handleUseProject = async (project: StoredProject) => {
     // 先停掉旧 session 残留的子进程，避免它继续占用 cwd 或被后续 sendAgentMessage 复用。
     const previousSessionId = app.selectedSessionRef.current?.id;
+    // Loop：停进程前先关闭旧 session 及不属于新执行目录的 Loop，避免定时器把消息发进正在停止的进程。
+    app.clearLoopForSession(previousSessionId);
+    app.clearLoopsOutsideProject(project.path);
     if (previousSessionId) {
       await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);
       app.clearApprovalStateForSession(previousSessionId, { alsoClearActive: true });
@@ -166,6 +172,10 @@ export function useProjectActions(
       (session) => session.projectPath === project.path,
     );
     for (const session of sessionsToRemove) {
+      // Loop：停进程前同步关闭，避免待发的自动重发在等待期间重新拉起进程。
+      app.clearLoopForSession(session.id);
+    }
+    for (const session of sessionsToRemove) {
       await window.ohMyPiDesktop.stopSessionProcess(session.id);
     }
     const removed = await window.ohMyPiDesktop.removeProject(project.path);
@@ -184,6 +194,7 @@ export function useProjectActions(
     // 让中间/右栏落到干净的空白态，避免「无目录 + 旧消息/用量/diff 残留」。
     if (app.selectedProjectRef.current?.path === project.path) {
       app.selectProject(null);
+      app.setDraftLoop(null);
       // 清空当前展示的消息流及其按 sessionId 的缓存（你已确认清掉）。
       app.setMessages([]);
       for (const session of sessionsToRemove) {
