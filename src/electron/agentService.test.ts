@@ -261,6 +261,26 @@ const startInitializedAgent = async (
 };
 
 describe('ACP 双流隔离与诊断日志', () => {
+  it('保留结构化 RPC 错误原因，并兼容缺失或非文本 details', async () => {
+    const service = createAgentService(makeSender([]));
+    for (const [data, expected] of [
+      [{ details: 'No model selected' }, 'Internal error: No model selected'],
+      [undefined, 'Internal error'],
+      [{ details: { debug: true } }, 'Internal error'],
+      [{ details: '   ' }, 'Internal error'],
+    ] as const) {
+      const starting = service.startAgent('s1', '/tmp/test-workspace', 'write');
+      const record = hoistedSpawns.at(-1)!;
+      const request = JSON.parse(record.stdinWrites[0]) as { id: string };
+      emitAcpMessage(record, {
+        jsonrpc: '2.0',
+        id: request.id,
+        error: { code: -32603, message: 'Internal error', data },
+      });
+      expect(await starting).toMatchObject({ ok: false, message: expected });
+    }
+  });
+
   it('stdout 半帧与 stderr 交错时仍能完成初始化', async () => {
     const events: EmittedEvent[] = [];
     const service = createAgentService(makeSender(events));

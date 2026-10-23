@@ -346,7 +346,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
 
     process.pendingRequests.delete(message.id);
     if (message.error) {
-      pending.reject(new Error(message.error.message));
+      // omp 把模型恢复、配置等失败原因放在 data.details，不能只留下通用的 Internal error。
+      const details = isRecord(message.error.data) ? message.error.data.details : undefined;
+      const reason = typeof details === 'string' ? details.trim() : '';
+      pending.reject(
+        new Error(
+          reason && reason !== message.error.message
+            ? `${message.error.message}: ${reason}`
+            : message.error.message,
+        ),
+      );
       return;
     }
     pending.resolve(message.result);
