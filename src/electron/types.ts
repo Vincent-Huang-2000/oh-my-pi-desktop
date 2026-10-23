@@ -128,6 +128,12 @@ export type CommandResult = {
   code: number | null;
 };
 
+export type OmpCapabilitiesResult = {
+  ok: boolean;
+  configOptions?: AcpConfigOption[];
+  commands?: AcpAvailableCommand[];
+};
+
 export type PlanReviewDecision = 'execute' | 'compact' | 'keep' | 'refine' | 'save' | 'cancel';
 export type PlanReviewData = {
   reviewId: string;

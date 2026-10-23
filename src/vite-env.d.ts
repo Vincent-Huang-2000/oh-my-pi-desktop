@@ -188,6 +188,12 @@ type GoalModeSnapshot = {
   armed: 'objective' | 'interview' | null;
 };
 
+type OmpCapabilitiesResult = {
+  ok: boolean;
+  configOptions?: AcpConfigOption[];
+  commands?: AcpAvailableCommand[];
+};
+
 interface Window {
   ohMyPiDesktop: {
     getState: () => Promise<DesktopState>;
@@ -205,6 +211,7 @@ interface Window {
     checkOmp: (
       workspacePath?: string,
     ) => Promise<{ installed: boolean; status: string; message: string }>;
+    detectOmpCapabilities: (workspacePath: string) => Promise<OmpCapabilitiesResult>;
     getOmpPath: () => Promise<string>;
     selectOmpPath: () => Promise<{ ok: boolean; path?: string; message?: string }>;
     // 保存侧栏布局（宽度与折叠状态），启动时随 getState 恢复。

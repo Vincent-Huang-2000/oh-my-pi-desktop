@@ -107,6 +107,10 @@ export function useProjectActions(
     if (result.path !== undefined) {
       app.setOmpPath(result.path);
     }
+    // 路径切换成功后清空旧能力结果并重新探测（含重新选择相同路径）。
+    if (result.ok) {
+      app.invalidateOmpCapabilities();
+    }
     // 路径切换成功后，若当前有选中的 session，立即用新 omp 重启它。
     if (result.ok && app.selectedSession && app.selectedProject) {
       await window.ohMyPiDesktop.startAgent(app.selectedSession.id, app.selectedProject.path);

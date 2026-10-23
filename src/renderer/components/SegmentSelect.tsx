@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AcpConfigOption } from '../types';
 import './SegmentSelect.css';
 
-type Option = NonNullable<AcpConfigOption['options']>[number];
+type Option = NonNullable<AcpConfigOption['options']>[number] & {
+  disabledReason?: string;
+};
 
 type SegmentSelectProps = {
   ariaLabel: string;
@@ -39,14 +41,15 @@ export function SegmentSelect({
   const currentName = useMemo(() => {
     const matched = options.find((o) => o.value === value);
     if (matched) return matched.name;
-    return options.length === 0 ? emptyLabel : '未选择';
+    return options.some((option) => !option.disabledReason) ? '未选择' : emptyLabel;
   }, [options, value, emptyLabel]);
 
   // 打开菜单时把高亮重置到当前选中项（若有），便于直接 Enter 确认或方向键微调。
   useEffect(() => {
     if (!open) return;
-    const idx = options.findIndex((o) => o.value === value);
-    setActiveIndex(idx >= 0 ? idx : 0);
+    const idx = options.findIndex((o) => o.value === value && !o.disabledReason);
+    setActiveIndex(idx >= 0 ? idx : options.findIndex((o) => !o.disabledReason));
+    menuRef.current?.focus();
   }, [open, options, value]);
 
   // 外部点击关闭：点击菜单外且不在触发按钮内时关闭。
@@ -79,10 +82,13 @@ export function SegmentSelect({
   const moveActive = (delta: number) => {
     if (options.length === 0) return;
     setActiveIndex((prev) => {
-      const next = prev + delta;
-      if (next < 0) return 0;
-      if (next > options.length - 1) return options.length - 1;
-      return next;
+      let next = prev + delta;
+      if (prev < 0 && delta < 0) next = options.length - 1;
+      while (next >= 0 && next < options.length) {
+        if (!options[next].disabledReason) return next;
+        next += delta;
+      }
+      return prev;
     });
   };
 
@@ -106,7 +112,7 @@ export function SegmentSelect({
     if (event.key === 'Enter') {
       event.preventDefault();
       const opt = options[activeIndex];
-      if (opt) {
+      if (opt && !opt.disabledReason) {
         onChange(opt.value);
         setOpen(false);
       }
@@ -167,13 +173,21 @@ export function SegmentSelect({
                   type="button"
                   role="option"
                   aria-selected={isSelected}
+                  aria-disabled={Boolean(opt.disabledReason)}
+                  disabled={Boolean(opt.disabledReason)}
+                  tabIndex={-1}
+                  title={opt.disabledReason}
                   className={[
                     'segment-select-item',
                     isActive ? 'active' : '',
                     isSelected ? 'selected' : '',
                   ].join(' ')}
-                  onClick={() => handleSelect(opt.value)}
-                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => {
+                    if (!opt.disabledReason) handleSelect(opt.value);
+                  }}
+                  onMouseEnter={() => {
+                    if (!opt.disabledReason) setActiveIndex(index);
+                  }}
                 >
                   <span className="segment-select-item-name">{opt.name}</span>
                   {isSelected && (

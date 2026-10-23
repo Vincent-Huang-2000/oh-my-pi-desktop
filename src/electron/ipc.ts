@@ -38,6 +38,7 @@ import { readFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { dialog, ipcMain, shell } from 'electron';
 import { runCommand } from './command.js';
+import { probeOmpCapabilities } from './ompCapabilities.js';
 import {
   ensureDefaultWorkspace,
   getSetting,
@@ -328,6 +329,16 @@ export const registerDesktopIpcHandlers = (agentService: AgentService) => {
     }
     setSetting('themeId', themeId);
     return { ok: true };
+  });
+
+  // 探测当前 omp 的运行模式与命令能力；失败返回 ok: false，渲染层按「尚未确认」处理。
+  ipcMain.handle('desktop:detect-omp-capabilities', async (_event, workspacePath: string) => {
+    try {
+      return await probeOmpCapabilities(getSetting('ompExecutablePath') || 'omp', workspacePath);
+    } catch (error) {
+      console.error('OMP capability detection failed:', error);
+      return { ok: false };
+    }
   });
 
   // 打开文件选择对话框让用户选择 omp 可执行文件，保存设置并执行 --version 验证。

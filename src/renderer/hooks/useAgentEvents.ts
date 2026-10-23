@@ -388,6 +388,13 @@ export function useAgentEvents(
       // commands_update：通知该 session 可用 slash 命令列表，同时按项目缓存（新 session 复用）。
       if (event.type === 'commands_update') {
         const commands = getPayloadAvailableCommands(event.payload);
+        app.setRunModeCapabilitiesBySession((current) => ({
+          ...current,
+          [event.sessionId]: {
+            ...current[event.sessionId],
+            commands: commands.map((command) => command.name),
+          },
+        }));
         if (commands.length > 0) {
           app.setDesktopState((current) => {
             const eventSession = current.recentSessions.find(
@@ -420,6 +427,17 @@ export function useAgentEvents(
       // config_update：刷新当前 session 的 configOptions；mode/model/thinking 切换都会触发。
       if (event.type === 'config_update') {
         const configOptions = getPayloadConfigOptions(event.payload) as AcpConfigOption[];
+        const mode = configOptions.find((option) => option.id === 'mode');
+        const modes = mode?.options?.map((option) => option.value);
+        if (modes) {
+          app.setRunModeCapabilitiesBySession((current) => ({
+            ...current,
+            [event.sessionId]: {
+              ...current[event.sessionId],
+              modes,
+            },
+          }));
+        }
         // 同步当前 session 的模型快照到 ref，供 tool_call 实时事件取用。
         const modelOpt = configOptions.find((o) => o.id === 'model');
         if (modelOpt && typeof modelOpt.currentValue === 'string') {
@@ -549,6 +567,11 @@ export function useAgentEvents(
       // 进程结束只收敛已有消息中的后台工具：不改回合计数和状态栏；
       // 临时 list/config 进程及未打开过的 session 没有消息缓存，直接忽略，避免新建空缓存。
       if (event.type === 'process_stopped') {
+        app.setRunModeCapabilitiesBySession((current) => {
+          const next = { ...current };
+          delete next[event.sessionId];
+          return next;
+        });
         if (
           app.selectedSessionRef.current?.id === event.sessionId ||
           app.messageCache.current[event.sessionId]

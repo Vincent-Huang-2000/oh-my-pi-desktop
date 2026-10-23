@@ -28,6 +28,8 @@ import {
 } from '../lib/constants';
 import type { PendingSlashCommand } from '../lib/slashCommands';
 import type { LoopState } from '../lib/loopMode';
+import type { RunModeCapabilities } from '../lib/runModeCapabilities';
+import { useOmpCapabilityDetection, type DetectedOmp } from './useOmpCapabilityDetection';
 import type { GitBranchSwitchError } from '../components/GitBranchSwitchErrorModal';
 import { DEFAULT_THEME_ID, getTheme } from '../theme';
 
@@ -111,6 +113,23 @@ export function useAppCore() {
   const [ompStatus, setOmpStatus] = useState('未检测');
   // 用户指定的 omp 可执行文件路径；空字符串表示使用 PATH 中的 'omp'。
   const [ompPath, setOmpPath] = useState('');
+  const [ompCapabilityCheckVersion, setOmpCapabilityCheckVersion] = useState(0);
+  const ompCapabilityRequest = useRef(0);
+  const [detectedOmp, setDetectedOmp] = useState<DetectedOmp | null>(null);
+  const invalidateOmpCapabilities = () => {
+    // 选择相同路径的新构建也必须重检，并立即使旧请求失效。
+    ompCapabilityRequest.current += 1;
+    setDetectedOmp(null);
+    setRunModeCapabilitiesBySession({});
+    setOmpCapabilityCheckVersion((version) => version + 1);
+  };
+  useOmpCapabilityDetection(
+    selectedProject?.path,
+    ompPath,
+    ompCapabilityCheckVersion,
+    ompCapabilityRequest,
+    setDetectedOmp,
+  );
   const [, setAgentStatus] = useState('空闲');
   // 按 sessionId 分桶的 in-flight prompt 计数；减到 0 该 session 视为空闲。
   const [agentBusyCountBySession, setAgentBusyCountBySession] = useState<Record<string, number>>(
@@ -293,6 +312,10 @@ export function useAppCore() {
   const [approvalRestoreFailed, setApprovalRestoreFailed] = useState(false);
   // ACP 通过 available_commands_update 维护的可用 slash 命令。
   const [availableCommands, setAvailableCommands] = useState<AcpAvailableCommand[]>([]);
+  // 能力判断按会话隔离，且不使用持久化配置缓存，避免更换 OMP 后沿用旧结果。
+  const [runModeCapabilitiesBySession, setRunModeCapabilitiesBySession] = useState<
+    Record<string, RunModeCapabilities>
+  >({});
   const [permissionRequest, setPermissionRequest] = useState<PermissionRequest | null>(null);
   // 当前展示的 elicitation 弹窗（omp 第2层审批门控），与权限弹窗独立。
   const [elicitationRequest, setElicitationRequest] = useState<ElicitationRequest | null>(null);
@@ -477,10 +500,19 @@ export function useAppCore() {
   );
 
   const displayedConfigOptions = useMemo(() => {
-    const draftConfigOptions =
+    const detectedConfigOptions =
+      detectedOmp?.projectPath === selectedProject?.path && detectedOmp?.ompPath === ompPath
+        ? detectedOmp?.result.configOptions
+        : undefined;
+    const cachedDraftConfigOptions =
       cachedProjectConfigOptions.length > 0
         ? cachedProjectConfigOptions
         : latestCachedConfigOptions;
+    const detectedMode = detectedConfigOptions?.find((option) => option.id === 'mode');
+    // 探测只刷新运行模式，不覆盖用户已有的模型和推理强度选择。
+    const draftConfigOptions = detectedMode
+      ? [...cachedDraftConfigOptions.filter((option) => option.id !== 'mode'), detectedMode]
+      : cachedDraftConfigOptions;
     const source = selectedSession ? acpConfigOptions : draftConfigOptions;
     if (selectedSession) {
       return source;
@@ -495,7 +527,26 @@ export function useAppCore() {
     draftConfigValues,
     latestCachedConfigOptions,
     selectedSession,
+    detectedOmp,
+    selectedProject?.path,
+    ompPath,
   ]);
+
+  const currentRunModeCapabilities = useMemo(() => {
+    const detected =
+      detectedOmp?.projectPath === selectedProject?.path && detectedOmp?.ompPath === ompPath
+        ? detectedOmp?.result
+        : undefined;
+    const live = selectedSession ? runModeCapabilitiesBySession[selectedSession.id] : undefined;
+    return {
+      modes:
+        live?.modes ??
+        detected?.configOptions
+          ?.find((option) => option.id === 'mode')
+          ?.options?.map((option) => option.value),
+      commands: live?.commands ?? detected?.commands?.map((command) => command.name),
+    };
+  }, [detectedOmp, selectedProject?.path, ompPath, selectedSession, runModeCapabilitiesBySession]);
 
   const modelConfig = useMemo(
     () => displayedConfigOptions.find((option) => option.id === 'model'),
@@ -625,6 +676,10 @@ export function useAppCore() {
     approvalProfileNotice,
     approvalRestoreFailed,
     availableCommands,
+    runModeCapabilitiesBySession,
+    setRunModeCapabilitiesBySession,
+    currentRunModeCapabilities,
+    invalidateOmpCapabilities,
     permissionRequest,
     elicitationRequest,
     questionnaireRequest,

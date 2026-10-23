@@ -83,6 +83,7 @@ export default function App() {
   const loopStatus = app.currentLoop ? describeLoopStatus(app.currentLoop, Date.now()) : null;
   const goalStrip = app.currentGoal ? describeGoalStrip(app.currentGoal) : null;
   const vibeActive = Boolean(app.selectedSession) && app.modeConfig?.currentValue === VIBE_MODE_ID;
+  const runModeCapabilities = app.currentRunModeCapabilities;
 
   const activeApprovalRequestId =
     app.activeApprovalKind === 'permission'
@@ -204,10 +205,16 @@ export default function App() {
                     status={goalStrip.status}
                     detail={goalStrip.detail}
                     tone={goalStrip.tone}
-                    actions={goalStrip.actions.map((action) => ({
-                      label: GOAL_ACTION_LABELS[action],
-                      onClick: () => goalMode.runGoalAction(action),
-                    }))}
+                    actions={goalStrip.actions
+                      .filter(
+                        (action) =>
+                          action !== 'guided' ||
+                          runModeCapabilities?.commands?.includes('guided-goal'),
+                      )
+                      .map((action) => ({
+                        label: GOAL_ACTION_LABELS[action],
+                        onClick: () => goalMode.runGoalAction(action),
+                      }))}
                   />
                 )}
                 {vibeActive && (
@@ -257,6 +264,7 @@ export default function App() {
           }
           modelConfig={app.modelConfig}
           modeConfig={app.modeConfig}
+          runModeCapabilities={runModeCapabilities}
           thinkingConfig={app.thinkingConfig}
           approvalProfile={app.currentApprovalProfile}
           approvalProfileNotice={app.approvalProfileNotice}
@@ -266,6 +274,7 @@ export default function App() {
           onLoopDisable={loopMode.disableCurrentLoop}
           onModelChange={(modelId) => void configSync.handleModelChange(modelId)}
           onModeChange={(modeId) => void configSync.handleModeChange(modeId)}
+          onGuidedGoal={() => void messageFlow.sendRunModeCommand('/guided-goal')}
           onThinkingChange={(thinkingId) => void configSync.handleThinkingChange(thinkingId)}
           onApprovalProfileChange={(approvalProfile) =>
             void configSync.handleApprovalProfileChange(approvalProfile)

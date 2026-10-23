@@ -55,6 +55,11 @@ import { ModelPickerPopover } from './ModelPickerPopover';
 import { PermissionModal } from './PermissionModal';
 import { QuestionnaireModal } from './QuestionnaireModal';
 import { SegmentSelect } from './SegmentSelect';
+import {
+  describeRunModeCapabilities,
+  GUIDED_GOAL_VALUE,
+  type RunModeCapabilities,
+} from '../lib/runModeCapabilities';
 import type {
   AcpConfigOption,
   ChatMessage,
@@ -122,6 +127,7 @@ type ChatWorkspaceProps = {
   // ACP 三项配置与桌面端审批档位都位于输入框纸飞机按钮左侧。
   modelConfig?: AcpConfigOption;
   modeConfig?: AcpConfigOption;
+  runModeCapabilities?: RunModeCapabilities;
   thinkingConfig?: AcpConfigOption;
   approvalProfile: ApprovalProfile;
   approvalProfileNotice: string;
@@ -132,6 +138,7 @@ type ChatWorkspaceProps = {
   onLoopDisable: () => void;
   onModelChange: (modelId: string) => void;
   onModeChange: (modeId: string) => void;
+  onGuidedGoal: () => void;
   onThinkingChange: (thinkingId: string) => void;
   onApprovalProfileChange: (approvalProfile: ApprovalProfile) => void;
   onPromptChange: (value: string) => void;
@@ -1182,6 +1189,7 @@ export function ChatWorkspace({
   questionnaireRequests,
   modelConfig,
   modeConfig,
+  runModeCapabilities,
   thinkingConfig,
   approvalProfile,
   approvalProfileNotice,
@@ -1191,6 +1199,7 @@ export function ChatWorkspace({
   onLoopDisable,
   onModelChange,
   onModeChange,
+  onGuidedGoal,
   onThinkingChange,
   onApprovalProfileChange,
   onPromptChange,
@@ -1246,7 +1255,11 @@ export function ChatWorkspace({
   const currentModelName =
     modelOptions.find((m) => m.value === currentModelValue)?.name ??
     (modelOptions.length === 0 ? modelEmptyLabel : '未选择模型');
-  const modeOptions = modeConfig?.options ?? [];
+  // 保持选项引用稳定，避免流式消息刷新时重置下拉菜单的键盘高亮。
+  const modeOptions = useMemo(
+    () => describeRunModeCapabilities(modeConfig, runModeCapabilities),
+    [modeConfig, runModeCapabilities],
+  );
   const currentMode = typeof modeConfig?.currentValue === 'string' ? modeConfig.currentValue : '';
   const thinkingOptions = thinkingConfig?.options ?? [];
   const currentThinking =
@@ -1600,7 +1613,11 @@ export function ChatWorkspace({
                     options={modeOptions}
                     value={currentMode}
                     emptyLabel={modeEmptyLabel}
-                    onChange={onModeChange}
+                    disabled={!selectedProject}
+                    onChange={(value) => {
+                      if (value === GUIDED_GOAL_VALUE) onGuidedGoal();
+                      else onModeChange(value);
+                    }}
                   />
                 </div>
                 <div className="config-segment">

@@ -85,6 +85,9 @@ const desktop = {
     ipcRenderer.invoke('desktop:reveal-in-explorer', workspacePath),
   // 探测 omp 是否安装可用（omp --version / omp acp --help）。
   checkOmp: (workspacePath?: string) => ipcRenderer.invoke('desktop:check-omp', workspacePath),
+  // 用临时 ACP 会话探测当前 omp 实际提供的运行模式与命令（不发送模型 prompt）。
+  detectOmpCapabilities: (workspacePath: string) =>
+    ipcRenderer.invoke('desktop:detect-omp-capabilities', workspacePath),
   // 读取当前用户指定的 omp 可执行文件路径（空字符串表示使用 PATH 中的 'omp'）。
   getOmpPath: () => ipcRenderer.invoke('desktop:get-omp-path'),
   // 打开文件选择对话框选择 omp 可执行文件，保存设置并验证。

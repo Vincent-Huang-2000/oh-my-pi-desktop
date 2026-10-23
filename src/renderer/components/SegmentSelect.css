@@ -59,6 +59,12 @@
   background: var(--color-accent-hover);
 }
 
+.segment-select-item[aria-disabled='true'] {
+  color: var(--color-text-tertiary);
+  background: transparent;
+  cursor: not-allowed;
+}
+
 .segment-select-item-name {
   overflow: hidden;
   text-overflow: ellipsis;
