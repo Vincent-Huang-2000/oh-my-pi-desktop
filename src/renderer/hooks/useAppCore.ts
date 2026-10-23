@@ -249,6 +249,24 @@ export function useAppCore() {
       setLoopState(sessionId, null);
     }
   };
+  // Goal 运行模式：omp 经 goal_update 下发的目标快照，按 sessionId 分桶，镜像 ref 供事件回调读取。
+  const [goalBySession, setGoalBySession] = useState<Record<string, GoalModeSnapshot>>({});
+  const goalBySessionRef = useRef<Record<string, GoalModeSnapshot>>({});
+  // 目标与待设定状态都为空即表示 Goal 模式已结束，直接删除该会话的快照。
+  const setGoalState = (sessionId: string, next: GoalModeSnapshot | null) => {
+    const map = { ...goalBySessionRef.current };
+    if (next && (next.goal || next.armed)) {
+      map[sessionId] = next;
+    } else {
+      delete map[sessionId];
+    }
+    goalBySessionRef.current = map;
+    setGoalBySession(map);
+  };
+  // 会话关闭或其 agent 进程被停止时清除；重新加载会话时由会话响应重新下发。
+  const clearGoalForSession = (sessionId: string | undefined) => {
+    if (sessionId && goalBySessionRef.current[sessionId]) setGoalState(sessionId, null);
+  };
   // 切换 workspace：不属于新执行目录的 Loop 一律关闭（cwd 不变量），草稿 Loop 一并清空。
   const clearLoopsOutsideProject = (projectPath: string | null) => {
     for (const [sessionId, loop] of Object.entries(loopBySessionRef.current)) {
@@ -498,6 +516,11 @@ export function useAppCore() {
     selectedSession && selectedSession.projectPath === selectedProject?.path
       ? (loopBySession[selectedSession.id] ?? null)
       : draftLoop;
+  // 当前会话的目标快照，驱动 Goal 状态条；草稿会话尚无 omp 状态。
+  const currentGoal =
+    selectedSession && selectedSession.projectPath === selectedProject?.path
+      ? (goalBySession[selectedSession.id] ?? null)
+      : null;
 
   // 当前选中 session 的待执行 slash 命令：随 session 切换读对应 ref 桶，
   // pendingSlashCommandVersion 仅作依赖项用于触发重渲染（ref 写入不会触发渲染）。
@@ -692,6 +715,10 @@ export function useAppCore() {
     setDraftLoop,
     clearLoopForSession,
     clearLoopsOutsideProject,
+    currentGoal,
+    goalBySessionRef,
+    setGoalState,
+    clearGoalForSession,
     activeApprovalKind,
     pendingSlashCommand,
   };

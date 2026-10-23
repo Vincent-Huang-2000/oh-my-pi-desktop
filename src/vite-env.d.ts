@@ -106,7 +106,8 @@ type AgentEvent = {
     | 'plan_review_update'
     | 'session_replaced'
     | 'plan_review_action_started'
-    | 'process_stopped';
+    | 'process_stopped'
+    | 'goal_update';
   message: string;
   payload?: unknown;
   /** 标记此事件结算了一个 in-flight prompt。 */
@@ -172,6 +173,20 @@ type PlanReviewSubmission = {
   savePath?: string;
 };
 type PlanReviewView = { review: PlanReviewData | null; ready: boolean; supported: boolean };
+// omp.goalMode v1 的目标快照（`goal_update` 事件 payload）。
+type GoalModeGoal = {
+  id: string;
+  objective: string;
+  status: 'active' | 'paused' | 'budget-limited' | 'complete' | 'dropped';
+  tokenBudget?: number;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+};
+type GoalModeSnapshot = {
+  goal: GoalModeGoal | null;
+  // 已进入 Goal 模式但尚未设定目标：objective = 下一条消息作为目标；interview = 引导访谈中。
+  armed: 'objective' | 'interview' | null;
+};
 
 interface Window {
   ohMyPiDesktop: {

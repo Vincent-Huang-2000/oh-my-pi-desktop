@@ -4,6 +4,11 @@ import {
   validatePlanReviewSubmission,
 } from './agentPlanReview.js';
 import type { PlanReviewSubmission } from './types.js';
+import {
+  describeGoalModeSnapshot,
+  getAcpGoalMode,
+  parseGoalModeSnapshot,
+} from './agentRunModes.js';
 /**
  * agentService — ACP Agent 服务的编排层。
  *
@@ -495,6 +500,20 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       }
       return events;
     }
+    // omp.goalMode：目标状态（创建、用量、暂停/继续、完成、放弃）变化时推送。
+    if (sessionUpdate === 'goal_update') {
+      const snapshot = parseGoalModeSnapshot(update);
+      return snapshot
+        ? [
+            {
+              sessionId,
+              type: 'goal_update',
+              message: describeGoalModeSnapshot(snapshot),
+              payload: snapshot,
+            },
+          ]
+        : [];
+    }
     if (sessionUpdate === 'available_commands_update') {
       const commands = normalizeAvailableCommands(update.availableCommands);
       process.availableCommands = commands;
@@ -889,6 +908,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
             process.reopeningPlanReview = false;
           });
       }
+    }
+    // 会话响应携带的目标快照：加载/恢复会话后恢复 Goal 状态条（旧版 omp 无此字段则跳过）。
+    const goalMode = getAcpGoalMode(response);
+    if (goalMode) {
+      emitEvent({
+        sessionId: process.localSessionId,
+        type: 'goal_update',
+        message: describeGoalModeSnapshot(goalMode),
+        payload: goalMode,
+      });
     }
     const planMode = getAcpActivePlan(response);
     if (!planMode) return;

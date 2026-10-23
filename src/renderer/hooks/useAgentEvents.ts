@@ -55,6 +55,7 @@ import {
 } from '../lib/historyLoaders';
 import { mergeAgentEventIntoMessages, PLAN_PREVIEW_LOADING_TEXT } from '../lib/messageMerge';
 import { type ReviewSource } from '../lib/constants';
+import { GOAL_ICON, summarizeObjective } from '../lib/goalMode';
 import { useAppCore } from './useAppCore';
 import { useLoopMode } from './useLoopMode';
 import { useToolGroups } from './useToolGroups';
@@ -561,6 +562,22 @@ export function useAgentEvents(
         const activePlan = getActiveSessionPlan(event.payload);
         if (activePlan) {
           cacheMessages((current) => applyActiveSessionPlan(current, activePlan));
+        }
+        return;
+      }
+
+      // Goal 运行模式：主进程已校验 payload；目标完成后状态条消失，在消息流中留一条提示。
+      if (event.type === 'goal_update') {
+        const snapshot = event.payload as GoalModeSnapshot;
+        const previous = app.goalBySessionRef.current[event.sessionId];
+        app.setGoalState(event.sessionId, snapshot);
+        if (snapshot.goal?.status === 'complete' && previous?.goal?.status !== 'complete') {
+          const notice: ChatMessage = {
+            id: `goal-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            role: 'status',
+            text: `${GOAL_ICON} 目标已完成：${summarizeObjective(snapshot.goal.objective)}`,
+          };
+          cacheMessages((current) => [...current, notice]);
         }
         return;
       }

@@ -4,9 +4,11 @@
  * 处理四个 config 选项的切换逻辑：
  * - model / mode / thinking：无选中 session 时更新 draftConfigValues（占位草稿），
  *   有 session 时走 IPC setAgentConfigOption 实时生效。
+ * - mode 从 Goal 切走会放弃目标：存在目标或引导访谈时先弹窗确认。
  * - approvalProfile：暂存新档位并标记 pendingApprovalProfile；进程重建统一推迟到下次消息发送前执行。
  */
 import { DEFAULT_APPROVAL_PROFILE } from '../lib/constants';
+import { GOAL_MODE_ID, getGoalExitWarning } from '../lib/goalMode';
 import type { useAppCore } from './useAppCore';
 export function useConfigSync(app: ReturnType<typeof useAppCore>) {
   const handleModelChange = async (modelId: string) => {
@@ -39,6 +41,11 @@ export function useConfigSync(app: ReturnType<typeof useAppCore>) {
     if (!app.selectedSession) {
       app.setDraftConfigValues((current) => ({ ...current, mode: modeId }));
       return;
+    }
+    // 从 Goal 切走会放弃目标（omp 的模式槽位只容纳一种模式），切换前先警告，取消则保持原模式。
+    if (app.modeConfig?.currentValue === GOAL_MODE_ID && modeId !== GOAL_MODE_ID) {
+      const warning = getGoalExitWarning(app.goalBySessionRef.current[app.selectedSession.id]);
+      if (warning && !window.confirm(warning)) return;
     }
     app.setAgentStatus('切换模式');
     const result = await window.ohMyPiDesktop.setAgentConfigOption(

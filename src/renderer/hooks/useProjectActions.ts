@@ -32,6 +32,7 @@ export function useProjectActions(
     const previousSessionId = app.selectedSessionRef.current?.id;
     // Loop：停进程前先关闭旧 session 及不属于新执行目录的 Loop，避免定时器把消息发进正在停止的进程。
     app.clearLoopForSession(previousSessionId);
+    app.clearGoalForSession(previousSessionId);
     app.clearLoopsOutsideProject(project.path);
     if (previousSessionId) {
       await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);
@@ -66,6 +67,7 @@ export function useProjectActions(
     const previousSessionId = app.selectedSessionRef.current?.id;
     // Loop：停进程前先关闭旧 session 及不属于新执行目录的 Loop，避免定时器把消息发进正在停止的进程。
     app.clearLoopForSession(previousSessionId);
+    app.clearGoalForSession(previousSessionId);
     app.clearLoopsOutsideProject(project.path);
     if (previousSessionId) {
       await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);
@@ -174,6 +176,7 @@ export function useProjectActions(
     for (const session of sessionsToRemove) {
       // Loop：停进程前同步关闭，避免待发的自动重发在等待期间重新拉起进程。
       app.clearLoopForSession(session.id);
+      app.clearGoalForSession(session.id);
     }
     for (const session of sessionsToRemove) {
       await window.ohMyPiDesktop.stopSessionProcess(session.id);

@@ -32,6 +32,7 @@ import { useAppCore } from './hooks/useAppCore';
 import { useApprovalFlow } from './hooks/useApprovalFlow';
 import { useConfigSync } from './hooks/useConfigSync';
 import { useGitReview } from './hooks/useGitReview';
+import { useGoalMode } from './hooks/useGoalMode';
 import { useLoopMode } from './hooks/useLoopMode';
 import { useMessageFlow } from './hooks/useMessageFlow';
 import { usePaneLayout } from './hooks/usePaneLayout';
@@ -41,8 +42,23 @@ import { useToolGroups } from './hooks/useToolGroups';
 import './styles.css';
 import { applyTheme, toggleTheme } from './theme';
 import { describeLoopStatus, LOOP_ICON } from './lib/loopMode';
+import {
+  describeGoalStrip,
+  GOAL_ICON,
+  type GoalStripAction,
+  VIBE_ICON,
+  VIBE_MODE_ID,
+} from './lib/goalMode';
 // 空 questionnaire 队列复用常量引用，避免每次渲染创建新数组触发下游 memo 失效。
 const EMPTY_QUESTIONNAIRE_REQUESTS: QuestionnaireRequest[] = [];
+// Goal 状态条操作的按钮文案。
+const GOAL_ACTION_LABELS: Record<GoalStripAction, string> = {
+  guided: '引导设定',
+  cancel: '取消',
+  pause: '暂停',
+  resume: '继续',
+  drop: '放弃目标',
+};
 
 export default function App() {
   const app = useAppCore();
@@ -62,7 +78,11 @@ export default function App() {
   const approvalFlow = useApprovalFlow(app);
   const configSync = useConfigSync(app);
   useAgentEvents(app, toolGroups, gitReview.refreshGitBranches, gitReview.refreshDiff, loopMode);
+  // Goal / Vibe 运行模式（omp acp 实现）：状态条操作转为 slash 命令或模式切换。
+  const goalMode = useGoalMode(app, messageFlow, configSync);
   const loopStatus = app.currentLoop ? describeLoopStatus(app.currentLoop, Date.now()) : null;
+  const goalStrip = app.currentGoal ? describeGoalStrip(app.currentGoal) : null;
+  const vibeActive = Boolean(app.selectedSession) && app.modeConfig?.currentValue === VIBE_MODE_ID;
 
   const activeApprovalRequestId =
     app.activeApprovalKind === 'permission'
@@ -165,16 +185,41 @@ export default function App() {
       <section className={paneLayout.layoutClassName}>
         <ChatWorkspace
           runModeStatus={
-            app.currentLoop && loopStatus ? (
-              <RunModeStrip
-                icon={LOOP_ICON}
-                label="Loop"
-                status={loopStatus.status}
-                detail={loopStatus.detail}
-                tone={app.currentLoop.paused ? 'paused' : 'active'}
-                actionLabel="关闭 Loop"
-                onAction={loopMode.disableCurrentLoop}
-              />
+            (app.currentLoop && loopStatus) || goalStrip || vibeActive ? (
+              <>
+                {app.currentLoop && loopStatus && (
+                  <RunModeStrip
+                    icon={LOOP_ICON}
+                    label="Loop"
+                    status={loopStatus.status}
+                    detail={loopStatus.detail}
+                    tone={app.currentLoop.paused ? 'paused' : 'active'}
+                    actions={[{ label: '关闭 Loop', onClick: loopMode.disableCurrentLoop }]}
+                  />
+                )}
+                {goalStrip && (
+                  <RunModeStrip
+                    icon={GOAL_ICON}
+                    label="Goal"
+                    status={goalStrip.status}
+                    detail={goalStrip.detail}
+                    tone={goalStrip.tone}
+                    actions={goalStrip.actions.map((action) => ({
+                      label: GOAL_ACTION_LABELS[action],
+                      onClick: () => goalMode.runGoalAction(action),
+                    }))}
+                  />
+                )}
+                {vibeActive && (
+                  <RunModeStrip
+                    icon={VIBE_ICON}
+                    label="Vibe"
+                    status="director 模式"
+                    detail="由 worker 会话在后台执行，结果返回后自动汇总"
+                    actions={[{ label: '退出 Vibe', onClick: goalMode.exitVibe }]}
+                  />
+                )}
+              </>
             ) : undefined
           }
           planReviewControls={

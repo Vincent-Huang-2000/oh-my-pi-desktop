@@ -217,6 +217,7 @@ export function useSessionLifecycle(
     const isCurrent = app.selectedSessionRef.current?.id === session.id;
     // Loop：关闭前同步撤销，避免待发的自动重发在关闭期间重新拉起已关闭会话的进程。
     app.clearLoopForSession(session.id);
+    app.clearGoalForSession(session.id);
     const result = await window.ohMyPiDesktop.closeSession(session.id);
     app.setAgentStatus(result.ok ? 'session 已关闭' : (result.message ?? '关闭失败'));
     if (!result.ok) {
@@ -261,6 +262,7 @@ export function useSessionLifecycle(
       const previousSessionId = app.selectedSessionRef.current?.id;
       // Loop：与切换项目一致，停进程前先关闭旧 session 及不属于目标项目的 Loop。
       app.clearLoopForSession(previousSessionId);
+      app.clearGoalForSession(previousSessionId);
       app.clearLoopsOutsideProject(project.path);
       if (previousSessionId) {
         await window.ohMyPiDesktop.stopSessionProcess(previousSessionId);

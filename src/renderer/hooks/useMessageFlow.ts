@@ -8,6 +8,7 @@
  * - handlePaste：ClipboardEvent 粘贴处理（图片走 dataURL、忽略非图片文件）
  * - applyDraftConfigValues：无 session 时先应用草稿 model/mode/thinking 再发送
  * - /loop：由桌面端本地拦截并交给 useLoopMode（omp acp 不处理该命令），不发给 omp
+ * - sendRunModeCommand：运行模式状态条发送 /goal、/guided-goal 等命令（不记作 Loop 提示）
  *
  * ## 维护
  * - sendContent 校验 session.projectPath === selectedProject.path，这是 cwd 不变量的一环。
@@ -71,7 +72,12 @@ export function useMessageFlow(
     return normalized.includes('plan') || normalized.includes('计划');
   };
 
-  const sendContent = async (rawText: string, attachments: PendingAttachment[]) => {
+  // recordLoopPrompt=false：运行模式状态条发出的 /goal 等命令不能成为 Loop 的重复提示。
+  const sendContent = async (
+    rawText: string,
+    attachments: PendingAttachment[],
+    options: { recordLoopPrompt?: boolean } = {},
+  ) => {
     if (!app.selectedProject) {
       return;
     }
@@ -151,7 +157,7 @@ export function useMessageFlow(
     // 从缓存+草稿覆盖切换到空的 app.acpConfigOptions，导致顶栏选择器短暂显示"模型未加载"。
     app.selectSession(session);
     // Loop 开启时，手动发送的消息成为新的 Loop 提示（暂停状态随之恢复）。
-    loopMode.recordManualPrompt(session.id, text.trim());
+    if (options.recordLoopPrompt !== false) loopMode.recordManualPrompt(session.id, text.trim());
     app.setAgentStatus('运行中');
     app.incrementAgentBusyCount(session.id);
     // 立即在底部插入「正在执行 slash 命令」卡片：仅当用户输入是合法 slash 命令时设置，
@@ -281,10 +287,15 @@ export function useMessageFlow(
     handleAttachAttachment(file);
   };
 
+  // 由运行模式状态条调用：以 slash 命令驱动 omp 的 Goal 操作（暂停 / 继续 / 放弃 / 引导设定）。
+  const sendRunModeCommand = (command: string) =>
+    sendContent(command, [], { recordLoopPrompt: false });
+
   return {
     handleSubmit,
     handleCancelTurn,
     handleSelectFile,
     handlePaste,
+    sendRunModeCommand,
   };
 }

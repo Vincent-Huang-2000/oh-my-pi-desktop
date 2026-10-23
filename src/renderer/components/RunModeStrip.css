@@ -40,9 +40,16 @@
   white-space: nowrap;
 }
 
+/* 操作按钮整体靠右；多个按钮并排时保持紧凑间距。 */
+.run-mode-strip-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+}
+
 .run-mode-strip-action {
   flex: none;
-  margin-left: auto;
   padding: 2px 8px;
   border: 0;
   border-radius: var(--radius-sm);
