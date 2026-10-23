@@ -3,6 +3,37 @@ import type { AgentEvent } from '../../electron/types.js';
 import { mergeAgentEventIntoMessages } from './messageMerge.js';
 
 describe('ACP 后台任务', () => {
+  it.each(['completed', 'failed'] as const)(
+    '历史重放保留工具的 %s 结果，不把旧 running 快照恢复为实时任务',
+    (status) => {
+      const messages = mergeAgentEventIntoMessages([], {
+        sessionId: 's1',
+        type: 'tool_call',
+        message: 'Historical bash',
+        payload: {
+          _replay: true,
+          update: {
+            toolCallId: 'history-bg',
+            status,
+            rawOutput: { details: { async: { state: 'running' } } },
+            content: [{ type: 'content', content: { type: 'text', text: '历史输出' } }],
+          },
+        },
+      });
+      const ended = mergeAgentEventIntoMessages(messages, {
+        sessionId: 's1',
+        type: 'done',
+        message: 'done',
+        payload: { stopReason: 'end_turn' },
+      });
+      expect(ended[0]).toMatchObject({
+        toolStatus: status,
+        toolBackground: false,
+        toolOutput: '历史输出',
+      });
+    },
+  );
+
   it('回合结束后后台工具继续运行并接收最终输出，保留工具标题', () => {
     let messages = mergeAgentEventIntoMessages([], {
       sessionId: 's1',
@@ -76,6 +107,25 @@ describe('ACP 后台任务', () => {
       message: 'Process closed',
     });
     expect(closed.map((message) => message.toolStatus)).toEqual(['failed', 'failed']);
+  });
+
+  it.each<AgentEvent>([
+    { sessionId: 's1', type: 'done', message: 'cancelled', payload: { stopReason: 'cancelled' } },
+    { sessionId: 's1', type: 'error', message: '回合失败', settlesPrompt: true },
+  ])('取消或错误仍收敛后台工具：$message', (event) => {
+    const messages = mergeAgentEventIntoMessages([], {
+      sessionId: 's1',
+      type: 'tool_call',
+      message: 'Background bash',
+      payload: {
+        update: {
+          toolCallId: 'bg',
+          status: 'completed',
+          rawOutput: { details: { async: { state: 'running' } } },
+        },
+      },
+    });
+    expect(mergeAgentEventIntoMessages(messages, event)[0].toolStatus).toBe('failed');
   });
 });
 

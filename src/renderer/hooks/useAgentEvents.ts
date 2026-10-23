@@ -527,7 +527,12 @@ export function useAgentEvents(
         if (app.selectedSessionRef.current?.id === event.sessionId) {
           app.setPermissionRequest(permissions[0] ?? null);
           app.setElicitationRequest(elicitations[0] ?? null);
-          app.setQuestionnaireRequest(questionnaires[0] ?? null);
+          // 用户可切到非队首问卷；其它请求撤销时保留当前表单，避免卸载后丢失未提交答案。
+          app.setQuestionnaireRequest((current) =>
+            current && questionnaires.some((request) => request.requestId === current.requestId)
+              ? current
+              : (questionnaires[0] ?? null),
+          );
           if (!permissions.length && !elicitations.length && !questionnaires.length)
             app.setAgentStatus(event.message);
         }

@@ -826,6 +826,55 @@ describe('P1 方案审核与新会话接续', () => {
       events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
     ).toMatchObject({ review, ready: true });
   });
+  it('重开方案执行成功时发出正常回合结束标记，供后台工具继续接收更新', async () => {
+    const { service, record, events, update } = await setup();
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/prompt').id,
+      result: { stopReason: 'end_turn' },
+    });
+    await Promise.resolve();
+    const reopening = service.reopenPlanReview('s1', '/tmp/test-workspace');
+    await vi.waitFor(() => expect(requestOf(record, 'omp.planReview/reopen')).toBeDefined());
+    update({ sessionUpdate: 'plan_review_update', review });
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'omp.planReview/reopen').id,
+      result: { ok: true },
+    });
+    await reopening;
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' }),
+    ).toMatchObject({ ok: true });
+    update({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'bg',
+      status: 'completed',
+      rawOutput: { details: { async: { state: 'running' } } },
+    });
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'omp.planReview/action').id,
+      result: { ok: true },
+    });
+    await Promise.resolve();
+    expect(events.at(-1)).toMatchObject({
+      type: 'done',
+      message: '方案操作已完成',
+      payload: { stopReason: 'end_turn' },
+    });
+    expect(events.filter((event) => event.type === 'done')).toHaveLength(2);
+    update({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'bg',
+      status: 'completed',
+      rawOutput: { details: { async: { state: 'completed' } } },
+    });
+    expect(events.at(-1)).toMatchObject({
+      type: 'tool_call',
+      payload: { update: { toolCallId: 'bg', status: 'completed' } },
+    });
+  });
   it('规划模式退出后，迟到的 action 失败回复不能恢复已经关闭的审核', async () => {
     const { service, record, events, update } = await setup();
     emitAcpMessage(record, {

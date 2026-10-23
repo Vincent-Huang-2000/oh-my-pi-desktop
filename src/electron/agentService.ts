@@ -1678,6 +1678,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           sessionId,
           type: ok ? 'done' : 'error',
           message: ok ? '方案操作已完成' : '方案操作未完成，请重新打开审核后重试',
+          // 审核 action 成功与 prompt 正常结束语义一致，后台工具仍可继续推送结果。
+          payload: ok ? { stopReason: 'end_turn' } : undefined,
           settlesPrompt: true,
         });
       },

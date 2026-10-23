@@ -407,8 +407,9 @@ export const getPayloadToolCall = (payload: unknown) => {
   const rawOutput = u.rawOutput as { details?: { async?: { state?: unknown } } } | undefined;
   const jobState = rawOutput?.details?.async?.state;
   if (jobState === 'running') {
-    def.background = true;
-    def.status = 'in_progress';
+    // 重放的是工具当时返回的快照，不代表旧进程中的后台任务仍存活；保留历史调用结果。
+    def.background = record._replay !== true;
+    if (def.background) def.status = 'in_progress';
   } else if (jobState === 'completed' || jobState === 'failed' || jobState === 'cancelled') {
     def.background = false;
   }
