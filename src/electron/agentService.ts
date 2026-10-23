@@ -488,6 +488,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         if (process.planReviewRequestId) pendingElicitations.delete(process.planReviewRequestId);
         process.planReview = undefined;
         process.planReviewRequestId = undefined;
+        process.planReviewReady = false;
       } else {
         const review = parsePlanReview(update.review);
         if (!review) return [];
@@ -1616,6 +1617,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
           !ok &&
           !process.closed &&
           process.acpSessionId === actionSessionId &&
+          process.planReviewReady === true &&
           !process.planReview
         ) {
           process.planReview = review;

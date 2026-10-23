@@ -616,6 +616,45 @@ describe('P1 方案审核与新会话接续', () => {
       events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
     ).toMatchObject({ review, ready: true });
   });
+  it('规划模式退出后，迟到的 action 失败回复不能恢复已经关闭的审核', async () => {
+    const { service, record, events, update } = await setup();
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'session/prompt').id,
+      result: { stopReason: 'end_turn' },
+    });
+    await Promise.resolve();
+    const reopening = service.reopenPlanReview('s1', '/tmp/test-workspace');
+    await vi.waitFor(() => expect(requestOf(record, 'omp.planReview/reopen')).toBeDefined());
+    update({ sessionUpdate: 'plan_review_update', review });
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: requestOf(record, 'omp.planReview/reopen').id,
+      result: { ok: true },
+    });
+    await reopening;
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' }),
+    ).toMatchObject({
+      ok: true,
+    });
+    const action = requestOf(record, 'omp.planReview/action');
+    update({ sessionUpdate: 'current_mode_update', currentModeId: 'default' });
+    update({ sessionUpdate: 'plan_review_update', review: null });
+    emitAcpMessage(record, { jsonrpc: '2.0', id: action.id, result: { ok: false } });
+    await Promise.resolve();
+    expect(
+      events.filter((event) => event.type === 'plan_review_update').at(-1)?.payload,
+    ).toMatchObject({
+      review: null,
+      ready: false,
+    });
+    expect(
+      await service.respondPlanReview('s1', review.reviewId, { decision: 'keep' }),
+    ).toMatchObject({
+      ok: false,
+    });
+  });
   it('切回运行中的会话不重新加载、不打断待审核表单', async () => {
     const { service, record, events, update, form } = await setup();
     update({ sessionUpdate: 'plan_review_update', review });
