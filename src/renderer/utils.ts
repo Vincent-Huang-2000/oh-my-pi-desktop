@@ -298,7 +298,7 @@ export const getPayloadAvailableCommands = (payload: unknown): AcpAvailableComma
     return [];
   }
   return record.commands
-    .map((item) => {
+    .map((item): AcpAvailableCommand | null => {
       if (!item || typeof item !== 'object') {
         return null;
       }
@@ -306,9 +306,18 @@ export const getPayloadAvailableCommands = (payload: unknown): AcpAvailableComma
       if (typeof obj.name !== 'string') {
         return null;
       }
+      const input = obj.input as Record<string, unknown> | null | undefined;
       return {
         name: obj.name,
         description: typeof obj.description === 'string' ? obj.description : '',
+        ...(input === null
+          ? { input: null }
+          : input &&
+              typeof input === 'object' &&
+              !Array.isArray(input) &&
+              typeof input.hint === 'string'
+            ? { input: { hint: input.hint } }
+            : {}),
       } satisfies AcpAvailableCommand;
     })
     .filter((command): command is AcpAvailableCommand => command !== null);

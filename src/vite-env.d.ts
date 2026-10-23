@@ -136,6 +136,7 @@ type AcpConfigOption = {
 type AcpAvailableCommand = {
   name: string;
   description: string;
+  input?: { hint: string } | null;
 };
 
 type StoredProjectConfigCache = {

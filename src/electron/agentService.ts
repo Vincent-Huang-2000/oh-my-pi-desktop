@@ -266,7 +266,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
   };
 
-  // 把 ACP `available_commands_update` 通知归一化：仅保留 name/description。
+  // 把 ACP `available_commands_update` 通知归一化：保留名称、描述及合法的参数提示。
   const normalizeAvailableCommands = (value: unknown): AcpAvailableCommand[] => {
     if (!Array.isArray(value)) {
       return [];
@@ -279,6 +279,13 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         {
           name: item.name,
           description: typeof item.description === 'string' ? item.description : '',
+          ...(item.input === null
+            ? { input: null }
+            : isRecord(item.input) &&
+                !Array.isArray(item.input) &&
+                typeof item.input.hint === 'string'
+              ? { input: { hint: item.input.hint } }
+              : {}),
         },
       ];
     });

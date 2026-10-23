@@ -90,6 +90,7 @@ export type AgentEvent = {
 export type AcpAvailableCommand = {
   name: string;
   description: string;
+  input?: { hint: string } | null;
 };
 
 export type StoredProjectConfigCache = {

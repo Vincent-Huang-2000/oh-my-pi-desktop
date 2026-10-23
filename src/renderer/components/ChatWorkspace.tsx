@@ -1516,7 +1516,16 @@ export function ChatWorkspace({
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => insertCommand(command.name)}
                       >
-                        <span className="command-palette-name">/{command.name}</span>
+                        <span className="command-palette-name">
+                          /{command.name}
+                          {typeof command.input?.hint === 'string' &&
+                            command.input.hint.trim().length > 0 && (
+                              <>
+                                {' '}
+                                <span className="command-palette-hint">{command.input.hint}</span>
+                              </>
+                            )}
+                        </span>
                         {command.description && (
                           <span className="command-palette-desc">{command.description}</span>
                         )}
