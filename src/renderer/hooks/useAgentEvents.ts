@@ -52,7 +52,7 @@ import {
   getHistoryLoadedPlans,
   insertHistoricalPlans,
 } from '../lib/historyLoaders';
-import { mergeAgentEventIntoMessages } from '../lib/messageMerge';
+import { mergeAgentEventIntoMessages, PLAN_PREVIEW_LOADING_TEXT } from '../lib/messageMerge';
 import { type ReviewSource } from '../lib/constants';
 import { useAppCore } from './useAppCore';
 import { useToolGroups } from './useToolGroups';
@@ -296,7 +296,7 @@ export function useAgentEvents(
               {
                 id: `plan-preview-${req.requestId}`,
                 role: 'plan' as const,
-                text: '正在加载完整方案…',
+                text: PLAN_PREVIEW_LOADING_TEXT,
                 planContentType: 'markdown' as const,
                 planPreview: true,
                 planPreviewRequestId: req.requestId,
@@ -537,6 +537,18 @@ export function useAgentEvents(
             app.setAgentStatus(event.message);
         }
         cacheMessages((current) => mergeAgentEventIntoMessages(current, event));
+        return;
+      }
+
+      // 进程结束只收敛已有消息中的后台工具：不改回合计数和状态栏；
+      // 临时 list/config 进程及未打开过的 session 没有消息缓存，直接忽略，避免新建空缓存。
+      if (event.type === 'process_stopped') {
+        if (
+          app.selectedSessionRef.current?.id === event.sessionId ||
+          app.messageCache.current[event.sessionId]
+        ) {
+          cacheMessages((current) => mergeAgentEventIntoMessages(current, event));
+        }
         return;
       }
 

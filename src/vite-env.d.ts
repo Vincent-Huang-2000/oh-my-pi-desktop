@@ -105,7 +105,8 @@ type AgentEvent = {
     | 'history_loaded'
     | 'plan_review_update'
     | 'session_replaced'
-    | 'plan_review_action_started';
+    | 'plan_review_action_started'
+    | 'process_stopped';
   message: string;
   payload?: unknown;
   /** 标记此事件结算了一个 in-flight prompt。 */

@@ -41,7 +41,8 @@ type AgentEvent = {
     | 'history_loaded'
     | 'plan_review_update'
     | 'session_replaced'
-    | 'plan_review_action_started';
+    | 'plan_review_action_started'
+    | 'process_stopped';
   message: string;
   payload?: unknown;
   settlesPrompt?: boolean;

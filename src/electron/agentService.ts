@@ -196,6 +196,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
   };
 
+  // 后台任务随子进程结束；静默停止不会再收到其终态，需通知渲染层收敛仍在运行的后台工具卡片。
+  // 直接发送不写日志：临时 list/config 进程也会经过这里，避免挤占 120 条日志上限。
+  const emitProcessStopped = (process: AcpProcessState) => {
+    sendAgentEvent({
+      sessionId: process.localSessionId,
+      type: 'process_stopped',
+      message: 'agent 进程已停止',
+    });
+  };
+
   const isReplayMessageEvent = (event: AgentEvent) =>
     event.type === 'user_message' ||
     event.type === 'output' ||
@@ -1086,6 +1096,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
         type: code === 0 ? 'done' : 'error',
         message,
       });
+      // 非零退出的 error 不结算 prompt，渲染层不会据此收敛后台工具，这里补发进程结束。
+      emitProcessStopped(process);
     });
   };
 
@@ -1747,6 +1759,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     processState.questionnaireFollowUps = [];
     clearPendingPermissionsForProcess(processState);
     clearPendingElicitationsForProcess(processState);
+    // 必须在重启/恢复前同步发出，避免误收敛新进程中的工具。
+    emitProcessStopped(processState);
   };
 
   // 拉取 agent 在指定 workspace 下保存的所有 session（ACP session/list）。
@@ -2016,6 +2030,7 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     processState.questionnaireFollowUps = [];
     clearPendingPermissionsForProcess(processState);
     clearPendingElicitationsForProcess(processState);
+    emitProcessStopped(processState);
     return { ok: true };
   };
 

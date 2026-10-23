@@ -8,7 +8,9 @@
  * - plan / plan_update → 按 planId 替换旧 plan 消息，同时清理 planPending
  *   占位、planPreview 预览卡、旧协议无 id 的 items 列表（详见 plan 分支注释）
  * - elicitation → 按 requestId 原地更新审批结果
+ * - request_cancelled → 标记被撤销的输入记录，结束对应方案预览
  * - done / error → 清理未收到正式 plan 的占位卡，收敛未终结的工具卡
+ * - process_stopped → 收敛随进程结束的后台工具卡
  *
  * 注意：本函数只做“我知道谁替换谁”的精确去重（planId 相同 / pending→正式 /
  * preview→正式）。它不负责“同类型多条消息只保留最后一条”的去重——那是
@@ -24,10 +26,26 @@ import {
   getMessageRole,
   getPayloadMessageId,
   getPayloadPlanChange,
+  getPayloadRequestId,
   getPayloadToolCall,
 } from '../utils';
 
 // 主进程已按 xd://propose 的 rawInput/xdev envelope 标记方案提交；渲染层不再从工具标题猜测。
+
+// 方案审批预览在完整方案读取完成前的占位文本；撤销时据此区分"未加载"与"已有正文"。
+export const PLAN_PREVIEW_LOADING_TEXT = '正在加载完整方案…';
+
+const isUnresolvedTool = (message: ChatMessage) =>
+  message.role === 'tool' &&
+  (message.toolStatus === undefined ||
+    message.toolStatus === 'pending' ||
+    message.toolStatus === 'in_progress');
+
+const settleTool = (message: ChatMessage, result: string): ChatMessage => ({
+  ...message,
+  toolStatus: 'failed',
+  toolOutput: message.toolOutput ? `${message.toolOutput}\n\n${result}` : result,
+});
 
 export const mergeAgentEventIntoMessages = (
   current: ChatMessage[],
@@ -38,14 +56,26 @@ export const mergeAgentEventIntoMessages = (
   const role = getMessageRole(event.type);
 
   if (event.type === 'request_cancelled') {
-    const payload = event.payload as { requestId?: unknown } | undefined;
-    return current.map((message) =>
-      typeof payload?.requestId === 'string' &&
-      message.elicitationRequestId === payload.requestId &&
-      (message.elicitationStatus === 'pending' || message.elicitationStatus === 'submitting')
-        ? { ...message, elicitationStatus: 'cancelled', elicitationResult: '已取消' }
-        : message,
-    );
+    const requestId = getPayloadRequestId(event.payload);
+    if (!requestId) return current;
+    return current.flatMap((message) => {
+      if (
+        message.elicitationRequestId === requestId &&
+        (message.elicitationStatus === 'pending' || message.elicitationStatus === 'submitting')
+      ) {
+        return [
+          { ...message, elicitationStatus: 'cancelled' as const, elicitationResult: '已取消' },
+        ];
+      }
+      // 撤销后方案不再待确认：已有正文的预览保留为普通方案文档，仍在加载的占位卡直接移除
+      // （主进程不会再为已撤销的请求补发完整方案）。
+      if (message.planPreview && message.planPreviewRequestId === requestId) {
+        return message.text === PLAN_PREVIEW_LOADING_TEXT
+          ? []
+          : [{ ...message, planPreview: false, planPreviewRequestId: undefined }];
+      }
+      return [message];
+    });
   }
 
   /* 流式文本合并：回答、思考与用户消息按 messageId + role 分别累积，
@@ -180,6 +210,16 @@ export const mergeAgentEventIntoMessages = (
     ];
   }
 
+  /* 后台任务跨回合运行，只随自身终态或 agent 进程结束收敛；进程被静默停止后不会再收到终态。
+     前台工具仍由回合结束收敛，这里不改动。 */
+  if (event.type === 'process_stopped') {
+    return current.map((message) =>
+      message.toolBackground && isUnresolvedTool(message)
+        ? settleTool(message, '后台任务已随 agent 进程停止。')
+        : message,
+    );
+  }
+
   /* Plan 模式占位卡只用于等待正式 plan；回合结束/报错仍未收到 plan 时自动清理。
      同时收敛没有收到 tool_call_update 终态的工具，避免 ACP 取消、进程退出或协议丢包后卡片永久转圈。 */
   if (event.type === 'done' || event.type === 'error') {
@@ -195,24 +235,15 @@ export const mergeAgentEventIntoMessages = (
         : stopReason === 'cancelled'
           ? '工具调用已随当前回合取消。'
           : '回合已结束，但未收到工具调用的完成状态。';
-    const settledMessages = withoutPendingPlan.map((message) => {
-      if (
-        message.role !== 'tool' ||
-        (message.toolBackground && event.type === 'done' && stopReason === 'end_turn') ||
-        (message.toolStatus !== undefined &&
-          message.toolStatus !== 'pending' &&
-          message.toolStatus !== 'in_progress')
-      ) {
-        return message;
-      }
-      return {
-        ...message,
-        toolStatus: 'failed' as const,
-        toolOutput: message.toolOutput
-          ? `${message.toolOutput}\n\n${unresolvedToolResult}`
-          : unresolvedToolResult,
-      };
-    });
+    // 正常结束的回合、未结算 prompt 的错误（如配置切换失败）都不代表后台任务结束；
+    // 进程退出另由 process_stopped 收敛。
+    const keepsBackground =
+      event.type === 'done' ? stopReason === 'end_turn' : !event.settlesPrompt;
+    const settledMessages = withoutPendingPlan.map((message) =>
+      isUnresolvedTool(message) && !(message.toolBackground && keepsBackground)
+        ? settleTool(message, unresolvedToolResult)
+        : message,
+    );
     // 正常 end_turn 和 cancelled 都静默完成：前者状态栏已有"完成"，后者已有 "已请求取消当前回合" 即时反馈。
     // 只有 error 才追加错误消息到对话流。
     if (event.type === 'error') {

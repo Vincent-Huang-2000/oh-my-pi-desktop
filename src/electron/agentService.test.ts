@@ -323,6 +323,34 @@ describe('ACP 请求撤销', () => {
   });
 });
 
+describe('后台任务的进程结束通知', () => {
+  it('静默停止时同步通知进程结束，且不写日志', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    await startInitializedAgent(service, 's1', '/tmp/test-workspace');
+    const logs = [...hoistedMemoryState.logs];
+    service.stopSessionProcess('s1');
+    expect(events.at(-1)).toEqual({
+      sessionId: 's1',
+      type: 'process_stopped',
+      message: 'agent 进程已停止',
+      payload: undefined,
+    });
+    expect(hoistedMemoryState.logs).toEqual(logs);
+    // 已无进程时重复停止不再发出事件。
+    service.stopSessionProcess('s1');
+    expect(events.filter((event) => event.type === 'process_stopped')).toHaveLength(1);
+  });
+
+  it('进程异常退出时先报告错误，再通知进程结束', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const record = await startInitializedAgent(service, 's1', '/tmp/test-workspace');
+    record.child.emit('close', 1);
+    expect(events.slice(-2).map((event) => event.type)).toEqual(['error', 'process_stopped']);
+  });
+});
+
 describe('ACP 双流隔离与诊断日志', () => {
   it('保留结构化 RPC 错误原因，并兼容缺失或非文本 details', async () => {
     const service = createAgentService(makeSender([]));

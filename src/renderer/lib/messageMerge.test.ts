@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentEvent } from '../../electron/types.js';
-import { mergeAgentEventIntoMessages } from './messageMerge.js';
+import type { ChatMessage } from '../types';
+import { mergeAgentEventIntoMessages, PLAN_PREVIEW_LOADING_TEXT } from './messageMerge.js';
 
 describe('ACP 后台任务', () => {
   it.each(['completed', 'failed'] as const)(
@@ -127,6 +128,54 @@ describe('ACP 后台任务', () => {
     });
     expect(mergeAgentEventIntoMessages(messages, event)[0].toolStatus).toBe('failed');
   });
+
+  const withForegroundAndBackground = () =>
+    mergeAgentEventIntoMessages(
+      mergeAgentEventIntoMessages([], {
+        sessionId: 's1',
+        type: 'tool_call',
+        message: 'Foreground',
+        payload: { update: { toolCallId: 'fg', status: 'in_progress' } },
+      }),
+      {
+        sessionId: 's1',
+        type: 'tool_call',
+        message: 'Background',
+        payload: {
+          update: {
+            toolCallId: 'bg',
+            status: 'completed',
+            rawOutput: { details: { async: { state: 'running' } } },
+          },
+        },
+      },
+    );
+
+  it('未结算 prompt 的错误（如配置失败）只收敛前台工具，后台任务继续运行', () => {
+    const messages = mergeAgentEventIntoMessages(withForegroundAndBackground(), {
+      sessionId: 's1',
+      type: 'error',
+      message: '设置 ACP 配置失败',
+    });
+    expect(messages.filter((message) => message.role === 'tool')).toMatchObject([
+      { toolCallId: 'fg', toolStatus: 'failed' },
+      { toolCallId: 'bg', toolStatus: 'in_progress', toolOutput: undefined },
+    ]);
+  });
+
+  it('进程静默停止时只收敛后台任务，不追加消息', () => {
+    const messages = withForegroundAndBackground();
+    const stopped = mergeAgentEventIntoMessages(messages, {
+      sessionId: 's1',
+      type: 'process_stopped',
+      message: 'agent 进程已停止',
+    });
+    expect(stopped).toHaveLength(messages.length);
+    expect(stopped).toMatchObject([
+      { toolCallId: 'fg', toolStatus: 'in_progress' },
+      { toolCallId: 'bg', toolStatus: 'failed', toolOutput: '后台任务已随 agent 进程停止。' },
+    ]);
+  });
 });
 
 describe('ACP 请求撤销记录', () => {
@@ -168,6 +217,33 @@ describe('ACP 请求撤销记录', () => {
       'pending',
     ]);
     expect(messages).toHaveLength(3);
+  });
+
+  it('撤销方案审批后结束对应预览：已有正文转为方案文档，加载占位卡移除', () => {
+    const preview = (id: string, requestId: string, text: string): ChatMessage => ({
+      id,
+      role: 'plan',
+      text,
+      planContentType: 'markdown',
+      planPreview: true,
+      planPreviewRequestId: requestId,
+    });
+    const cancel = (current: ChatMessage[], requestId: string) =>
+      mergeAgentEventIntoMessages(current, {
+        sessionId: 's1',
+        type: 'request_cancelled',
+        message: 'cancelled',
+        payload: { requestId },
+      });
+    const loaded = cancel(
+      [preview('loaded', 'r1', '# Plan'), preview('other', 'r2', '# Other')],
+      'r1',
+    );
+    expect(loaded).toMatchObject([
+      { id: 'loaded', text: '# Plan', planPreview: false, planPreviewRequestId: undefined },
+      { id: 'other', planPreview: true, planPreviewRequestId: 'r2' },
+    ]);
+    expect(cancel([preview('loading', 'r1', PLAN_PREVIEW_LOADING_TEXT)], 'r1')).toEqual([]);
   });
 });
 

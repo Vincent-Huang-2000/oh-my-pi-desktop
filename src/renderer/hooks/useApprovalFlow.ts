@@ -22,6 +22,10 @@ import type { ChatMessage, QuestionnaireAnswer } from '../types';
 import { getElicitationResult, type ElicitationResult } from '../lib/elicitationText';
 import type { useAppCore } from './useAppCore';
 
+// IPC 返回后检查请求是否仍在队列：不在时说明等待期间已被 request_cancelled 撤销。
+const isQueued = (queue: { requestId: string }[] | undefined, requestId: string) =>
+  (queue ?? []).some((request) => request.requestId === requestId);
+
 export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
   // 防止同一 permission request 被并发提交多次（双击 / 快速重试）。
   const pendingPermissionIds = useRef(new Set<string>());
@@ -55,7 +59,10 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     try {
       const result = await window.ohMyPiDesktop.permissionOptionResponse(requestId, optionId);
       if (!result.ok) {
-        app.setAgentStatus('审批失败');
+        // 已被 request_cancelled 移出队列时，撤销处理已推进弹窗和状态栏，不再改报审批失败。
+        if (isQueued(app.permissionBySession.current[sessionId], requestId)) {
+          app.setAgentStatus('审批失败');
+        }
         return;
       }
       const remaining = (app.permissionBySession.current[sessionId] ?? []).filter(
@@ -110,6 +117,8 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
       return next;
     });
     const result = await window.ohMyPiDesktop.elicitationResponse(requestId, action, content);
+    // 等待期间 omp 可能已撤销该请求：撤销处理已移出队列、推进弹窗并把记录标为已取消。
+    const withdrawn = !isQueued(app.elicitationBySession.current[sessionId], requestId);
     const updateElicitationRecord = (
       status: NonNullable<ChatMessage['elicitationStatus']>,
       result: ElicitationResult,
@@ -117,6 +126,7 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
       const updateMessages = (current: ChatMessage[]) =>
         current.map((message) => {
           if (message.elicitationRequestId === requestId) {
+            if (status === 'failed' && message.elicitationStatus === 'cancelled') return message;
             return {
               ...message,
               elicitationStatus: status,
@@ -147,6 +157,7 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     app.elicitationBySession.current[sessionId] = remaining;
     if (!result.ok) {
       updateElicitationRecord('failed', { label: '确认失败：请求已失效' });
+      if (withdrawn) return;
       if (app.selectedSessionRef.current?.id === sessionId) {
         app.setElicitationRequest(remaining[0] ?? null);
         app.setAgentStatus(
@@ -196,7 +207,8 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     ) => {
       const updateMessages = (current: ChatMessage[]) =>
         current.map((message) =>
-          message.elicitationRequestId === requestId
+          message.elicitationRequestId === requestId &&
+          !(status === 'failed' && message.elicitationStatus === 'cancelled')
             ? { ...message, elicitationStatus: status, elicitationResult: resultText }
             : message,
         );
@@ -220,6 +232,8 @@ export function useApprovalFlow(app: ReturnType<typeof useAppCore>) {
     if (!result.ok) {
       if (result.reason === 'stale') {
         updateRecord('failed', '问卷请求已失效');
+        // 已被撤销处理移出队列并推进到下一份问卷时，不再重复推进或改写状态栏。
+        if (!isQueued(app.questionnaireBySession.current[sessionId], requestId)) return false;
         advanceToNextQuestionnaire(requestId, sessionId);
         if (app.selectedSessionRef.current?.id === sessionId) {
           const next = app.questionnaireBySession.current[sessionId]?.[0];
