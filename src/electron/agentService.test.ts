@@ -170,7 +170,9 @@ vi.mock('./state.js', () => {
       ];
       return { ...session };
     },
-    addLog: () => {},
+    addLog: (sessionId: string, level: string, message: string) => {
+      s.logs.push({ sessionId, level, message });
+    },
     removeSession: (id: string) => {
       s.recentSessions = s.recentSessions.filter((item: MemorySession) => item.id !== id);
     },
@@ -257,6 +259,127 @@ const startInitializedAgent = async (
   await starting;
   return record;
 };
+
+describe('ACP 双流隔离与诊断日志', () => {
+  it('stdout 半帧与 stderr 交错时仍能完成初始化', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const starting = service.startAgent('s1', '/tmp/test-workspace', 'write');
+    const record = hoistedSpawns[0];
+    const request = JSON.parse(record.stdinWrites[0]) as { id: number };
+    const response = JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} });
+    const split = '{"jsonrpc":"2.0",'.length;
+    record.stdout.emit('data', Buffer.from(response.slice(0, split)));
+    record.stderr.emit('data', Buffer.from('extension log\n'));
+    record.stdout.emit('data', Buffer.from(`${response.slice(split)}\n`));
+
+    expect((await starting).ok).toBe(true);
+    expect(events.filter((event) => ['output', 'error'].includes(event.type))).toEqual([]);
+    expect(hoistedMemoryState.logs.filter((log) => log.message.includes('extension'))).toEqual([
+      { sessionId: 's1', level: 'info', message: '[stderr] extension log' },
+    ]);
+    service.stopAll();
+  });
+
+  it('stderr 残行不混入 stdout，多行诊断和空白不产生业务事件', async () => {
+    const events: EmittedEvent[] = [];
+    const sender = makeSender(events);
+    const service = createAgentService(sender);
+    const starting = service.startAgent('s1', '/tmp/test-workspace', 'write');
+    const record = hoistedSpawns[0];
+    const request = JSON.parse(record.stdinWrites[0]) as { id: number };
+    record.stderr.emit('data', Buffer.from('extension '));
+    emitAcpMessage(record, { jsonrpc: '2.0', id: request.id, result: {} });
+    expect((await starting).ok).toBe(true);
+    const baseline = sender.mock.calls.length;
+    record.stderr.emit('data', Buffer.from('log\r\n\n  \r\nError: extension diagnostic\nnext\n'));
+
+    expect(sender).toHaveBeenCalledTimes(baseline);
+    expect(events.filter((event) => ['output', 'error'].includes(event.type))).toEqual([]);
+    expect(hoistedMemoryState.logs.filter((log) => log.message.startsWith('[stderr]'))).toEqual([
+      { sessionId: 's1', level: 'info', message: '[stderr] extension log' },
+      { sessionId: 's1', level: 'info', message: '[stderr] Error: extension diagnostic' },
+      { sessionId: 's1', level: 'info', message: '[stderr] next' },
+    ]);
+    service.stopAll();
+  });
+
+  it('关闭时分别冲刷两条无换行尾行，响应先于 pending 拒绝处理', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const starting = service.startAgent('s1', '/tmp/test-workspace', 'write');
+    const record = hoistedSpawns[0];
+    const request = JSON.parse(record.stdinWrites[0]) as { id: number };
+    record.stdout.emit(
+      'data',
+      Buffer.from(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: {} })),
+    );
+    record.stderr.emit('data', Buffer.from('extension tail'));
+    record.child.emit('close', 0);
+
+    expect((await starting).ok).toBe(true);
+    expect(events.filter((event) => ['output', 'error'].includes(event.type))).toEqual([]);
+    expect(hoistedMemoryState.logs.filter((log) => log.message.includes('extension'))).toEqual([
+      { sessionId: 's1', level: 'info', message: '[stderr] extension tail' },
+    ]);
+  });
+
+  it('停止后的旧进程残行及后到数据不泄漏事件或诊断', async () => {
+    const events: EmittedEvent[] = [];
+    const sender = makeSender(events);
+    const service = createAgentService(sender);
+    const record = await startInitializedAgent(service, 's1', '/tmp/test-workspace');
+    record.stdout.emit('data', Buffer.from('old stdout'));
+    record.stderr.emit('data', Buffer.from('old stderr'));
+    service.stopSessionProcess('s1');
+    const eventCount = sender.mock.calls.length;
+    const logs = [...hoistedMemoryState.logs];
+    record.stdout.emit('data', Buffer.from(' late\n'));
+    record.stderr.emit('data', Buffer.from(' late\n'));
+    record.child.emit('close', 0);
+
+    expect(sender).toHaveBeenCalledTimes(eventCount);
+    expect(hoistedMemoryState.logs).toEqual(logs);
+    expect(record.child.kill).toHaveBeenCalledOnce();
+  });
+
+  it('合法 JSON-RPC error 仍使初始化失败并发出业务错误', async () => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const starting = service.startAgent('s1', '/tmp/test-workspace', 'write');
+    const record = hoistedSpawns[0];
+    const request = JSON.parse(record.stdinWrites[0]) as { id: number };
+    emitAcpMessage(record, {
+      jsonrpc: '2.0',
+      id: request.id,
+      error: { code: -32603, message: 'initialize failed' },
+    });
+
+    expect((await starting).ok).toBe(false);
+    expect(events).toContainEqual(
+      expect.objectContaining({ sessionId: 's1', type: 'error', message: 'initialize failed' }),
+    );
+  });
+
+  it.each(['error', 'close'] as const)('进程 %s 仍报告真实失败', async (kind) => {
+    const events: EmittedEvent[] = [];
+    const service = createAgentService(makeSender(events));
+    const record = await startInitializedAgent(service, 's1', '/tmp/test-workspace');
+    if (kind === 'error') {
+      record.child.emit('error', new Error('child failed'));
+    } else {
+      record.child.emit('close', 1);
+    }
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        sessionId: 's1',
+        type: 'error',
+        message: kind === 'error' ? 'child failed' : 'agent 已退出，代码 1',
+      }),
+    );
+    service.stopAll();
+  });
+});
 
 // ── 1. FIFO 排队测试 ──
 

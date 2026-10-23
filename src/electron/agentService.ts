@@ -726,9 +726,10 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     sendErrorResponse(process, message.id, -32601, `未支持的 ACP client 方法：${message.method}`);
   };
 
-  const handleLine = (process: AcpProcessState, line: string, isError = false) => {
-    if (isError) {
-      emitEvent({ sessionId: process.localSessionId, type: 'error', message: line });
+  const handleLine = (process: AcpProcessState, line: string, isStderr = false) => {
+    if (isStderr) {
+      // stderr 只记录诊断，不能仅凭输出来源判定业务失败。
+      addLog(process.localSessionId, 'info', `[stderr] ${line}`);
       return;
     }
 
@@ -761,15 +762,17 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
     });
   };
 
-  const handleChunk = (process: AcpProcessState, chunk: Buffer, isError = false) => {
-    process.lineBuffer += chunk.toString();
-    const lines = process.lineBuffer.split(/\r?\n/);
-    process.lineBuffer = lines.pop() ?? '';
+  const handleChunk = (process: AcpProcessState, chunk: Buffer, isStderr = false) => {
+    // 两条独立流可能交错到达，不能共享未完成的残行。
+    const bufferKey = isStderr ? 'stderrLineBuffer' : 'stdoutLineBuffer';
+    process[bufferKey] += chunk.toString();
+    const lines = process[bufferKey].split(/\r?\n/);
+    process[bufferKey] = lines.pop() ?? '';
 
     lines
       .map((line) => line.trim())
       .filter(Boolean)
-      .forEach((line) => handleLine(process, line, isError));
+      .forEach((line) => handleLine(process, line, isStderr));
   };
 
   const initializeAcp = async (process: AcpProcessState) => {
@@ -1022,10 +1025,16 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       process.questionnaireFollowUps = [];
       clearPendingPermissionsForProcess(process);
       clearPendingElicitationsForProcess(process);
-      if (!process.suppressCloseEvent && process.lineBuffer.trim()) {
-        handleLine(process, process.lineBuffer.trim());
-        process.lineBuffer = '';
+      if (!process.suppressCloseEvent) {
+        if (process.stdoutLineBuffer.trim()) {
+          handleLine(process, process.stdoutLineBuffer.trim());
+        }
+        if (process.stderrLineBuffer.trim()) {
+          handleLine(process, process.stderrLineBuffer.trim(), true);
+        }
       }
+      process.stdoutLineBuffer = '';
+      process.stderrLineBuffer = '';
       process.pendingRequests.forEach((pending) => pending.reject(new Error('ACP 进程已退出')));
       process.pendingRequests.clear();
       if (process.suppressCloseEvent) {
@@ -1062,7 +1071,8 @@ export const createAgentService = (sendAgentEvent: AgentEventSender): AgentServi
       localSessionId: sessionId,
       localSessionTitle: storedSession?.title ?? '新的 agent 会话',
       workspacePath,
-      lineBuffer: '',
+      stdoutLineBuffer: '',
+      stderrLineBuffer: '',
       nextRequestId: 1,
       pendingRequests: new Map(),
       ready: Promise.resolve(),

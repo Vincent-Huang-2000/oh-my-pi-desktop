@@ -73,7 +73,8 @@ export type AcpProcessState = {
   localSessionId: string;
   localSessionTitle: string;
   workspacePath: string;
-  lineBuffer: string;
+  stdoutLineBuffer: string;
+  stderrLineBuffer: string;
   nextRequestId: number;
   pendingRequests: Map<JsonRpcId, PendingRequest>;
   ready: Promise<void>;
