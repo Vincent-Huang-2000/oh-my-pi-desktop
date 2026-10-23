@@ -383,8 +383,8 @@ describe('ACP 双流隔离与诊断日志', () => {
 
 // ── 1. FIFO 排队测试 ──
 
-describe('updateApprovalProfile FIFO 与代际跳过', () => {
-  it('第二次切换档位时，第一次的 stop/start 被代际跳过，仅第二次执行进程重建', async () => {
+describe('updateApprovalProfile FIFO 与延迟生效', () => {
+  it('连续两次切换按请求顺序保存，未发送消息时不启动进程', async () => {
     const events: EmittedEvent[] = [];
     const svc = createAgentService(makeSender(events));
 
@@ -399,32 +399,22 @@ describe('updateApprovalProfile FIFO 与代际跳过', () => {
       },
     ];
 
-    // p1 被 p2 抢先递增 generation → 跳过了 stop/start
+    // 切换只保存档位，实际应用统一由下次发送消息触发。
     const p1 = svc.updateApprovalProfile('s1', '/tmp/test-workspace', 'always-ask');
     const p2 = svc.updateApprovalProfile('s1', '/tmp/test-workspace', 'yolo');
 
-    // p1 跳过 stop/start → 没有 spawn，直接返回
     const r1 = await p1;
-    expect(r1.ok).toBe(true);
-    expect(hoistedSpawns.length).toBe(0);
-
-    // p2 执行 stop/start → spawn child
-    await new Promise((r) => setTimeout(r, 0));
-    expect(hoistedSpawns.length).toBe(1);
-
-    // 让 p2 的 child 完成
-    const rec = hoistedSpawns[0];
-    rec.child.emit('close', 0);
-    await new Promise((r) => setTimeout(r, 0));
-
-    await p2;
+    const r2 = await p2;
+    expect(r1).toMatchObject({ ok: true, session: { approvalProfile: 'always-ask' } });
+    expect(r2).toMatchObject({ ok: true, session: { approvalProfile: 'yolo' } });
+    expect(hoistedSpawns).toHaveLength(0);
 
     // 最终持久化档位为 yolo（最后一次请求的值）
     const final = hoistedMemoryState.recentSessions.find((s) => s.id === 's1');
     expect(final?.approvalProfile).toBe('yolo');
   });
 
-  it('连续三次切换档位，前两次的 stop/start 均被跳过', async () => {
+  it('连续三次切换均返回各自保存的档位，最终保存最后一次选择', async () => {
     const events: EmittedEvent[] = [];
     const svc = createAgentService(makeSender(events));
 
@@ -443,22 +433,13 @@ describe('updateApprovalProfile FIFO 与代际跳过', () => {
     const p2 = svc.updateApprovalProfile('s1', '/tmp/test-workspace', 'write');
     const p3 = svc.updateApprovalProfile('s1', '/tmp/test-workspace', 'yolo');
 
-    // p1 跳过、p2 也跳过 — 均无 spawn
     const r1 = await p1;
-    expect(r1.ok).toBe(true);
     const r2 = await p2;
-    expect(r2.ok).toBe(true);
-    expect(hoistedSpawns.length).toBe(0);
-
-    // p3 执行 stop/start
-    await new Promise((r) => setTimeout(r, 0));
-    expect(hoistedSpawns.length).toBe(1);
-
-    const rec = hoistedSpawns[0];
-    rec.child.emit('close', 0);
-    await new Promise((r) => setTimeout(r, 0));
-
-    await p3;
+    const r3 = await p3;
+    expect(r1).toMatchObject({ ok: true, session: { approvalProfile: 'always-ask' } });
+    expect(r2).toMatchObject({ ok: true, session: { approvalProfile: 'write' } });
+    expect(r3).toMatchObject({ ok: true, session: { approvalProfile: 'yolo' } });
+    expect(hoistedSpawns).toHaveLength(0);
 
     const final = hoistedMemoryState.recentSessions.find((s) => s.id === 's1');
     expect(final?.approvalProfile).toBe('yolo');
