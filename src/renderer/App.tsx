@@ -230,10 +230,10 @@ export default function App() {
             ) : undefined
           }
           planReviewControls={
-            app.selectedSession && planReview.view?.supported ? (
+            app.selectedSession && planReview.view?.review ? (
               <div className="plan-review-entry">
                 <button type="button" onClick={() => void planReview.open()}>
-                  {planReview.view.review ? '继续审核方案' : '审核方案'}
+                  继续审核方案
                 </button>
                 {planReview.notice && <span role="status">{planReview.notice}</span>}
               </div>
